@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- fontawesome -->
+    <script src="https://kit.fontawesome.com/d57fcc156f.js" crossorigin="anonymous"></script>
+    <title>CERMS - Register</title>
+  </head>
+  <body>
+    <br>
+    <div class="container">
+      <h1 id="welcomeMsg">Register</h1>
+      <p id="welcomeMsg2">Open or close a register.</p>
+    </div>
+    <div class="container">
+      <div class="" role="alert" id="errorMsg">
+      </div>
+      <ul class="nav justify-content-end">
+        <li class="nav-item">
+          <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+              Options
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+              <div class="container">
+                <div class="btn-group-vertical">
+                  <a class="btn btn-primary" href="account.html" role="button">Account</a>
+                  <a class="btn btn-primary" href="products.html" role="button">Products</a>
+                </div>
+                <hr>
+                <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
+              </div>
+            </ul>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <hr>
+    <div class="container">
+      <div class="" role="alert" id="errorMsg">
+      </div>
+    </div>
+    <div class="container">
+      <a class="btn btn-primary" href="home.html" role="button">Home</a>
+      <a class="btn btn-primary" href="members.html" role="button">Members</a>
+      <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
+      <button disabled class="btn btn-secondary">Register</button>
+      <a class="btn btn-primary" href="history.html" role="button">History</a>
+      <a class="btn btn-primary" href="analytics.html" role="button">Analytics</a>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
+      data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Close Register</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>You are closing a register. Would you also like to logout?</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="endingSubmitLogoutBtn" class="btn btn-danger" data-bs-dismiss="modal">Close + Log Out</button>
+            <button type="button" id="endingSubmitBtn" class="btn btn-primary" data-bs-dismiss="modal">Just Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <br>
+
+    <div class="container">
+      <button class="btn btn-success" type="button" name="button" id="personalRegOpen">Open Personal Register</button>
+      <button class="btn btn-danger" type="button" name="button" id="personalRegClose">Close Personal Register</button>
+      <button class="btn btn-success" type="button" name="button" id="personalRegDrop">Create Money Drop</button>
+    </div>
+    <br>
+    <br>
+    <div class="container" id="startingAmtContainer">
+      <p>Starting Register Amount</p>
+      <input id="startingAmt" class="form-control" type="number" name="" value="0">
+      <br>
+      <p>Select shift working</p>
+      <select class="form-control" id="startingShift">
+        <option value="">---</option>
+        <option value="b">7am - 3pm</option>
+        <option value="c">3pm - 11pm</option>
+        <option value="a">11pm - 7am</option>
+        <option value="d">No shift assigned</option>
+      </select>
+      <br>
+      <button class="btn btn-success" type="button" name="button" id="startingSubmitBtn">Submit</button>
+    </div>
+
+    <div class="container" id="endingAmtContainer">
+      <h3>Close Register</h3>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon1">$100 x </span>
+        <input id="input100" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon1">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon2">$50 x </span>
+        <input id="input50" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon2">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon3">$20 x </span>
+        <input id="input20" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon3">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon4">$10 x </span>
+        <input id="input10" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon4">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon5">$5 x </span>
+        <input id="input5" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon5">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon6">$1 x </span>
+        <input id="input1" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon6">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon7">$0.25 x </span>
+        <input id="input25c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon7">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon8">$0.10 x </span>
+        <input id="input10c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon8">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon9">$0.05 x </span>
+        <input id="input5c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon9">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon10">$0.01 x </span>
+        <input id="input1c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon10">
+      </div>
+
+      <p>Ending Register Amount</p>
+      <input disabled id="endingAmt" class="form-control" type="number" name="" value="0">
+      <br>
+      <p>Expected Amount</p>
+      <input disabled id="endingExpAmt" class="form-control" type="number" name="" value="0">
+      <br>
+      <p>Difference</p>
+      <input disabled id="endingDiffAmt" class="form-control" type="number" name="" value="0">
+      <br>
+      <p>CCard Total</p>
+      <input id="endingCCardAmt" class="form-control" type="number" name="" value="0">
+      <br>
+      <button class="btn btn-success" type="button" name="button" data-bs-toggle='modal' data-bs-target='#myModal' data-bs-dismiss="modal">Submit</button>
+    </div>
+
+    <div class="container" id="dropAmtContainer">
+      <h3>Money Drop</h3>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon1">$100 x </span>
+        <input id="dinput100" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon1">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon2">$50 x </span>
+        <input id="dinput50" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon2">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon3">$20 x </span>
+        <input id="dinput20" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon3">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon4">$10 x </span>
+        <input id="dinput10" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon4">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon5">$5 x </span>
+        <input id="dinput5" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon5">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon6">$1 x </span>
+        <input id="dinput1" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon6">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon7">$0.25 x </span>
+        <input id="dinput25c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon7">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon8">$0.10 x </span>
+        <input id="dinput10c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon8">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon9">$0.05 x </span>
+        <input id="dinput5c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon9">
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text" id="basic-addon10">$0.01 x </span>
+        <input id="dinput1c" type="number" class="form-control" placeholder=0 aria-describedby="basic-addon10">
+      </div>
+    
+      <p>Drop Amount</p>
+      <input disabled id="dropAmt" class="form-control" type="number" name="" value="0">
+      <br>
+      <button class="btn btn-success" type="button" name="button" id="dropSubmitBtn">Submit</button>
+    </div>
+
+    <div class="container" id="manageRegisters">
+      <h3>Manage Registers</h3>
+      <br>
+      <div class="container">
+        <button class="btn btn-primary" type="button" name="button" id="genReportBtn">Generate report now</button>
+      </div>
+
+    </div>
+
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="./js/register.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+  </body>
+</html>

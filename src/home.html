@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <!-- fontawesome -->
+    <script src="https://kit.fontawesome.com/d57fcc156f.js" crossorigin="anonymous"></script>
+    <title>CERMS - Home</title>
+  </head>
+  <body>
+    <br>
+    <div class="container">
+      <h1 id="welcomeMsg">Welcome ...</h1>
+      <p id="welcomeMsg2"></p>
+    </div>
+    <div class="container">
+      <ul class="nav justify-content-end">
+        <li class="nav-item">
+          <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+              Options
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+              <div class="container">
+                <div class="btn-group-vertical">
+                  <a class="btn btn-primary" href="account.html" role="button">Account</a>
+                  <a class="btn btn-primary" href="products.html" role="button">Products</a>
+                </div>
+                <hr>
+                <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
+              </div>
+            </ul>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <hr>
+    <div class="container">
+      <div class="" role="alert" id="errorMsg">
+      </div>
+    </div>
+    <div class="container">
+      <button type="button" id="homeBtn" disabled class="btn btn-secondary">Home</button>
+      <a class="btn btn-primary" href="members.html" role="button">Members</a>
+      <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
+      <a class="btn btn-primary" href="register.html" role="button">Register</a>
+      <a class="btn btn-primary" href="history.html" role="button">History</a>
+      <a class="btn btn-primary" href="analytics.html" role="button">Analytics</a>
+    </div>
+    <br>
+
+    <!-- Modal -->
+    <div class="modal fade" id="myModal2" tabindex="-1" aria-labelledby="exampleModalLabel2" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="activityInfoName">Member Name</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p id="activityInfoType">Membership Type</p>
+            <p id="activityInfoTimeIn">Time checked in</p>
+            <p id="activityInfoRentalInfo">Rental Type / Number</p>
+            <p id="activityInfoNotes">Notes</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" data-bs-toggle='modal' data-bs-target='#myModal5' data-bs-dismiss="modal" id="editRentalInfoBtn" class="btn btn-success">Edit Rental Info</button>
+            <button type="button" data-bs-dismiss="modal" id="addToWaitlist" class="btn btn-warning">Add to waitlist</button>
+            <button type="button" data-bs-dismiss="modal" id="removeFromWaitlist" class="btn btn-primary">Remove from waitlist</button>
+            <button type="button" data-bs-dismiss="modal" id="viewMemberBtn" class="btn btn-primary">View Member</button>
+            <button type="button" data-bs-dismiss="modal" class="btn btn-secondary">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="myModal3" tabindex="-1" aria-labelledby="exampleModalLabel3" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="confirmCheckoutName">Member Name</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Are you sure you want to check out this member?</p>
+            <input id="confirmCheckoutCheck" class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+            <label id="confirmCheckoutLbl" class="form-check-label" for="flexCheckDefault">
+              Member has all personal belongings
+            </label>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="confirmCheckoutBtn" class="btn btn-danger" data-bs-dismiss="modal">Confirm</button>
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="myModal4" tabindex="-1" aria-labelledby="exampleModalLabel4" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="confirmRenewName">Member Name</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p id="renewTxt"></p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="confirmRenewBtn" class="btn btn-success" data-bs-dismiss="modal">Confirm</button>
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="myModal5" tabindex="-1" aria-labelledby="exampleModalLabel5" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Change Rental Info</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            What would you like to change this rental to?
+            <br>
+            <br>
+            <select required class="form-select" id="editRentalInfoType">
+              <option value="">Select Rental</option>
+            </select>
+            <br>
+            <input required type="number" class="form-control" id="editRentalInfoNum" placeholder="Enter Locker/Room Number">
+            <br>
+            <textarea required class="form-control" id="editRentalInfoNotes" placeholder="Notes about check-in" rows="3"></textarea>
+            <br>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="editRentalInfoConfirmBtn" class="btn btn-success" data-bs-dismiss="modal">Confirm</button>
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <p id="pageDetails">Current checked-in members: 0</p>
+    </div>
+    <div class="container">
+      <table id="activityTable" class="table table-striped table-hover">
+        <thead>
+            <tr>
+              <th scope="col">Rental Number</th>
+              <th scope="col">Rental Type</th>
+              <th scope="col">Last Name</th>
+              <th scope="col">First Name</th>
+              <th scope="col">Time Remaining</th>
+              <th scope="col">Actions</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr id="testTable">
+              <th scope="row"></th>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+      </table>
+    </div>
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="./js/home.js"></script>
+    <script src="../node_modules/tablesort/dist/tablesort.min.js"></script>
+    <script src="../node_modules/tablesort/dist/sorts/tablesort.number.min.js"></script>
+
+    <script>
+      if (activityTable) {
+      //  ipcRenderer.send('activity-request')
+        new Tablesort(activityTable);
+      }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+  </body>
+</html>
