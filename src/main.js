@@ -23,36 +23,20 @@ const theHostName = os.hostname();
   });
 */
 
-// Dev
-const devfirebaseConfig = {
-  apiKey: "AIzaSyBIeJt3AtzmJdaU_unQ-oDGFFBh88YVwMw",
-  authDomain: "club-pittsburgh-entry.firebaseapp.com",
-  projectId: "club-pittsburgh-entry",
-  storageBucket: "club-pittsburgh-entry.appspot.com",
-  messagingSenderId: "546322625937",
-  appId: "1:546322625937:web:3d6ad3bea215d2f0131630",
-  measurementId: "G-PXJK7L6QTB",
-  databaseURL: "gs://club-pittsburgh-entry.appspot.com"
-};
-
 // Live
 const firebaseConfig = {
-  apiKey: "AIzaSyAA0xmPc0BkMpkwUsLhbu9DoNaoGMJx9Ps",
-  authDomain: "club-pittsburgh-entry-6be3b.firebaseapp.com",
-  projectId: "club-pittsburgh-entry-6be3b",
-  storageBucket: "club-pittsburgh-entry-6be3b.appspot.com",
-  messagingSenderId: "890034879933",
-  appId: "1:890034879933:web:df948262e760574954e6d4",
-  measurementId: "G-FNVWW1E9EE",
-  databaseURL: "gs://club-pittsburgh-entry-6be3b.appspot.com"
+  apiKey: "AIzaSyBLgcEx6bUsvCxZo6_Ieyo23J3duVQSjo4",
+  authDomain: "cerms-7af24.firebaseapp.com",
+  projectId: "cerms-7af24",
+  storageBucket: "cerms-7af24.appspot.com",
+  messagingSenderId: "448459034729",
+  appId: "1:448459034729:web:f73e546ecd1ceb9bd8d2f8",
+  measurementId: "G-Y7RNQZP9KB",
+  databaseURL: "gs://cerms-7af24.appspot.com"
 };
 
 function initializeAppFunct(){
-  if (devMode) {
-    firebaseApp = initializeApp(devfirebaseConfig);
-  }else{
-    firebaseApp = initializeApp(firebaseConfig);
-  }
+  firebaseApp = initializeApp(firebaseConfig);
 }
 
 const startInitApp = initializeAppFunct();
@@ -2894,9 +2878,6 @@ ipcMain.on('account-auto-login', (event, arg) => {
     // Dev
     if (devMode) {
       attemptLogin(Array('matthew@striks.com', 'P@SSW0RD'))
-//      attemptLogin(Array('matthew.striks@gmail.com', 'P@SSW0RD'))
-    }else{
-//      attemptLogin(Array('clubpittsburgh2@gmail.com', 'P@SSW0RD'))
     }
   }
 })
@@ -3318,11 +3299,7 @@ ipcMain.on('generate-report-now', (event, arg) => {
 ipcMain.on('uploadProductImg', (event, arg) => {
   theClient2 = event.sender;
   let theConfig;
-  if (devMode) {
-    theConfig = devfirebaseConfig    
-  }else{
-    theConfig = firebaseConfig    
-  }
+  theConfig = firebaseConfig    
   theClient2.send('uploadProductImg-return', Array(theConfig, theProductImgID))
 })
 
