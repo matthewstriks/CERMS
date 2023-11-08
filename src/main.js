@@ -11,6 +11,7 @@ const { log } = require('console');
 const delay = require('delay');
 const { address } = require('address');
 const os = require('os');
+const { getSystemMemoryInfo } = require('process');
 const theHostName = os.hostname();
 
 /*
@@ -144,6 +145,10 @@ function goMembers(){
 
 function getEMail(){
   return userData.email;
+}
+
+function getSystemAccess(){
+  return userData.access;
 }
 
 async function getEMailByID(theUserID){
@@ -321,6 +326,7 @@ async function renewActivity(memberInfo){
 
 async function createMail(toWho, theSubject, theText, theHTML, attachmentFile){
   const docRef = await addDoc(collection(db, "mail"), {
+    access: getSystemAccess(),
     to: toWho,
     message: {
       subject: theSubject,
@@ -338,6 +344,7 @@ async function createCategory(catName, catDesc, catColor){
     return
   }
   const docRef = await addDoc(collection(db, 'categories'), {
+    access: getSystemAccess(),
     name: catName,
     desc: catDesc,
     color: catColor
@@ -379,6 +386,7 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     theMembershipLength = proMembershipLength * theMultiple
   }
   const docRef = await addDoc(collection(db, 'products'), {
+    access: getSystemAccess(),
     cat: proCat,
     name: proName,
     price: proPrice,
@@ -422,6 +430,7 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
   }
 
   const docRef = await addDoc(collection(db, 'discounts'), {
+    access: getSystemAccess(),
     code: discCode,
     dollar: discDollar,
     percent: discPercent,
@@ -474,7 +483,7 @@ async function viewOrderReciept(theOrderNumber){
   let p2 = path.join(__dirname, '.', 'last-reciept.html');
   let theReciept = ""
 
-  const querySnapshot = await getDocs(collection(db, "orders"));
+  const querySnapshot = await getDocs(collection(db, "orders"), where('access', '==', getSystemAccess()));
   querySnapshot.forEach((doc) => {
     if (doc.id == theOrderNumber) {
       theReciept = doc.data().reciept
@@ -606,7 +615,6 @@ async function recieptProcess(orderInfo, theOrderNumber){
 }
 
 async function completeOrder(orderInfo){
-  console.log(orderInfo);
   if (!regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
@@ -633,6 +641,7 @@ async function completeOrder(orderInfo){
 
   // paymentMethod: credit card, gift card, cash
   const docRef = await addDoc(collection(db, "orders"), {
+    access: getSystemAccess(),
     customerID: theCustomerID,
     products: orderInfo[1],
     discounts: orderInfo[2],
@@ -697,6 +706,7 @@ async function createActivity(memberInfo){
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theTimeExpire = theCurrentTime + 21600;
   const docRef = await addDoc(collection(db, "activity"), {
+    access: getSystemAccess(),
     active: true,
     goingInactive: false,
     waitlist: memberInfo[4],
@@ -826,8 +836,7 @@ async function getActiveRegister(){
 
 async function registerStatus(){
   let theUserID = getUID()
-  const registerRef = collection(db, "registers");
-  docRef = query(registerRef, where("active", "==", true), where("uid", "==", theUserID));
+  docRef = query(collection(db, "registers"), where("active", "==", true), where("uid", "==", theUserID), where('access', '==', getSystemAccess()));
   const docSnap = await getDocs(docRef);
 
   regStatus = false
@@ -857,7 +866,7 @@ async function registerStatus(){
 }
 
 async function gatherAllRegisters(){
-  const q = query(collection(db, "registers"), where("active", "==", true), where('uid', '!=', getUID()));
+  const q = query(collection(db, "registers"), where("active", "==", true), where('uid', '!=', getUID()), where('access', '==', getSystemAccess()));
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach(async (doc) => {
     theClient.send('register-all-request-return', Array(doc.id, doc.data()))    
@@ -871,7 +880,7 @@ async function startRegister(registerInfo){
   }
 
   if (registerInfo[1] == 'b') {
-    const q = query(collection(db, "registers"), where("active", "==", true), where("shift", '!=', 'd'));
+    const q = query(collection(db, "registers"), where("active", "==", true), where("shift", '!=', 'd'), where('access', '==', getSystemAccess()));
     let stillOpen = false
     const querySnapshot = await getDocs(q);
     querySnapshot.forEach((doc) => {
@@ -888,6 +897,7 @@ async function startRegister(registerInfo){
   }
 
   const docRef = await addDoc(collection(db, "registers"), {
+    access: getSystemAccess(),
     active: true,
     timestampStart: serverTimestamp(),
     uid: getUID(),
@@ -1066,7 +1076,7 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
     const docRef = doc(db, "registers", registerID);
     const docSnap = await getDoc(docRef);
     registerInfo = docSnap.data()    
-    q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID));
+    q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID), where('access', '==', getSystemAccess()));
    
     const startDate = new Date(registerInfo.timestampStart['seconds'] * 1000);
     let day = startDate.getDate();
@@ -1132,7 +1142,7 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
     let startTime = `${hour}:${min}:${sec} ${ampm}`;
 
     startDateStr = startDateS + ' ' + startTime
-    q1 = query(ordersRef, where("timestamp", ">", dates));
+    q1 = query(ordersRef, where("timestamp", ">", dates), where('access', '==', getSystemAccess()));
   }
 
   if (isFinal) {
@@ -1166,7 +1176,7 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
     startTime = `${hour}:${min}:${sec} ${ampm}`;
 
     startDateStr = startDateS + ' ' + startTime
-    q1 = query(ordersRef, where("timestamp", ">", startDateFinal));    
+    q1 = query(ordersRef, where("timestamp", ">", startDateFinal), where('access', '==', getSystemAccess()));    
   }
 
   let productsAndAmounts = Array()
@@ -1791,7 +1801,7 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
 
 async function startRegisterReportFinal(){
   startRegisterReport(false, true, systemData.registerStart['seconds'], false)
-  const systemRef = doc(db, "system", "system");
+  const systemRef = doc(db, "system", userData.access);
   await updateDoc(systemRef, {
     registerStart: serverTimestamp(),
   });
@@ -1965,7 +1975,6 @@ async function editProductInventory(productInfo) {
 }
 
 async function editDiscount(discountInfo){
-  console.log(discountInfo);
   notificationSystem('warning', 'Editing Discount...')
   let userAllowed = canUser('permissionEditDiscounts')
   if (!userAllowed) {
@@ -1992,7 +2001,7 @@ async function editDiscount(discountInfo){
 }
 
 async function updateTLID(){
-  const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1));
+  const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1), where('access', '==', getSystemAccess()));
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
     updateLID()
@@ -2018,7 +2027,7 @@ async function createMembership(memberInfo){
 
   idExpiration = theCurrentTime + theProductInfo[1].membershipLength
 
-  const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1));
+  const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1), where('access', '==', getSystemAccess()));
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
     theClient.send('membership-pending-waiting-for-id')
@@ -2029,7 +2038,7 @@ async function createMembership(memberInfo){
     setTimeout(function(){createMembership(memberInfo)}, 3000);
   });
   if (!update){
-    const q2 = query(collection(db, "members"), where("name", "==", memberInfo[0] + " " + memberInfo[1]), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]));
+    const q2 = query(collection(db, "members"), where("name", "==", memberInfo[0] + " " + memberInfo[1]), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]), where('access', '==', getSystemAccess()));
     const querySnapshot2 = await getDocs(q2);
     querySnapshot2.forEach( async (doc) => {
       updateMembership(doc.id, doc.data(), memberInfo);
@@ -2039,6 +2048,7 @@ async function createMembership(memberInfo){
   }
   if (!update) {
     const docRef = await addDoc(collection(db, "members"), {
+      access: getSystemAccess(),
       notes: memberInfo[4],
       name: memberInfo[0] + " " + memberInfo[1],
       fname: memberInfo[0],
@@ -2071,7 +2081,7 @@ async function createMembership(memberInfo){
 }
 
 async function gatherUserByID(theUserID){
-  const querySnapshot = await getDocs(collection(db, "users"));
+  const querySnapshot = await getDocs(collection(db, "users"), where('access', '==', getSystemAccess()));
   querySnapshot.forEach((doc) => {
     if (doc.id == theUserID) {
       return doc.data()
@@ -2080,14 +2090,15 @@ async function gatherUserByID(theUserID){
 }
 
 async function gatherAllUsers(){
-  const querySnapshot = await getDocs(collection(db, "users"));
+  let theAccessCode = getSystemAccess()
+  const querySnapshot = await getDocs(collection(db, "users"), where('access', '==', theAccessCode));
   querySnapshot.forEach((doc) => {
     theClient.send('recieve-users', Array(doc.id, doc.data()))
   });
 }
 
 async function gatherMemberHistory(memberID){
-  const q1 = query(collection(db, "activity"), where("memberID", "==", memberID));
+  const q1 = query(collection(db, "activity"), where("memberID", "==", memberID), where('access', '==', getSystemAccess()));
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
     theClient.send('member-history-request-return', Array(doc.id, doc.data()))
@@ -2095,7 +2106,7 @@ async function gatherMemberHistory(memberID){
 }
 
 async function gatherOrderHistory(memberID){
-  const q1 = query(collection(db, "orders"), where("customerID", "==", memberID));
+  const q1 = query(collection(db, "orders"), where("customerID", "==", memberID), where('access', '==', getSystemAccess()));
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
     theClient.send('member-order-history-request-return', Array(doc.id, doc.data()))
@@ -2108,7 +2119,7 @@ async function startGatherAllMembers(){
   }
   startGatherAllMembersA = true;
 
-  const q = query(collection(db, "members"), orderBy("creation_time"));
+  const q = query(collection(db, "members"), orderBy("creation_time"), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
@@ -2200,7 +2211,7 @@ async function displayAllHistory(){
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeP24 = theCurrentTime - 604800
   let theCurrentTimeP24Date = new Date(theCurrentTimeP24 * 1000);
-  const q = query(collection(db, "activity"), where("active", "==", false), where("timeOut", ">=", theCurrentTimeP24Date));
+  const q = query(collection(db, "activity"), where("active", "==", false), where("timeOut", ">=", theCurrentTimeP24Date), where('access', '==', getSystemAccess()));
 
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach( async (doc) => {
@@ -2213,7 +2224,7 @@ async function displayAllOrders(){
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeP24 = theCurrentTime - 604800
   let theCurrentTimeP24Date = new Date(theCurrentTimeP24 * 1000);
-  const q = query(collection(db, "orders"), where("timestamp", ">=", theCurrentTimeP24Date));
+  const q = query(collection(db, "orders"), where("timestamp", ">=", theCurrentTimeP24Date), where('access', '==', getSystemAccess()));
 
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach(async (doc) => {
@@ -2230,7 +2241,7 @@ async function startGatherAllActivity(){
     return
   }
   startGatherAllActivityA = true;
-  const q = query(collection(db, "activity"), where("active", "==", true));
+  const q = query(collection(db, "activity"), where("active", "==", true), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -2272,7 +2283,7 @@ async function startGatherAllCategories(){
     return
   }
   startGatherAllCategoryA = true;
-  const q = query(collection(db, "categories"));
+  const q = query(collection(db, "categories"), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -2312,7 +2323,7 @@ async function startGatherAllProducts(){
     return
   }
   startGatherAllProductsA = true;
-  const q = query(collection(db, "products"), orderBy('name', 'asc'));
+  const q = query(collection(db, "products"), orderBy('name', 'asc'), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -2366,7 +2377,7 @@ async function startGatherAllDiscounts(){
     return
   }
   startGatherAllDiscountsA = true;
-  const q = query(collection(db, "discounts"));
+  const q = query(collection(db, "discounts"), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -2406,7 +2417,7 @@ async function startGatherAllOrders(){
     return
   }
   startGatherAllOrdersA = true;
-  const q = query(collection(db, "orders"));
+  const q = query(collection(db, "orders"), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -2447,13 +2458,19 @@ async function displayAllActivity(){
   })
 }
 
-function attemptLogin(details){
+async function attemptLogin(details){
   loginCreds = details;
   signInWithEmailAndPassword(auth, details[0], details[1])
   .then(async(userCredential) => {
-    mainWin.loadFile(path.join(__dirname, 'index.html'));
     user = userCredential.user;
-    setTimeout(function() {startLoading()}, 1000);
+    await getUserData()
+    if (!getSystemAccess()) {
+      mainWin.loadFile(path.join(__dirname, 'access.html'));
+    } else {
+      mainWin.loadFile(path.join(__dirname, 'index.html'));
+      user = userCredential.user;
+      setTimeout(function () { startLoading() }, 1000);
+    }      
   })
   .catch((error) => {
     const errorCode = error.code;
@@ -2461,6 +2478,33 @@ function attemptLogin(details){
     console.log(error);
     notificationSystem('danger', errorMessage + ' (' + errorCode + ')')
   });
+}
+
+async function addAccess(code){
+  notificationSystem('warning', 'Checking access code...')
+  updateDoc(doc(db, "users", getUID()), {
+    access: code,
+  }); 
+
+  setTimeout(async () => {
+    const docRef = doc(db, "system", code);
+    const docSnap = await getDoc(docRef).catch((error) => {
+      console.log(error);
+      if (error.code == "permission-denied") {
+        notificationSystem('danger', 'Access code NOT valid!')
+        updateDoc(doc(db, "users", getUID()), {
+          access: "",
+        });        
+      }
+    })
+
+    if (docSnap.exists()) {
+      loadAuth()
+      setTimeout(() => {
+        notificationSystem('success', 'Access code has been saved to your account!')        
+      }, 1000);
+    }
+  }, 2000);
 }
 
 function createAccount(accountInfo){
@@ -2473,16 +2517,17 @@ function createAccount(accountInfo){
         sendPasswordResetEmail(auth, accountInfo[0])
           .then(() => {
             setDoc(doc(db, "users", newUser.uid), {
+              access: getSystemAccess(),
               rank: accountInfo[2],
               displayName: accountInfo[1],
-              email: accountInfo[0]
+              email: accountInfo[0],
             });
             notificationSystem('success', "Account created! New employee must check their email to 'reset' their password.")
             signInWithEmailAndPassword(auth, loginCreds[0], loginCreds[1])
             .then((userCredential) => {
               user = userCredential.user;
-              getSystemData();
-              getUserData();
+              getUserData()
+              getSystemData();              
             })
             .catch((error) => {
               const errorCode = error.code;
@@ -2514,15 +2559,15 @@ async function startLoading(){
   loadingProgress = 0;
   totalLoadingProccesses = 8 // CHANGE ME
 
-  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading system data...'))
-  await getSystemData();
-  loadingProgress = loadingProgress + 1
-
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading user data...'))
   let theUserData = await getUserData();
   if (!theUserData) {
     return
   }
+  loadingProgress = loadingProgress + 1
+
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading system data...'))
+  await getSystemData();
   loadingProgress = loadingProgress + 1
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading members...'))
@@ -2556,8 +2601,19 @@ async function startLoading(){
 }
 
 async function getSystemData(){
-  const docRef = doc(db, "system", "system");
-  const docSnap = await getDoc(docRef);
+  const docRef = doc(db, "system", userData.access);
+  const docSnap = await getDoc(docRef).catch((error) => {
+    console.log(error);
+    if (error.code == "permission-denied") {
+      notificationSystem('danger', 'Access code NOT valid!')
+      updateDoc(doc(db, "users", getUID()), {
+        access: "",
+      });
+      setTimeout(() => {
+        userLogout()
+      }, 2000);
+    }
+  });
   let userAllowed = false
   if (userData) {
     userAllowed = canUser("permissionEditSystemSettings");    
@@ -2566,21 +2622,30 @@ async function getSystemData(){
   if (docSnap.exists()) {
     systemData = docSnap.data();
     systemData.fileSaveSystemDir = null
+    let userAllowed = canUser("permissionEditSystemSettings");
     let fileSel = false
 
     if (!Array.isArray(systemData.fileSaveSystem)) {
       systemData.fileSaveSystemDir = systemData.fileSaveSystem
-      return true
+      fileSel = true
+    } else {
+      systemData.fileSaveSystem.forEach(theDir => {
+        if (fs.existsSync(theDir) && !fileSel) {
+          fileSel = true
+          systemData.fileSaveSystemDir = theDir
+        }
+      });
     }
-    systemData.fileSaveSystem.forEach(theDir => {
-      if (fs.existsSync(theDir) && !fileSel) {
-        fileSel = true
-        systemData.fileSaveSystemDir = theDir
-      }
-    });  
+
     if (!fileSel && userAllowed) {
       updateFileDir()
-    }  
+    } else if (!fileSel) {
+      setTimeout(() => {
+        notificationSystem('warning', 'There is no directory saved for your report storage. Please contact a manager to address this ASAP!')
+        let theMsg = 'There is currently no directory saved for you report storage. Please login to the system on the PC named ' + theHostName + ', and select a directory where you want the reports to save when promoted to do so.'
+        createMail(systemData.invWarnEMail, "Report save error!", theMsg, theMsg)
+      }, 5000);
+    }
     return true
   }
 }
@@ -2599,7 +2664,7 @@ async function updateFileDir(){
       }
       theDirsArray.push(theNewDirSingle)      
       systemData.fileSaveSystemDir = theNewDirSingle
-      const docRef = doc(db, "system", "system");
+      const docRef = doc(db, "system", userData.access);
       await updateDoc(docRef, {
         fileSaveSystem: theDirsArray
       });
@@ -2629,7 +2694,7 @@ ipcMain.on('remove-dir', async (event, arg) => {
   });
   if (systemData.fileSaveSystemDir == arg) {
   }
-  const docRef = doc(db, "system", "system");
+  const docRef = doc(db, "system", userData.access);
   await updateDoc(docRef, {
     fileSaveSystem: theDirsArray
   });
@@ -2638,7 +2703,7 @@ ipcMain.on('remove-dir', async (event, arg) => {
 })
 
 async function updateLID(){
-  const docRef = doc(db, "system", "system");
+  const docRef = doc(db, "system", userData.access);
   systemData.lid = systemData.lid + 1
   await updateDoc(docRef, {
     lid: systemData.lid
@@ -2664,32 +2729,7 @@ async function getUserData(){
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-    userData = docSnap.data();
-    let userAllowed = canUser("permissionEditSystemSettings");
-    let fileSel = false
-
-    if (!Array.isArray(systemData.fileSaveSystem)) {
-      systemData.fileSaveSystemDir = systemData.fileSaveSystem
-      fileSel = true
-    }else{
-      systemData.fileSaveSystem.forEach(theDir => {
-        if (fs.existsSync(theDir) && !fileSel) {
-          fileSel = true
-          systemData.fileSaveSystemDir = theDir
-        }
-      });
-    }
-
-    if (!fileSel && userAllowed) {
-      updateFileDir()
-    } else if (!fileSel){
-      setTimeout(() => {
-        notificationSystem('warning', 'There is no directory saved for your report storage. Please contact a manager to address this ASAP!')
-        let theMsg = 'There is currently no directory saved for you report storage. Please login to the system on the PC named ' + theHostName + ', and select a directory where you want the reports to save when promoted to do so.'
-        createMail(systemData.invWarnEMail, "Report save error!", theMsg, theMsg)
-      }, 5000);
-    }
-    
+    userData = docSnap.data();    
     return true
   }else{
     theClient.send('send-loading-progress', Array(0, 0, 'ACCOUNT DEACTIVATED!!! CONTACT MANAGER!!! Click <a href="login.html">here</a> to return to login...'))
@@ -2870,6 +2910,11 @@ ipcMain.on('getClient', (event, arg) => {
 ipcMain.on('account-login', (event, arg) => {
   theClient = event.sender;
   attemptLogin(arg)
+})
+
+ipcMain.on('account-access', (event, arg) => {
+  theClient = event.sender;
+  addAccess(arg)
 })
 
 ipcMain.on('account-auto-login', (event, arg) => {
@@ -3197,7 +3242,6 @@ ipcMain.on('gather-discounts', (event, arg) => {
 
 ipcMain.on('create-discount', (event, arg) => {
   theClient = event.sender;
-  console.log(arg);
   createDiscount(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10])
 })
 
@@ -3264,7 +3308,7 @@ ipcMain.on('edit-invWarn', async (event, arg) => {
   theClient = event.sender;
   let userAllowed = canUser("permissionEditSystemSettings");
   if (userAllowed) {
-    const docRef = doc(db, "system", "system");
+    const docRef = doc(db, "system", userData.access);
     await updateDoc(docRef, {
       invWarnEMail: arg
     });
@@ -3277,7 +3321,7 @@ ipcMain.on('edit-renew-time', async (event, arg) => {
   theClient = event.sender;
   let userAllowed = canUser("permissionEditSystemSettings");
   if (userAllowed) {
-    const docRef = doc(db, "system", "system");
+    const docRef = doc(db, "system", userData.access);
     await updateDoc(docRef, {
       renewTime: arg
     });
