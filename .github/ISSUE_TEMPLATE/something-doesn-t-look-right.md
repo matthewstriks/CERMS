@@ -1,7 +1,7 @@
 ---
 name: Something doesn’t look right
 about: When something does not look right... Maybe a number is off or text is misspelled
-title: "[INVALID]"
+title: ""
 labels: invalid
 assignees: matthewstriks
 
