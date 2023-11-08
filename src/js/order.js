@@ -45,21 +45,25 @@ if (searchProducts) {
   })
 
   myInput.onkeypress = function (event) {
-    if (event.keyCode == 13) {
+    if (event.key == 'Enter') {
       myInput.value = ""
     }
   };
 }
-
+let lastRanVal = ""
 function filterFunction() {
   var input, filter, ul, li, a, i;
   input = document.getElementById("myInput");
   filter = input.value.toUpperCase();
   div = document.getElementById("myDropdown");
   a = div.getElementsByTagName("li");
+  if (lastRanVal == filter) {
+    return
+  }
+  lastRanVal = filter
   for (i = 0; i < a.length; i++) {
     txtValue = a[i].textContent || a[i].innerText || a[i].getAttribute('barcode');
-    if (filter == a[i].getAttribute('barcode')) {
+    if (filter == a[i].getAttribute('barcode') && filter != "") {
       a[i].style.display = "";
       a[i].click()
       return
@@ -341,6 +345,8 @@ const formatter = new Intl.NumberFormat('en-US', {
 });
 
 function addProductCard(theProduct){  
+  console.log('Hey:');
+  console.log(theProduct);
   let currentProductCard = document.getElementById(theProduct[0] + 'newCard')
   let currentProductCardInfo = document.getElementById(theProduct[0] + 'cardHeader')
   if (currentProductCard) {
@@ -483,7 +489,6 @@ function startOrderDiscount(discountCode){
         failReason = 'Discount only for single products!'
         return        
       }
-      console.log('Hey: ' + item[1].limit);
       if ((item[1].limit) && (item[1].used >= item[1].limit)) {
         failReason = 'Discount has already been used ' + item[1].limit + ' time(s)'
         return
@@ -646,10 +651,16 @@ ipcRenderer.on('return-products-order', (event, arg) => {
     productSearchItem.setAttribute('data-bs-toggle', 'modal')
     productSearchItem.setAttribute('data-bs-target', '#myModal3')
   }
+  productSearchItem.tabIndex = 0
   productSearchItem.setAttribute('barcode', arg[1].barcode)
   productSearchItem.addEventListener('click', function(){
     addProductCard(arg)
   })
+  productSearchItem.onkeypress = function (event) {
+    if (event.key == 'Enter') {
+      addProductCard(arg)
+    }
+  };
   productSearchItem.style.display = 'none'
 
 
