@@ -19,6 +19,10 @@ let invWarnEMail = document.getElementById('invWarnEMail')
 let editRenewTime = document.getElementById('editRenewTime')
 let editRenewTimeBtn = document.getElementById('editRenewTimeBtn')
 let editInvWarnEMail = document.getElementById('editInvWarnEMail')
+let connectQuickBooksBtn = document.getElementById('connectQuickBooksBtn')
+let connectQuickBooksDiv = document.getElementById('connectQuickBooksDiv')
+let connectQuickBooksInput = document.getElementById('connectQuickBooksInput')
+let quickBooksTestBtn = document.getElementById('quickBooksTestBtn')
 
 let editAccountBtn = document.getElementById('editAccountBtn')
 let editAccountForm = document.getElementById('editAccountForm')
@@ -38,6 +42,7 @@ let usersArray = Array();
 
 let errorMsg = document.getElementById('errorMsg');
 ipcRenderer.on('notification-system', (event, arg) => {
+  window.scrollTo(0, 0);
   errorMsg.className = 'alert alert-' + arg[0]
   errorMsg.innerHTML = arg[1]
 }) 
@@ -54,8 +59,29 @@ if (document.getElementById('quickSaleBtn')) {
   })
 }
 
+if (connectQuickBooksBtn) {
+  let connectBtnClicked = false
+  connectQuickBooksDiv.style.display = 'none'
+  connectQuickBooksBtn.addEventListener('click', function () {
+    if (connectBtnClicked) {
+      connectBtnClicked = false
+      connectQuickBooksDiv.style.display = 'none'
+      ipcRenderer.send('quickbooks-login', connectQuickBooksInput.value)
+    } else {
+      connectBtnClicked = true
+      connectQuickBooksDiv.style.display = ''
+      ipcRenderer.send('quickbooks-connect')
+    }
+  })
+}
+
+if (quickBooksTestBtn) {
+  quickBooksTestBtn.addEventListener('click', function () {
+    ipcRenderer.send('quickbooks-test')
+  })
+}
+
 if (changePasswordBtn) {
-  changePasswordBtn.focus();
   changePasswordBtn.addEventListener('click', function(){
     ipcRenderer.send('account-change-password')
   })
@@ -137,6 +163,14 @@ ipcRenderer.on('recieve-account', (event, arg) => {
     })
     editModalDirs.appendChild(opt);
     editModalDirs.appendChild(opt2);
+
+    if (arg[3]) {
+      connectQuickBooksBtn.disabled = true
+      connectQuickBooksBtn.innerHTML = 'Connected!'
+    }else{
+      connectQuickBooksBtn.innerHTML = 'Connect'
+      connectQuickBooksBtn.disabled = false
+    }
   });
 
   invWarnEMail.value = arg[2].invWarnEMail
@@ -199,6 +233,11 @@ if (employeeInput) {
     });
   })
 }
+
+ipcRenderer.on('quickbooks-test-test', (event, arg) => {
+  console.log('hey\n\n');
+  console.log(arg['json']['Invoice']['Id']);
+})
 
 ipcRenderer.on('account-edit-success', (event, arg) => {
   var i, L = employeeInput.options.length - 1;

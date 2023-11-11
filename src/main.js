@@ -1,5 +1,5 @@
 const devMode = true;
-const { app, BrowserWindow, ipcMain, dialog, webContents } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, webContents, shell, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const xl = require('excel4node');
@@ -13,6 +13,7 @@ const { address } = require('address');
 const os = require('os');
 const { getSystemMemoryInfo } = require('process');
 const theHostName = os.hostname();
+const OAuthClient = require('intuit-oauth');
 
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
@@ -56,6 +57,8 @@ const discounts = Array();
 const discountsData = Array();
 const orders = Array();
 const ordersData = Array();
+const users = Array();
+const usersData = Array();
 
 let mainWin;
 let uploadImgWin;
@@ -74,6 +77,7 @@ let startGatherAllActivityA = false
 let startGatherAllCategoryA = false
 let startGatherAllProductsA = false
 let startGatherAllDiscountsA = false
+let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
 
 let pendingOrderType;
@@ -639,7 +643,21 @@ async function completeOrder(orderInfo){
     });
   }
 
+  const toDate = new Date();
+  let hour = toDate.getHours();
+
+  let theShift = false
+
+  if (hour >= 7 && hour <= 14) {
+    theShift = 'B'
+  } else if (hour >= 15 && hour <= 22) {
+    theShift = 'C'
+  } else if ((hour >= 23 || hour <= 6)) {
+    theShift = 'A'
+  }
+
   // paymentMethod: credit card, gift card, cash
+  // total: Sub, Tax, Tot, OGTot
   const docRef = await addDoc(collection(db, "orders"), {
     access: getSystemAccess(),
     customerID: theCustomerID,
@@ -648,7 +666,8 @@ async function completeOrder(orderInfo){
     total: orderInfo[3],
     paymentMethod: orderInfo[4],
     cashier: getUID(),
-    timestamp: serverTimestamp()
+    timestamp: serverTimestamp(),
+    shift: theShift
   });
 
   let registerInfo = await getActiveRegister()
@@ -879,7 +898,7 @@ async function startRegister(registerInfo){
     return
   }
 
-  if (registerInfo[1] == 'b') {
+  if (registerInfo[1] == 'B') {
     const q = query(collection(db, "registers"), where("active", "==", true), where("shift", '!=', 'd'), where('access', '==', getSystemAccess()));
     let stillOpen = false
     const querySnapshot = await getDocs(q);
@@ -890,7 +909,7 @@ async function startRegister(registerInfo){
       notificationSystem('danger', 'Please ensure all registers are closed before opening a dayshift drawer.')
       return
     }else{
-      startRegisterReportFinal()
+      startRegisterReport(false, true)
     }
 
     getSystemData()
@@ -925,7 +944,7 @@ async function manageEndRegister(registerInfo){
     active: false
   });
   goRegister()
-  startRegisterReport(registerInfo[0], false, false, registerInfo[2])
+  startRegisterReport(registerInfo[0], false)
   registerStatus()
 }
 
@@ -950,7 +969,7 @@ async function endRegister(registerInfo, logoutTF){
     input1c: registerInfo[10],
     active: false
   });
-  startRegisterReport(regStatusID, false, false, false)
+  startRegisterReport(regStatusID, false)
   regStatus = false
   regStatusID = false
   regStatusShift = false
@@ -996,47 +1015,95 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
   });      
 }
 
-async function registerReportTest(){
-  // Create a new instance of a Workbook class
-  var wb = new xl.Workbook();
-
-  // Add Worksheets to the workbook
-  var ws = wb.addWorksheet('Detail');
-  var ws2 = wb.addWorksheet('Summary');
-
-  // Create a reusable style
-  var redStyle = wb.createStyle({
-    font: {
-      color: '#FF0800',
-      size: 12,
-    },
-    numberFormat: '$#,##0.00; ($#,##0.00); -',
-  });
-
-  var boldStyle = wb.createStyle({
-    font: {
-      bold: true,
-      size: 12
-    }
-  })
-
-  var moneyStyle = wb.createStyle({
-    numberFormat: '$#,##0.00; ($#,##0.00); -',
-  });
-
-  wb.write(systemData.fileSaveSystemDir + '/test-report.xlsx')
-}
-
-
-async function startRegisterReport(registerID, timeframe, isFinal, cid){
+async function startRegisterReport(registerID, isFinal) {
+  notificationSystem('warning', 'Generating register report... Do not shut down application.')
   getSystemData()
-  let registerInfo;
+  let registerInfo
   let startDateStr
-  let reportType = ""
-  let theCID = getUID()
-  if (cid) {
-    theCID = cid
-  }
+  let theShift = false
+  let reportType = 'Generated'
+  let cashName = 'No Cashier Assigned (Full Report)'
+  let startDates
+
+  let totalMoneyA = 0
+  let totalMoneyB = 0
+  let totalMoneyC = 0
+
+  let totalTaxA = 0
+  let totalTaxB = 0
+  let totalTaxC = 0
+
+  let totalNetA = 0
+  let totalNetB = 0
+  let totalNetC = 0
+
+  let totalCashA = 0
+  let totalCashB = 0
+  let totalCashC = 0
+
+  let totalCCardA = 0
+  let totalCCardB = 0
+  let totalCCardC = 0
+
+  let totalGCardA = 0
+  let totalGCardB = 0
+  let totalGCardC = 0
+
+  let osA = 0
+  let osB = 0
+  let osC = 0
+
+  let membershipTotalsA = 0
+  let membershipTotalsB = 0
+  let membershipTotalsC = 0
+
+  let lockerTotalsA = 0
+  let lockerTotalsB = 0
+  let lockerTotalsC = 0
+
+  let roomTotalsA = 0
+  let roomTotalsB = 0
+  let roomTotalsC = 0
+
+  let counterTxTotalsA = 0
+  let counterTxTotalsB = 0
+  let counterTxTotalsC = 0
+
+  let salesTxTotalsA = 0
+  let salesTxTotalsB = 0
+  let salesTxTotalsC = 0
+
+  let noCounterTxTotalsA = 0
+  let noCounterTxTotalsB = 0
+  let noCounterTxTotalsC = 0
+
+  let passThruTotalsA = 0
+  let passThruTotalsB = 0
+  let passThruTotalsC = 0
+
+  let detailCCardA = 0
+  let detailCCardB = 0
+  let detailCCardC = 0
+
+  let detailGCardA = 0
+  let detailGCardB = 0
+  let detailGCardC = 0
+
+  let detailCashA = 0
+  let detailCashB = 0
+  let detailCashC = 0
+
+  let detailNetA = 0
+  let detailNetB = 0
+  let detailNetC = 0
+
+  let actualCashA = 0
+  let actualCashB = 0
+  let actualCashC = 0
+
+  let chargeTotalA = 0
+  let chargeTotalB = 0
+  let chargeTotalC = 0
 
   const toDate = new Date();
   let day = toDate.getDate();
@@ -1045,7 +1112,7 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
   let hour = toDate.getHours();
   let min = toDate.getMinutes();
   let sec = toDate.getSeconds();
-  let ampm = hour >= 12 ? 'pm' : 'am';
+  let ampm = hour >= 12 ? 'PM' : 'AM';
 
   if (day < 10) {
     day = '0' + day
@@ -1063,21 +1130,44 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
     sec = '0' + sec
   }
 
+  if (hour > 12) {
+    hour = hour - 12
+  }
+
   let currentDate = `${month}/${day}/${year}`;
+  let yesterDate = `${month}/${day - 1}/${year}`;
   let currentDateFile = `${month}-${day}-${year}`;
   let currentTime = `${hour}:${min}:${sec} ${ampm}`;
   let currentTimeFile = `${hour}-${min}-${sec}-${ampm}`;
 
   currentDateStr = currentDate + ' ' + currentTime
+  currentDateFileStr = currentDateFile + ' ' + currentTimeFile
 
   const ordersRef = collection(db, "orders");
+
   if (registerID) {
-    reportType = 'Regiser'
+    reportType = 'Register'
     const docRef = doc(db, "registers", registerID);
     const docSnap = await getDoc(docRef);
-    registerInfo = docSnap.data()    
-    q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID), where('access', '==', getSystemAccess()));
-   
+    registerInfo = docSnap.data()
+    let theCID = registerInfo.uid
+    cashName = registerInfo.uname
+    theShift = registerInfo.shift
+
+    if (theShift == "A") {
+      osA = (registerInfo.ending - registerInfo.starting)
+      actualCashA = actualCashA + registerInfo.ending
+      chargeTotalA = chargeTotalA + registerInfo.ccard
+    } else if (theShift == "B") {
+      osB = (registerInfo.ending - registerInfo.starting)
+      actualCashB = actualCashB + registerInfo.ending
+      chargeTotalB = chargeTotalB + registerInfo.ccard
+    } else {
+      osC = (registerInfo.ending - registerInfo.starting)
+      actualCashC = actualCashC + registerInfo.ending
+      chargeTotalC = chargeTotalC + registerInfo.ccard
+    }
+
     const startDate = new Date(registerInfo.timestampStart['seconds'] * 1000);
     let day = startDate.getDate();
     let month = startDate.getMonth() + 1;
@@ -1103,81 +1193,59 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
       sec = '0' + sec
     }
 
-    let startDateS = `${month}/${day}/${year}`;
-    let startTime = `${hour}:${min}:${sec} ${ampm}`;
-
-    startDateStr = startDateS + ' ' + startTime
-
-  }
-
-  if (timeframe) {
-    reportType = 'Generated'
-
-    const dates = new Date(currentDate + ' 07:00');
-    let day = dates.getDate();
-    let month = dates.getMonth() + 1;
-    let year = dates.getFullYear();
-    let hour = dates.getHours();
-    let min = dates.getMinutes();
-    let sec = dates.getSeconds();
-    let ampm = hour >= 12 ? 'pm' : 'am';
-
-    if (day < 10) {
-      day = '0' + day
-    }
-
-    if (month < 10) {
-      month = '0' + month
-    }
-
-    if (min < 10) {
-      min = '0' + min
-    }
-
-    if (sec < 10) {
-      sec = '0' + sec
+    if (hour > 12) {
+      hour = hour - 12
     }
 
     let startDateS = `${month}/${day}/${year}`;
     let startTime = `${hour}:${min}:${sec} ${ampm}`;
 
     startDateStr = startDateS + ' ' + startTime
-    q1 = query(ordersRef, where("timestamp", ">", dates), where('access', '==', getSystemAccess()));
-  }
-
-  if (isFinal) {
+    startDates = new Date(registerInfo.timestampStart['seconds'] * 1000)
+    q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID));
+  } else if (!registerID && isFinal) {
     reportType = 'Final'
-    const startDateFinal = new Date(isFinal * 1000);
-    let day = startDateFinal.getDate();
-    let month = startDateFinal.getMonth() + 1;
-    let year = startDateFinal.getFullYear();
-    let hour = startDateFinal.getHours();
-    let min = startDateFinal.getMinutes();
-    let sec = startDateFinal.getSeconds();
-    let ampm = hour >= 12 ? 'pm' : 'am';
-
-    if (day < 10) {
-      day = '0' + day
-    }
-
-    if (month < 10) {
-      month = '0' + month
-    }
-
-    if (min < 10) {
-      min = '0' + min
-    }
-
-    if (sec < 10) {
-      sec = '0' + sec
-    }
-
-    startDateS = `${month}/${day}/${year}`;
-    startTime = `${hour}:${min}:${sec} ${ampm}`;
-
-    startDateStr = startDateS + ' ' + startTime
-    q1 = query(ordersRef, where("timestamp", ">", startDateFinal), where('access', '==', getSystemAccess()));    
+    startDates = new Date(yesterDate + ' 07:00');
+    q1 = query(ordersRef, where("timestamp", ">", startDates));
+  } else {
+    reportType = 'Generated'
+    startDates = new Date(currentDate + ' 07:00');
+    q1 = query(ordersRef, where("timestamp", ">", startDates));
   }
+
+  const startDate = startDates;
+  let day2 = startDate.getDate();
+  let month2 = startDate.getMonth() + 1;
+  let year2 = startDate.getFullYear();
+  let hour2 = startDate.getHours();
+  let min2 = startDate.getMinutes();
+  let sec2 = startDate.getSeconds();
+  let ampm2 = hour >= 12 ? 'pm' : 'am';
+
+  if (day2 < 10) {
+    day2 = '0' + day2
+  }
+
+  if (month2 < 10) {
+    month2 = '0' + month2
+  }
+
+  if (min2 < 10) {
+    min2 = '0' + min2
+  }
+
+  if (sec2 < 10) {
+    sec2 = '0' + sec2
+  }
+
+  if (hour2 > 12) {
+    hour2 = hour2 - 12
+  }
+
+  let startDateS = `${month2}/${day2}/${year2}`;
+  let startTime = `${hour2}:${min2}:${sec2} ${ampm2}`;
+
+  startDateStr = startDateS + ' ' + startTime
 
   let productsAndAmounts = Array()
   let discountsAndAmounts = Array()
@@ -1187,13 +1255,6 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
   discountsData.forEach((discount, i) => {
     discountsAndAmounts.push(Array(discount[0], 0))
   });
-
-  let totalMoney = 0;
-  let totalTax = 0;
-  let totalNet = 0;
-  let totalCash = 0;
-  let totalCCard = 0;
-  let totalGCard = 0;
 
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
@@ -1212,39 +1273,165 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
             discountAA[1] = discountAA[1] + 1
           }
         })
-      })      
+      })
     }
-    totalMoney = totalMoney + orderInfo.total[0]
-    totalTax = totalTax + orderInfo.total[1]
-    totalCCard = totalCCard + orderInfo.paymentMethod[0]
-    totalGCard = totalGCard + orderInfo.paymentMethod[1]
+
+    let orderDate = new Date(orderInfo.timestamp['seconds'] * 1000)
+    let day = orderDate.getDate();
+    let month = orderDate.getMonth() + 1;
+    let year = orderDate.getFullYear();
+    let hour = orderDate.getHours();
+    let min = orderDate.getMinutes();
+    let sec = orderDate.getSeconds();
+    let ampm = hour >= 12 ? 'PM' : 'AM';
+
+    if (day < 10) {
+      day = '0' + day
+    }
+
+    if (month < 10) {
+      month = '0' + month
+    }
+
+    if (min < 10) {
+      min = '0' + min
+    }
+
+    if (sec < 10) {
+      sec = '0' + sec
+    }
+
+    if (hour > 12) {
+      hour = hour - 12
+    }
+
+    let orderDateStr = `${month}/${day}/${year}`;
+    let orderTime = `${hour}:${min}:${sec} ${ampm}`;
+
+    orderDateStrF = orderDateStr + ' ' + orderTime
+
+    let totalMoney = orderInfo.total[0]
+    let totalTax = orderInfo.total[1]
+    let totalCCard = orderInfo.paymentMethod[0]
+    let totalGCard = orderInfo.paymentMethod[1]
+    let totalCash
     if (orderInfo.paymentMethod[3] < 0) {
-      totalCash = totalCash + (orderInfo.paymentMethod[2] + orderInfo.paymentMethod[3])
-    }else{
-      totalCash = totalCash + orderInfo.paymentMethod[2]
+      totalCash = (orderInfo.paymentMethod[2] + orderInfo.paymentMethod[3])
+    } else {
+      totalCash = orderInfo.paymentMethod[2]
     }
 
+    orderInfo.products.forEach(orderProduct => {
+      productsData.forEach(product => {
+        if (orderProduct == product[0]) {
+          if (product[1].membership) {
+            if (orderInfo.shift == "A") {
+              membershipTotalsA = membershipTotalsA + Number(product[1].price)
+            } else if (orderInfo.shift == "B") {
+              membershipTotalsB = membershipTotalsB + Number(product[1].price)
+            } else if (orderInfo.shift == "C") {
+              membershipTotalsC = membershipTotalsC + Number(product[1].price)
+            }
+          } else if (product[1].rental) {
+            if (product[1].name.toUpperCase().includes('LOCKER')) {
+              if (orderInfo.shift == "A") {
+                lockerTotalsA = lockerTotalsA + Number(product[1].price)
+              } else if (orderInfo.shift == "B") {
+                lockerTotalsB = lockerTotalsB + Number(product[1].price)
+              } else if (orderInfo.shift == "C") {
+                lockerTotalsC = lockerTotalsC + Number(product[1].price)
+              }
+            } else {
+              if (orderInfo.shift == "A") {
+                roomTotalsA = roomTotalsA + Number(product[1].price)
+              } else if (orderInfo.shift == "B") {
+                roomTotalsB = roomTotalsB + Number(product[1].price)
+              } else if (orderInfo.shift == "C") {
+                roomTotalsC = roomTotalsC + Number(product[1].price)
+              }
+            }
+          } else if (product[1].taxable) {
+            if (orderInfo.shift == "A") {
+              counterTxTotalsA = counterTxTotalsA + Number(product[1].price)
+            } else if (orderInfo.shift == "B") {
+              counterTxTotalsB = counterTxTotalsB + Number(product[1].price)
+            } else if (orderInfo.shift == "C") {
+              counterTxTotalsC = counterTxTotalsC + Number(product[1].price)
+            }
+          } else {
+            if (orderInfo.shift == "A") {
+              noCounterTxTotalsA = noCounterTxTotalsA + Number(product[1].price)
+            } else if (orderInfo.shift == "B") {
+              noCounterTxTotalsB = noCounterTxTotalsB + Number(product[1].price)
+            } else if (orderInfo.shift == "C") {
+              noCounterTxTotalsC = noCounterTxTotalsC + Number(product[1].price)
+            }
+          }
+          // Add tax
+          if (product[1].taxable) {
+            if (orderInfo.shift == "A") {
+              salesTxTotalsA = salesTxTotalsA + (Number(product[1].price) * .07)
+            } else if (orderInfo.shift == "B") {
+              salesTxTotalsB = salesTxTotalsB + (Number(product[1].price) * .07)
+            } else if (orderInfo.shift == "C") {
+              salesTxTotalsC = salesTxTotalsC + (Number(product[1].price) * .07)
+            }
+          }
+        }
+      });
+    });
+
+    // paymentMethod: credit card, gift card, cash, change
+    // total: Sub, Tax, Tot, OGTot
+    if (orderInfo.shift == "A") {
+      totalMoneyA = totalMoneyA + totalMoney
+      totalTaxA = totalTaxA + totalTax
+      totalCCardA = totalCCardA + totalCCard
+      totalGCardA = totalGCardA + totalGCard
+      if (orderInfo.paymentMethod[3] < 0) {
+        totalCashA = totalCashA + totalCash
+      } else {
+        totalCashA = totalCashA + totalCash
+      }
+      detailCCardA = detailCCardA + orderInfo.paymentMethod[0]
+      detailGCardA = detailGCardA + orderInfo.paymentMethod[1]
+      detailCashA = detailCashA + (orderInfo.paymentMethod[2] + orderInfo.paymentMethod[3])
+    } else if (orderInfo.shift == "B") {
+      totalMoneyB = totalMoneyB + totalMoney
+      totalTaxB = totalTaxB + totalTax
+      totalCCardB = totalCCardB + totalCCard
+      totalGCardB = totalGCardB + totalGCard
+      if (orderInfo.paymentMethod[3] < 0) {
+        totalCashB = totalCashB + totalCash
+      } else {
+        totalCashB = totalCashB + totalCash
+      }
+      detailCCardB = detailCCardB + orderInfo.paymentMethod[0]
+      detailGCardB = detailGCardB + orderInfo.paymentMethod[1]
+      detailCashB = detailCashB + (orderInfo.paymentMethod[2] + orderInfo.paymentMethod[3])
+    } else if (orderInfo.shift == "C") {
+      totalMoneyC = totalMoneyC + totalMoney
+      totalTaxC = totalTaxC + totalTax
+      totalCCardC = totalCCardC + totalCCard
+      totalGCardC = totalGCardC + totalGCard
+      if (orderInfo.paymentMethod[3] < 0) {
+        totalCashC = totalCashC + totalCash
+      } else {
+        totalCashC = totalCashC + totalCash
+      }
+      detailCCardC = detailCCardC + orderInfo.paymentMethod[0]
+      detailGCardC = detailGCardC + orderInfo.paymentMethod[1]
+      detailCashC = detailCashC + (orderInfo.paymentMethod[2] + orderInfo.paymentMethod[3])
+    }
   })
- 
-  totalNet = totalMoney + totalTax
 
-  // https://www.npmjs.com/package/excel4node
+  totalNetA = totalMoneyA + totalTaxA
+  totalNetB = totalMoneyB + totalTaxB
+  totalNetC = totalMoneyC + totalTaxC
 
-  // Create a new instance of a Workbook class
   var wb = new xl.Workbook();
-
-  // Add Worksheets to the workbook
-  var ws = wb.addWorksheet('Detail');
-  var ws2 = wb.addWorksheet('Summary');
-
-  // Create a reusable style
-  var redStyle = wb.createStyle({
-    font: {
-      color: '#FF0800',
-      size: 12,
-    },
-    numberFormat: '$#,##0.00; ($#,##0.00); -',
-  });
+  var detailWB = wb.addWorksheet('Detail');
+  var summaryWB = wb.addWorksheet('Summary');
 
   var boldStyle = wb.createStyle({
     font: {
@@ -1255,203 +1442,25 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
 
   var moneyStyle = wb.createStyle({
     numberFormat: '$#,##0.00; ($#,##0.00); -',
+    font: {
+      color: "#FF0800"
+    }
   });
 
-  //      (Y, X)  
-  ws.cell(1, 1)
-    .string('CERMS')
-    .style(boldStyle)
-    .style({ font: { size: 20 } });
-
-  ws.cell(1, 4)
-    .string('Report Start Time: ')
-
-  ws.cell(1, 6)
-    .string(startDateStr)
-
-  ws.cell(2, 4)
-    .string('Report End Time: ')
-
-  ws.cell(2, 6)
-    .string(currentDateStr)
-
-  ws.cell(3, 4)
-    .string('Cashier: ')
-
-  let cashName = 'No Cashier Assigned (Full Report)'
-  if (registerID) {
-    cashName = registerInfo.uname
-  }
-
-  ws.cell(3, 6)
-    .string(cashName)
-
-  ws.cell(2, 1)
-    .string('Deposit Detail Worksheet')
-
-  ws.cell(3, 1)
-    .string('2.0')
-
-  ws.cell(4, 1)
-    .string('Totals:')
-
-  ws.cell(4, 3)
-    .number(totalMoney)
-    .style(moneyStyle)
-
-  ws.cell(7, 2)
-    .string('TAX')
-    .style(boldStyle)
-
-  ws.cell(7, 3)
-    .number(totalTax)
-    .style(moneyStyle)
-
-  ws.cell(8, 2)
-    .string('NET')
-    .style(boldStyle);
-
-  ws.cell(8, 3)
-    .number(totalNet)
-    .style(moneyStyle);
-
-  ws.cell(10, 2)
-    .string('CASH')
-    .style(boldStyle);
-
-  ws.cell(10, 3)
-    .number(totalCash)
-    .style(moneyStyle);
-
-  ws.cell(11, 2)
-    .string('CCARD')
-    .style(boldStyle);
-
-  ws.cell(11, 3)
-    .number(totalCCard)
-    .style(moneyStyle);
-
-  ws.cell(12, 2)
-    .string('GCARD')
-    .style(boldStyle);
-
-  ws.cell(12, 3)
-    .number(totalGCard)
-    .style(moneyStyle);
-
-  if (!isFinal) {
-    ws.cell(13, 1)
-      .string('Cash')
-    ws.cell(13, 2)
-      .string('Over/Short')
-    ws.cell(14, 1)
-      .string('CCard')
-    ws.cell(14, 2)
-      .string('Over/Short')
-
-    let registerDiff = 0;
-    let registerDiff2 = 0;
-
-    if (registerID) {
-      registerDiff = (registerInfo.ending - registerInfo.starting)
-      registerDiff2 = (registerInfo.ccard - totalCCard)
-    }
-    let osTxt = ''
-    let osTxt2 = ''
-    if (registerDiff > 0) {
-      osTxt = 'Over'
-    } else if (registerDiff < 0) {
-      osTxt = 'Short'
-    } else {
-      osTxt = ''
-    }
-    if (registerDiff2 > 0) {
-      osTxt2 = 'Over'
-    } else if (registerDiff2 < 0) {
-      osTxt2 = 'Short'
-    } else {
-      osTxt2 = ''
-    }
-
-    ws.cell(13, 3)
-      .string(osTxt)
-    ws.cell(14, 3)
-      .string(osTxt2)
-
-    ws2.cell(10, 8)
-      .string(osTxt)
-
-    ws2.cell(10, 10)
-      .string(osTxt2)
-
-    if (registerDiff != 0) {
-      ws.cell(13, 4)
-        .number(registerDiff)
-        .style(moneyStyle);
-    }
-
-    if (registerDiff2 != 0) {
-      ws.cell(14, 4)
-        .number(registerDiff2)
-        .style(moneyStyle);
-
-      ws2.cell(14, 10)
-        .number(registerDiff2)
-        .style(moneyStyle);
-    }
-
-    ws2.cell(14, 8)
-      .number(registerDiff)
-      .style(moneyStyle);
-
-    ws.cell(13, 6)
-      .string('Money Drop: ')
-
-    if (registerInfo) {
-      ws.cell(13, 7)
-        .number(registerInfo.drop)
-        .style(moneyStyle)      
-    }else{
-      ws.cell(13, 7)
-        .number(0)
-        .style(moneyStyle)      
-    }
-  }
-
-  ws.cell(16, 1)
-    .string('Products:')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  ws.cell(16, 2)
-    .string('Description')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  ws.cell(16, 3)
-    .string('#')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  ws.cell(16, 4)
-    .string('$')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  let productDescLine = 18;
+  let productDescLine = 16;
   let productNames = Array()
   productsData.forEach((product, i) => {
     productNames.push(product[1].name)
-    ws.cell(productDescLine, 2)
-    .string(product[1].name);
+    detailWB.cell(productDescLine, 2)
+      .string(product[1].name);
     productsAndAmounts.forEach((productsAA, i2) => {
       if (productsAA[0] == product[0]) {
-        ws.cell(productDescLine, 3)
-        .number(productsAA[1]);
+        detailWB.cell(productDescLine, 3)
+          .number(productsAA[1]);
 
-        ws.cell(productDescLine, 4)
-        .number(product[1].price * productsAA[1])
-        .style(moneyStyle);
+        detailWB.cell(productDescLine, 4)
+          .number(product[1].price * productsAA[1])
+          .style(moneyStyle);
       }
     })
     productDescLine = productDescLine + 1
@@ -1460,351 +1469,610 @@ async function startRegisterReport(registerID, timeframe, isFinal, cid){
 
   const lengthArr = productNames.map(productNames => productNames.length)
   const maxWidth = Math.max(...lengthArr)
-  ws.column(2).setWidth(maxWidth)
+  detailWB.column(2).setWidth(maxWidth)
 
-  ws.cell(productDescLine, 1)
-    .string('Advertisment Sales:')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  ws.cell(productDescLine, 2)
-    .string('Description')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  ws.cell(productDescLine, 3)
-    .string('#')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  ws.cell(productDescLine, 4)
-    .string('$')
-    .style(boldStyle)
-    .style({ font: { underline: true } });
-
-  productDescLine = productDescLine + 2
-  
-  discountsData.forEach((discount, i) => {
-    if (discount[1].asCheck) {
-      ws.cell(productDescLine, 2)
-        .string(discount[1].code);
-      discountsAndAmounts.forEach((discountAA, i2) => {
-        if (discountAA[0] == discount[0]) {
-          ws.cell(productDescLine, 3)
-            .number(discountAA[1]);
-        }
-      })
-      productDescLine = productDescLine + 1      
-    }
-  });
-  productDescLine = productDescLine + 1
-
-
-  // Set value of cell C1 to a formula styled with paramaters of style
-//  ws.cell(1, 3)
- //   .formula('A1 + B1')
-  //  .style(style);
-
-  // Set value of cell A2 to 'string' styled with paramaters of style
-//  ws.cell(2, 1)
- //   .string('string')
-  //  .style(style);
-
-  // Set value of cell A3 to true as a boolean type styled with paramaters of style but with an adjustment to the font size.
-//  ws.cell(3, 1)
-  //  .bool(true)
-   // .style(style)
-    //.style({ font: { size: 14 } });
-
-
-// 2nd page
-
-  //       U/D   L/R
   //      (Y, X)  
-  ws2.cell(1, 1)
+  detailWB.cell(1, 1)
     .string('CERMS')
     .style(boldStyle)
-    .style({ font: { size: 20 } });
+    .style({ font: { size: 20 } })
 
-  ws2.cell(1, 4)
+  detailWB.cell(1, 10)
+    .string('Deposit Date/Time')
     .style(boldStyle)
-    .string('Deposit Journal Worksheet')
 
-  ws2.cell(1, 6)
-    .style(boldStyle)
-    .string('Deposit Date:')
-
-  ws2.cell(1, 7)
+  detailWB.cell(1, 12)
     .string(startDateStr)
 
-  ws2.cell(1, 8)
+  detailWB.cell(1, 15)
+    .string('Cashier: ')
     .style(boldStyle)
-    .string('Cashier:')
 
-  ws2.cell(1, 9)
+  detailWB.cell(1, 17)
     .string(cashName)
 
-  ws2.cell(1, 11)
-    .string('2.0')
-
-  ws2.cell(2, 1)
+  detailWB.cell(2, 1)
+    .string("Deposit Detail Worksheet")
     .style(boldStyle)
-    .string('Biz Date')
 
-  ws2.cell(2, 2)
-    .style(boldStyle)
-    .string('Shift')
-
-  ws2.cell(2, 3)
-    .style(boldStyle)
-    .string('Memberships')
-
-  ws2.cell(2, 4)
-    .style(boldStyle)
-    .string('Rentals')
-
-  ws2.cell(2, 6)
-    .style(boldStyle)
-    .string('CounterTx')
-
-  ws2.cell(2, 7)
-    .style(boldStyle)
-    .string('Sales Tax')
-
-  ws2.cell(2, 8)
-    .style(boldStyle)
-    .string('NoTxCounter')
-
-  ws2.cell(2, 9)
-    .style(boldStyle)
-    .string('Pass-Thru')
-
-  ws2.cell(2, 10)
-    .style(boldStyle)
-    .string('Shift Gross')
-
-  ws2.cell(2, 11)
-    .style(boldStyle)
-    .string("Day's Gross")
-
-  ws2.cell(2, 12)
-    .style(boldStyle)
-    .string("Advert. Sales")
-
-  ws2.cell(3, 1)
+  detailWB.cell(2, 3)
     .string(startDateStr)
 
-  let membershipsAmt = 0
-  let rentalsAmt = 0
-  let counterTxAmt = 0
-  let salesTaxAmt = 0
-  let noCounterTxAmt = 0
-  let passThruAmt = 0
-  let grossShiftAmt = 0
-  let grossDayAmt = 0
-  let advertSaleAmt = 0
-  productsData.forEach((product, i) => {
-    productsAndAmounts.forEach((productsAA, i2) => {
-      if (productsAA[0] == product[0]) {
-        if (product[1].membership) {
-          membershipsAmt = membershipsAmt + (product[1].price * productsAA[1])
-        } else if (product[1].rental) {
-          rentalsAmt = rentalsAmt + (product[1].price * productsAA[1])
-        } else {
-          if (product[1].taxable) {
-            let proPrice = Number(product[1].price)
-            let proTax = Number(.07)
-            let proMulti = Number(productsAA[1])
-            counterTxAmt = counterTxAmt + (proPrice + (proPrice * proTax)) * proMulti
-            salesTaxAmt = salesTaxAmt + ((proPrice * proTax) * proMulti)
-          }else{
-            noCounterTxAmt = noCounterTxAmt + (product[1].price * productsAA[1])
-          }
-        }
-      }
-    })
-  }); 
+  detailWB.cell(2, 10)
+    .string('Weekday')
 
-  //
-  ws2.cell(3, 3)
-    .number(membershipsAmt)
-    .style(moneyStyle);
-
-  ws2.cell(3, 4)
-    .number(rentalsAmt)
-    .style(moneyStyle);
-
-  ws2.cell(3, 6)
-    .number(counterTxAmt)
-    .style(moneyStyle);
-
-  ws2.cell(3, 7)
-    .number(salesTaxAmt)
-    .style(moneyStyle);
-
-  ws2.cell(3, 8)
-    .number(noCounterTxAmt)
-    .style(moneyStyle);
-
-  ws2.cell(3, 9)
-    .number(passThruAmt)
-    .style(moneyStyle);
-
-  ws2.cell(3, 10)
-    .number(totalNet)
-    .style(moneyStyle);
-  
-  ws2.cell(3, 11)
-    .number(grossDayAmt)
-    .style(moneyStyle);
-  
-  ws2.cell(3, 12)
-    .string("N/A")
-    .style(moneyStyle);
-  
-    ws2.cell(7, 2)
+  detailWB.cell(3, 1)
+    .string('CERMS 2.0')
     .style(boldStyle)
-    .string('Totals:')
 
-  ws2.cell(7, 3)
-    .number(membershipsAmt)
-    .style(moneyStyle);
-
-  ws2.cell(7, 4)
-    .number(rentalsAmt)
-    .style(moneyStyle);
-    
-  ws2.cell(7, 6)
-    .number(counterTxAmt)
-    .style(moneyStyle);
-
-  ws2.cell(7, 7)
-    .number(salesTaxAmt)
-    .style(moneyStyle);
-
-  ws2.cell(7, 8)
-    .number(noCounterTxAmt)
-    .style(moneyStyle);
-
-  ws2.cell(7, 9)
-    .number(passThruAmt)
-    .style(moneyStyle);
-
-  ws2.cell(7, 10)
-    .number(grossShiftAmt)
-    .style(moneyStyle);
-
-  ws2.cell(7, 11)
-    .number(grossDayAmt)
-    .style(moneyStyle);
-
-  ws2.cell(9, 1)
+  detailWB.cell(3, 3)
+    .string('7a - 3p')
     .style(boldStyle)
+
+  detailWB.cell(3, 5)
+    .string('3p - 11p')
+    .style(boldStyle)
+
+  detailWB.cell(3, 7)
+    .string('11p - 7a')
+    .style(boldStyle)
+
+  detailWB.cell(4, 3)
+    .string('#')
+    .style(boldStyle)
+
+  detailWB.cell(4, 4)
+    .string('$')
+    .style(boldStyle)
+
+  detailWB.cell(5, 1)
+    .string('DEPT TOTAL') // - tax
+    .style(boldStyle)
+
+  detailWB.cell(5, 4)
+    .number(totalMoneyB) // total - tax (7a-3p)
+    .style(moneyStyle)
+
+  detailWB.cell(5, 6)
+    .number(totalMoneyC) // total - tax (3p-11p)
+    .style(moneyStyle)
+
+  detailWB.cell(5, 8)
+    .number(totalMoneyA) // total - tax (11p-7a)
+    .style(moneyStyle)
+
+  detailWB.cell(7, 2)
+    .string("TAX")
+    .style(boldStyle)
+
+  detailWB.cell(7, 4)
+    .number(totalTaxB) // tax (7a-3p)
+    .style(moneyStyle)
+
+  detailWB.cell(7, 6)
+    .number(totalTaxC) // tax (3p-11p)
+    .style(moneyStyle)
+
+  detailWB.cell(7, 8)
+    .number(totalTaxA) // tax (11p-7a)
+    .style(moneyStyle)
+
+  detailWB.cell(8, 2)
+    .string("NET")
+
+  detailWB.cell(8, 4)
+    .number(totalNetB) // total + tax (7a-3p)
+    .style(moneyStyle)
+
+  detailWB.cell(8, 6)
+    .number(totalNetC) // total + tax (3p-11p)
+    .style(moneyStyle)
+
+  detailWB.cell(8, 8)
+    .number(totalNetA) // total + tax (11p-7a)
+    .style(moneyStyle)
+
+  detailWB.cell(10, 2)
+    .string("CASH")
+    .style(boldStyle)
+
+  detailWB.cell(10, 4)
+    .number(totalCashB) // cash (7a-3p)
+    .style(moneyStyle)
+
+  detailWB.cell(10, 6)
+    .number(totalCashC) // cash (3p-11p)
+    .style(moneyStyle)
+
+  detailWB.cell(10, 8)
+    .number(totalCashA) // cash (11p-7a)
+    .style(moneyStyle)
+
+  detailWB.cell(11, 2)
+    .string("CCARD")
+    .style(boldStyle)
+
+  detailWB.cell(11, 4)
+    .number(totalCCardB) // ccard (7a-3p)
+    .style(moneyStyle)
+
+  detailWB.cell(11, 6)
+    .number(totalCCardC) // ccard (3p-11p)
+    .style(moneyStyle)
+
+  detailWB.cell(11, 8)
+    .number(totalCCardA) // ccard (11p-7a)
+    .style(moneyStyle)
+
+  detailWB.cell(12, 2)
+    .string("GIFT CARDS")
+    .style(boldStyle)
+
+  detailWB.cell(12, 4)
+    .number(totalGCardB) // gcard (7a-3p)
+    .style(moneyStyle)
+
+  detailWB.cell(12, 6)
+    .number(totalGCardC) // gcard (3p-11p)
+    .style(moneyStyle)
+
+  detailWB.cell(12, 8)
+    .number(totalGCardA) // gcard (11p-7a)
+    .style(moneyStyle)
+
+  detailWB.cell(13, 2)
+    .string('Over/(Short)')
+
+  detailWB.cell(13, 4)
+    .number(osB) // OS (7a-3p)
+    .style(moneyStyle)
+
+  detailWB.cell(13, 6)
+    .number(osC) // OS (3p-11p)
+    .style(moneyStyle)
+
+  detailWB.cell(13, 8)
+    .number(osA) // OS (11p-7a)
+    .style(moneyStyle)
+
+  detailWB.cell(15, 2)
+    .string('Description')
+    .style(boldStyle)
+
+  summaryWB.cell(1, 1)
+    .string("CERMS")
+    .style(boldStyle)
+
+  summaryWB.cell(1, 4)
+    .string('Deposit Journal Worksheet')
+    .style(boldStyle)
+
+  summaryWB.cell(1, 7)
+    .string('Deposit Date/Time')
+    .style(boldStyle)
+
+  summaryWB.cell(1, 9)
+    .string(startDateStr)
+
+  summaryWB.cell(1, 11)
+    .string('Cashier: ')
+    .style(boldStyle)
+
+  summaryWB.cell(1, 13)
+    .string(cashName)
+
+  summaryWB.cell(1, 16)
+    .string('CERMS 2.0')
+    .style(boldStyle)
+
+  summaryWB.cell(3, 1)
+    .string("Biz Date")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 2)
+    .string("Shift")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 3)
+    .string("Memberships")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 4)
+    .string("Locker")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 5)
+    .string("Room")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 6)
+    .string("CounterTx")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 7)
+    .string("SalesTx")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 8)
+    .string("NoCounterTx")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 9)
+    .string("PassThru")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 10)
+    .string("Days Gross")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 11)
+    .string("Weekday")
+    .style(boldStyle)
+
+  summaryWB.cell(5, 1)
+    .string(startDateStr)
+    .style(boldStyle)
+
+  summaryWB.cell(5, 2)
+    .string("7a to 3p")
+    .style(boldStyle)
+
+  summaryWB.cell(5, 3)
+    .number(membershipTotalsB) // Memberships (7a-3p)
+    .style(moneyStyle)
+
+  summaryWB.cell(5, 4)
+    .number(lockerTotalsB) // Locker (7a-3p)
+    .style(moneyStyle)
+
+  summaryWB.cell(5, 5)
+    .number(roomTotalsB) // Room (7a-3p)
+    .style(moneyStyle)
+
+  summaryWB.cell(5, 6)
+    .number(counterTxTotalsB) // CounterTx (7a-3p)
+    .style(moneyStyle)
+
+  summaryWB.cell(5, 7)
+    .number(salesTxTotalsB) // SalesTx (7a-3p)
+    .style(moneyStyle)
+
+  summaryWB.cell(5, 8)
+    .number(noCounterTxTotalsB) // NoCounterTx (7a-3p)
+    .style(moneyStyle)
+
+  summaryWB.cell(5, 9)
+    .number(passThruTotalsB) // PassThru (7a-3p)
+    .style(moneyStyle)
+
+  let daysGrossB = (membershipTotalsB + lockerTotalsB + roomTotalsB + counterTxTotalsB + salesTxTotalsB + noCounterTxTotalsB + passThruTotalsB)
+  summaryWB.cell(5, 10)
+    .number(daysGrossB) // Days Gross (7a-3p)
+    .style(moneyStyle)
+
+  summaryWB.cell(6, 1)
+    .string(startDateStr)
+    .style(boldStyle)
+
+  summaryWB.cell(6, 2)
+    .string("3p to 11p")
+    .style(boldStyle)
+
+  summaryWB.cell(6, 3)
+    .number(membershipTotalsC) // Memberships (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(6, 4)
+    .number(lockerTotalsC) // Locker (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(6, 5)
+    .number(roomTotalsC) // Room (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(6, 6)
+    .number(counterTxTotalsC) // CounterTx (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(6, 7)
+    .number(salesTxTotalsC) // SalesTx (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(6, 8)
+    .number(noCounterTxTotalsC) // NoCounterTx (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(6, 9)
+    .number(passThruTotalsC) // PassThru (3p-11p)
+    .style(moneyStyle)
+
+  let daysGrossC = (membershipTotalsC + lockerTotalsC + roomTotalsC + counterTxTotalsC + salesTxTotalsC + noCounterTxTotalsC + passThruTotalsC)
+  summaryWB.cell(6, 10)
+    .number(daysGrossC) // Days Gross (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(7, 1)
+    .string(startDateStr)
+    .style(boldStyle)
+
+  summaryWB.cell(7, 2)
+    .string("11p to 7a")
+    .style(boldStyle)
+
+  summaryWB.cell(7, 3)
+    .number(membershipTotalsA) // Memberships (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(7, 4)
+    .number(lockerTotalsA) // Locker (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(7, 5)
+    .number(roomTotalsA) // Room (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(7, 6)
+    .number(counterTxTotalsA) // CounterTx (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(7, 7)
+    .number(salesTxTotalsA) // SalesTx (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(7, 8)
+    .number(noCounterTxTotalsA) // NoCounterTx (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(7, 9)
+    .number(passThruTotalsA) // PassThru (11p-7a)
+    .style(moneyStyle)
+
+  let daysGrossA = (membershipTotalsA + lockerTotalsA + roomTotalsA + counterTxTotalsA + salesTxTotalsA + noCounterTxTotalsA + passThruTotalsA)
+  summaryWB.cell(7, 10)
+    .number(daysGrossA) // Days Gross (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 1)
+    .string('TOTALS')
+    .style(boldStyle)
+
+  summaryWB.cell(9, 3)
+    .number((membershipTotalsA + membershipTotalsB + membershipTotalsC)) // Membership Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 4)
+    .number((lockerTotalsA + lockerTotalsB + lockerTotalsC)) // Locker Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 5)
+    .number((roomTotalsA + roomTotalsB + roomTotalsC)) // Room Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 6)
+    .number((counterTxTotalsA + counterTxTotalsB + counterTxTotalsC)) // CounterTx Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 7)
+    .number((salesTxTotalsA + salesTxTotalsB + salesTxTotalsC)) // SalesTx Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 8)
+    .number((noCounterTxTotalsA + noCounterTxTotalsB + noCounterTxTotalsC)) // NoCounterTx Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 9)
+    .number((passThruTotalsA + passThruTotalsB + passThruTotalsC)) // PassThru Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 10)
+    .number((daysGrossA + daysGrossB + daysGrossC)) // Days Gross Totals
+    .style(moneyStyle)
+    .style(boldStyle)
+
+  summaryWB.cell(9, 11)
+    .string("") // Weekday
+
+  summaryWB.cell(11, 1)
     .string('Biz Date')
-
-  ws2.cell(9, 2)
     .style(boldStyle)
+
+  summaryWB.cell(11, 2)
     .string('Shift')
-
-  ws2.cell(9, 3)
     .style(boldStyle)
+
+  summaryWB.cell(11, 3)
     .string('Detail CCard')
-
-  ws2.cell(9, 4)
     .style(boldStyle)
-    .string('Detail Gift Card')
 
-  ws2.cell(9, 5)
+  summaryWB.cell(11, 4)
+    .string('Detail GCard')
     .style(boldStyle)
+
+  summaryWB.cell(11, 5)
     .string('Detail Cash')
-
-  ws2.cell(9, 6)
     .style(boldStyle)
+
+  summaryWB.cell(11, 6)
     .string('Detail Net')
-
-  ws2.cell(9, 7)
     .style(boldStyle)
+
+  summaryWB.cell(11, 7)
     .string('Actual Cash')
-
-  ws2.cell(9, 8)
     .style(boldStyle)
+
+  summaryWB.cell(11, 8)
     .string('Over/(Short)')
-
-  ws2.cell(9, 9)
     .style(boldStyle)
-    .string('Actual Charge')
 
-  ws2.cell(9, 10)
+  summaryWB.cell(11, 9)
+    .string('Charge Total')
     .style(boldStyle)
-    .string('Over/(Short)')
 
-  ws2.cell(10, 1)
+  summaryWB.cell(13, 1)
     .string(startDateStr)
+    .style(boldStyle)
 
-  ws2.cell(10, 2)
-    .string('')
+  summaryWB.cell(13, 2)
+    .string('7a to 3p')
+    .style(boldStyle)
 
-  //
+  summaryWB.cell(13, 3)
+    .number(detailCCardB) // Detail CCard (7a-3p)
+    .style(moneyStyle)
 
-  ws2.cell(10, 6)
-    .string('NET')
+  summaryWB.cell(13, 4)
+    .number(detailGCardB) // Detail GCard (7a-3p)
+    .style(moneyStyle)
 
+  summaryWB.cell(13, 5)
+    .number(detailCashB) // Detail Cash (7a-3p)
+    .style(moneyStyle)
 
-  if (registerInfo) {
-    ws2.cell(10, 3)
-      .number(registerInfo.ccard)
-      .style(moneyStyle);
+  detailNetB = (detailCCardB + detailGCardB + detailCashB)
+  summaryWB.cell(13, 6)
+    .number(detailNetB) // Detail Net (7a-3p)
+    .style(moneyStyle)
 
-    ws2.cell(10, 4)
-      .number(registerInfo.gcard)
-      .style(moneyStyle);
+  summaryWB.cell(13, 7)
+    .number(actualCashB) // Actual Cash (7a-3p)
+    .style(moneyStyle)
 
-    ws2.cell(10, 5)
-      .number(totalCash)
-      .style(moneyStyle);
+  summaryWB.cell(13, 8)
+    .number(osB) // OS (7a-3p)
+    .style(moneyStyle)
 
-    ws2.cell(10, 7)
-      .number(totalCash)
-      .style(moneyStyle);
+  summaryWB.cell(13, 9)
+    .number(chargeTotalB) // Charge Total (7a-3p)
+    .style(moneyStyle)
 
-    ws2.cell(10, 9)
-      .number(registerInfo.ccard)
-      .style(moneyStyle);
+  summaryWB.cell(14, 1)
+    .string(startDateStr)
+    .style(boldStyle)
 
-    ws2.cell(14, 3)
-      .number(registerInfo.ccard)
-      .style(moneyStyle);
+  summaryWB.cell(14, 2)
+    .string('3p to 11p')
+    .style(boldStyle)
 
-    ws2.cell(14, 4)
-      .number(registerInfo.gcard)
-      .style(moneyStyle);
+  summaryWB.cell(14, 3)
+    .number(detailCCardC) // Detail CCard (3p-11p)
+    .style(moneyStyle)
 
-    ws2.cell(14, 5)
-      .number(registerInfo.ending)
-      .style(moneyStyle);
+  summaryWB.cell(14, 4)
+    .number(detailGCardC) // Detail GCard (3p-11p)
+    .style(moneyStyle)
 
-    ws2.cell(14, 6)
-      .number(registerInfo.ccard + registerInfo.gcard + registerInfo.ending)
-      .style(moneyStyle);
+  summaryWB.cell(14, 5)
+    .number(detailCashC) // Detail Cash (3p-11p)
+    .style(moneyStyle)
 
-    ws2.cell(14, 7)
-      .number(registerInfo.ending)
-      .style(moneyStyle);
+  detailNetC = (detailCCardC + detailGCardC + detailCashC)
+  summaryWB.cell(14, 6)
+    .number(detailNetC) // Detail Net (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(14, 7)
+    .number(actualCashC) // Actual Cash (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(14, 8)
+    .number(osC) // OS (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(14, 9)
+    .number(chargeTotalC) // Charge Total (3p-11p)
+    .style(moneyStyle)
+
+  summaryWB.cell(15, 1)
+    .string(startDateStr)
+    .style(boldStyle)
+
+  summaryWB.cell(15, 2)
+    .string('11p to 7a')
+    .style(boldStyle)
+
+  summaryWB.cell(15, 3)
+    .number(detailCCardA) // Detail CCard (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(15, 4)
+    .number(detailGCardA) // Detail GCard (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(15, 5)
+    .number(detailCashA) // Detail Cash (11p-7a)
+    .style(moneyStyle)
+
+  detailNetA = (detailCCardA + detailGCardA + detailCashA)
+  summaryWB.cell(15, 6)
+    .number(detailNetA) // Detail Net (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(15, 7)
+    .number(actualCashA) // Actual Cash (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(15, 8)
+    .number(osA) // OS (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(15, 9)
+    .number(chargeTotalA) // Total Charge (11p-7a)
+    .style(moneyStyle)
+
+  summaryWB.cell(17, 1)
+    .string('TOTALS')
+    .style(boldStyle)
+
+  let totalDetailCCard = (detailCCardA + detailCCardB + detailCCardC)
+  summaryWB.cell(17, 3)
+    .number(totalDetailCCard) // Total Detail CCard
+    .style(moneyStyle)
+
+  let totalDetailGCard = (detailGCardA + detailGCardB + detailGCardC)
+  summaryWB.cell(17, 4)
+    .number(totalDetailGCard) // Total Detail GCard
+    .style(moneyStyle)
+
+  let totalDetailCash = (detailCashA + detailCashB + detailCashC)
+  summaryWB.cell(17, 5)
+    .number(totalDetailCash) // Total Detail Cash
+    .style(moneyStyle)
+
+  let totalDetailNet = (detailNetA + detailNetB + detailNetC)
+  summaryWB.cell(17, 6)
+    .number(totalDetailNet) // Total Detail Net
+    .style(moneyStyle)
+
+  let totalActualCash = (actualCashA + actualCashB + actualCashC)
+  let totalActualCashExp = (totalCashA + totalCashB + totalCCardC)
+  summaryWB.cell(17, 7)
+    .number(totalActualCash) // Total Actual Cash
+    .style(moneyStyle)
+
+  let totalOS = (osA + osB + osC)
+  summaryWB.cell(17, 8)
+    .number(totalOS) // Total OS
+    .style(moneyStyle)
+
+  let totalChargeTotal = (chargeTotalA + chargeTotalB + chargeTotalC)
+  let totalChargeTotalExp = (totalCCardA + totalCCardB + totalCCardC)
+  summaryWB.cell(17, 9)
+    .number(totalChargeTotal) // Total Charge Total
+    .style(moneyStyle)
+
+  if (!isFinal) {
+    summaryWB.cell(17, 10)
+      .number(totalChargeTotal - totalChargeTotalExp) // Total OS Charge
+      .style(moneyStyle)
   }
 
-  ws2.cell(14, 2)
+  summaryWB.cell(17, 11)
+    .string("<-- Over Credit/(Under Debit)")
     .style(boldStyle)
-    .string('Totals:')
 
-  wb.write(systemData.fileSaveSystemDir + '/' + currentDateFile + '-' + currentTimeFile + '-' + reportType + '.xlsx')
-}
-
-async function startRegisterReportFinal(){
-  startRegisterReport(false, true, systemData.registerStart['seconds'], false)
-  const systemRef = doc(db, "system", userData.access);
-  await updateDoc(systemRef, {
-    registerStart: serverTimestamp(),
-  });
+  let writeSaveDir = systemData.fileSaveSystemDir + '/' + currentDateFile + '-' + currentTimeFile + '-' + reportType + '.xlsx'
+  wb.write(writeSaveDir)
+  notificationSystem('success', "Report written and saved to '" + writeSaveDir + "'")
 }
 
 async function editMembership(memberInfo){
@@ -2080,11 +2348,18 @@ async function createMembership(memberInfo){
   }
 }
 
-async function gatherUserByID(theUserID){
-  const querySnapshot = await getDocs(collection(db, "users"), where('access', '==', getSystemAccess()));
-  querySnapshot.forEach((doc) => {
-    if (doc.id == theUserID) {
-      return doc.data()
+async function gatherUserByID(theUserID) {
+  usersData.forEach(user => {
+    if (user[0] == theUserID) {
+      return user[1]
+    }
+  });
+}
+
+async function gatherUserNameByID(theUserID) {
+  usersData.forEach(user => {
+    if (user[0] == theUserID) {
+      return user[1].displayName
     }
   });
 }
@@ -2412,6 +2687,43 @@ async function startGatherAllDiscounts(){
   });
 }
 
+async function startGatherAllUsers() {
+  if (startGatherAllUsersA) {
+    return
+  }
+  startGatherAllUsersA = true;
+  const q = query(collection(db, "users", where('access', '==', getSystemAccess())));
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach(async (change) => {
+      if (change.type === "added") {
+        if (!users.includes(change.doc.id)) {
+          users.push(change.doc.id);
+          usersData.push(Array(change.doc.id, change.doc.data()));
+        }
+      }
+      if (change.type === "modified") {
+        if (users.includes(change.doc.id)) {
+          usersData.forEach(async (item, i) => {
+            if (item[0] == change.doc.id) {
+              item[1] = change.doc.data();
+            }
+          });
+        }
+      }
+      if (change.type === "removed") {
+        if (users.includes(change.doc.id)) {
+          usersData.forEach((item, i) => {
+            if (item[0] == change.doc.id) {
+              item[1] = change.doc.data();
+              usersData.splice(i, 1)
+            }
+          });
+        }
+      }
+    });
+  });
+}
+
 async function startGatherAllOrders(){
   if (startGatherAllOrdersA) {
     return
@@ -2557,7 +2869,7 @@ function createAccount(accountInfo){
 
 async function startLoading(){
   loadingProgress = 0;
-  totalLoadingProccesses = 8 // CHANGE ME
+  totalLoadingProccesses = 10 // CHANGE ME
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading user data...'))
   let theUserData = await getUserData();
@@ -2594,9 +2906,16 @@ async function startLoading(){
   await startGatherAllDiscounts();
   loadingProgress = loadingProgress + 1
 
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading users...'))
+  await startGatherAllUsers();
+  loadingProgress = loadingProgress + 1
+
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
+  await quickBooksLogin();
+  loadingProgress = loadingProgress + 1
+
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Finished loading!'))
   goHome(true);
-//    createMail(Array('matthew@striks.com'), 'Test email!', "Test!", "Test")
   await updateTLID();
 }
 
@@ -2989,7 +3308,7 @@ ipcMain.on('request-account', (event, arg) => {
   theClient = event.sender;
   let displayName = getDisplayName();
   let rank = getRank();
-  theClient.send('recieve-account', Array(displayName, rank, systemData))
+  theClient.send('recieve-account', Array(displayName, rank, systemData, oauthClient.isAccessTokenValid()))
 })
 
 ipcMain.on('account-create', (event, arg) => {
@@ -3337,7 +3656,7 @@ ipcMain.on('quick-sale', (event, arg) => {
 
 ipcMain.on('generate-report-now', (event, arg) => {
   theClient = event.sender;
-  startRegisterReport(false, true, false, false)
+  startRegisterReport(false, false)
 })
 
 ipcMain.on('uploadProductImg', (event, arg) => {
@@ -3390,4 +3709,178 @@ ipcMain.on('reciept-choice-pande', (event, arg) => {
 
 ipcMain.on('reciept-choice-close', (event, arg) => {
   recieptWin.close()
+})
+
+const oauthClient = new OAuthClient({
+  clientId: 'ABJqZxMnj4SwV0T1cu7GPf2WOzGjcjQW44wzKG8OtlVJnxg1Bs',
+  clientSecret: 'uAre4dCXtd2Fwbt6CR93XGI3WceTUWZSYoye9tEH',
+  environment: 'sandbox',
+  redirectUri: 'http://clubentertainmentrms.com/resources/quickbooks/',
+});
+
+function quickBooksConnect() {
+  // AuthorizationUri
+  const authUri = oauthClient.authorizeUri({
+    scope: [OAuthClient.scopes.Accounting, OAuthClient.scopes.OpenId],
+    state: 'testState',
+  }); // can be an array of multiple scopes ex : {scope:[OAuthClient.scopes.Accounting,OAuthClient.scopes.OpenId]}
+  shell.openExternal(authUri)
+}
+
+function quickBooksCheckLogin(){
+  return oauthClient.isAccessTokenValid()
+}
+
+const isValidUrl = urlString => {
+  var urlPattern = new RegExp('^(https?:\\/\\/)?' + // validate protocol
+    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // validate domain name
+    '((\\d{1,3}\\.){3}\\d{1,3}))' + // validate OR ip (v4) address
+    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // validate port and path
+    '(\\?[;&a-z\\d%_.~+=-]*)?' + // validate query string
+    '(\\#[-a-z\\d_]*)?$', 'i'); // validate fragment locator
+  return !!urlPattern.test(urlString);
+}
+
+async function quickBooksLogin(parseRedirect) {
+  let authToken
+  if (systemData.quickBooksToken) {
+    authToken = systemData.quickBooksToken
+  }
+  if (isValidUrl(parseRedirect)) {
+    oauthClient.createToken(parseRedirect)
+      .then(async function (authResponse) {
+        authToken = authResponse.getJson()
+      })
+      .catch(function (e) {
+        notificationSystem('danger', 'Something went wrong. (' + e.originalMessage + ')')
+        console.log("The error message is :" + e.originalMessage);
+        console.log(e.intuit_tid);
+        return false
+    });
+  }
+
+  oauthClient.setToken(authToken);
+  if (oauthClient.isAccessTokenValid()) {
+    const docRef = doc(db, "system", getSystemAccess());
+    await updateDoc(docRef, {
+      access: getSystemAccess(),
+      quickBooksToken: authToken
+    }).catch((error) => {
+      console.log(error);
+      if (error.code == "permission-denied") {
+        notificationSystem('danger', 'Access code NOT valid!')
+        updateDoc(doc(db, "users", getUID()), {
+          access: "",
+        });
+      }
+    });
+    return true
+  } else {
+    console.log('Something went wrong');
+    return false
+  }
+}
+
+function quickbooksGetAllProducts(){
+  console.log('HERE: ');
+  console.log(oauthClient.isAccessTokenValid());
+  oauthClient
+    .makeApiCall({
+      url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/4620816365354134710/query',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: "select * from Item",
+    })
+    .then(function (response) {
+      console.log(response);
+      theClient.send('quickbooks-test-test', response)
+    })
+    .catch(function (e) {
+      console.log('The error is ' + JSON.stringify(e));
+    });
+}
+
+function quickBooksTest() {
+  let body = {
+    "Line": [
+      {
+        "DetailType": "SalesItemLineDetail",
+        "Amount": 123.0,
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Membership",
+            "value": "1"
+          }
+        }
+      },
+      {
+        "DetailType": "SalesItemLineDetail",
+        "Amount": 123.0,
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Membership",
+            "value": "1"
+          }
+        }
+      },
+      {
+        "DetailType": "SalesItemLineDetail",
+        "Amount": 123.0,
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Membership",
+            "value": "1"
+          }
+        }
+      },
+      {
+        "DetailType": "SalesItemLineDetail",
+        "Amount": 100.0,
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Product",
+            "value": "1"
+          }
+        }
+      }
+    ],
+    "CustomerRef": {
+      "value": "1"
+    }
+  }
+
+  oauthClient
+    .makeApiCall({
+      url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/4620816365354134710/invoice?minorversion=69',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+    .then(function (response) {
+      console.log(response);
+      console.log('\n\n');
+      console.log(arg['json']['Invoice']);
+      console.log('\n\n');
+      theClient.send('quickbooks-test-test', response)
+    })
+    .catch(function (e) {
+      console.log('The error is ' + JSON.stringify(e));
+    });
+}
+
+ipcMain.on('quickbooks-test', (event, arg) => {
+//  quickBooksTest()
+  quickbooksGetAllProducts()
+})
+
+ipcMain.on('quickbooks-connect', (event, arg) => {
+  quickBooksConnect()
+})
+
+ipcMain.on('quickbooks-login', (event, arg) => {
+  quickBooksLogin(arg)
 })

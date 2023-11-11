@@ -163,14 +163,14 @@ if (noRecieptBtn) {
     membersEmailInput.style.display = 'none'  
     printEmailCompleteBtn.style.display = 'none'  
     recieptStyle = 0
-    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), theChange), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value))
+    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), Number(theChange)), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value))
   })  
 }
 
 if (printBtn) {
   printBtn.addEventListener('click', function(){
     recieptStyle = 1
-    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), theChange), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value))
+    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), Number(theChange)), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value))
   })  
 }
 
