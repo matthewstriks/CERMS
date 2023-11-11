@@ -2692,7 +2692,7 @@ async function startGatherAllUsers() {
     return
   }
   startGatherAllUsersA = true;
-  const q = query(collection(db, "users", where('access', '==', getSystemAccess())));
+  const q = query(collection(db, "users"), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach(async (change) => {
       if (change.type === "added") {
@@ -2721,7 +2721,7 @@ async function startGatherAllUsers() {
         }
       }
     });
-  });
+  })
 }
 
 async function startGatherAllOrders(){
