@@ -80,10 +80,12 @@ let startGatherAllDiscountsA = false
 let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
 
+let pendingOrders = Array()
 let pendingOrderType;
 let pendingOrderInfo;
 let pendingOrderID;
 let lastMemberCreated;
+let orderSuspended = false
 
 let regStatus = false;
 let regStatusID = false;
@@ -452,7 +454,6 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
 }
 
 async function createOrder(memberInfo, orderType, thePendingOrder){
-  await goOrder()
   if (!regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
@@ -464,14 +465,13 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
   }
 
   pendingOrderType = orderType
+  pendingOrderInfo = thePendingOrder
   let theMembersData
   if (memberInfo[0]) {
     theMembersData = await getMemberInfo(memberInfo[0]);
     theMembersName = theMembersData.name;
-    pendingOrderInfo = thePendingOrder
   }else{
     theMembersName = memberInfo[2]
-    pendingOrderInfo = thePendingOrder
   }
   setTimeout(function(){
     theClient.send('send-customer-info', Array(theMembersName, theMembersData, memberInfo[0]))
@@ -481,6 +481,24 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
       }
     });
   }, 1000)
+}
+
+async function suspendOrder(orderInfo) {
+  if (!regStatus) {
+    setTimeout(() => {
+      notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
+    }, 1000);
+    setTimeout(() => {
+      goRegister()
+    }, 3000);
+    return
+  }
+  orderSuspended = true
+  pendingOrders = orderInfo
+}
+
+async function resumeOrder(){
+  theClient.send('resume-order', pendingOrders)
 }
 
 async function viewOrderReciept(theOrderNumber){
@@ -635,10 +653,9 @@ async function completeOrder(orderInfo){
   }
 
   if (orderInfo[2]) {
-    const washingtonRef = doc(db, "discounts", orderInfo[2][0]);
+    const discountRef = doc(db, "discounts", orderInfo[2][0]);
 
-    // Atomically increment the population of the city by 50.
-    await updateDoc(washingtonRef, {
+    await updateDoc(discountRef, {
       used: increment(1)
     });
   }
@@ -3258,12 +3275,14 @@ ipcMain.on('account-logout', (event, arg) => {
 
 ipcMain.on('membership-create', (event, arg) => {
   theClient = event.sender;
+  goOrder()
   createOrder(Array(false, arg[3], arg[0] + ' ' + arg[1]), 'membership', arg)
 })
 
 ipcMain.on('membership-update', async (event, arg) => {
   theClient = event.sender;
   if (arg[11]) {
+    goOrder()
     createOrder(Array(arg[0], arg[4], arg[1] + ' ' + arg[2]), 'updatemembership', arg)        
   }else{
     editMembership(arg);
@@ -3369,11 +3388,13 @@ ipcMain.on('account-delete-user', async (event, arg) => {
 
 ipcMain.on('activity-create', (event, arg) => {
   theClient = event.sender;
+  goOrder()
   createOrder(arg, 'activity', arg)
 })
 
 ipcMain.on('activity-renew', (event, arg) => {
   theClient = event.sender;
+  goOrder()
   createOrder(Array(arg[2], arg[1][2], false), 'renew', arg)
 })
 
@@ -3537,6 +3558,11 @@ ipcMain.on('create-product', (event, arg) => {
 ipcMain.on('gather-products-order', (event, arg) => {
   theClient = event.sender;
   displayAllProductsOrder()
+  setTimeout(() => {
+    if (orderSuspended) {
+      theClient.send('order-suspended')
+    }
+  }, 1000);
 })
 
 ipcMain.on('gather-products', (event, arg) => {
@@ -3610,8 +3636,14 @@ ipcMain.on('order-checkout', (event, arg) => {
   completeOrder(arg)
 })
 
+ipcMain.on('suspend-order', (event, arg) => {
+  theClient = event.sender;
+  suspendOrder(arg)
+})
+
 ipcMain.on('member-create-order', (event, arg) => {
   theClient = event.sender;
+  goOrder()
   createOrder(Array(arg, false, false), 'order', false)
 })
 
@@ -3651,6 +3683,7 @@ ipcMain.on('edit-renew-time', async (event, arg) => {
 
 ipcMain.on('quick-sale', (event, arg) => {
   theClient = event.sender;
+  goOrder()
   createOrder(Array(arg, false, false), 'order', false)
 })
 

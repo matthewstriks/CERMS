@@ -4,6 +4,8 @@ let productSection = document.getElementById('productSection');
 let customerName = document.getElementById('customerName');
 let checkoutCustomerInfo = document.getElementById('checkoutCustomerInfo');
 let clearBtn = document.getElementById('clearBtn');
+let resumeBtn = document.getElementById('resumeBtn');
+let suspendBtn = document.getElementById('suspendBtn');
 let checkoutBtn = document.getElementById('checkoutBtn');
 let productCheckoutList = document.getElementById('productCheckoutList');
 let finishOrderBtn = document.getElementById('finishOrderBtn');
@@ -247,6 +249,23 @@ if (cashEnter) {
   })
 }
 
+if (suspendBtn) {
+  resumeBtn.style.display = 'none'
+  suspendBtn.addEventListener('click', function(){
+    resumeBtn.style.display = ''
+    suspendBtn.style.display = 'none'
+    ipcRenderer.send('suspend-order', Array(productsTotal))
+  })
+}
+
+if (resumeBtn) {
+  resumeBtn.addEventListener('click', function () {
+    suspendBtn.style.display = ''
+    resumeBtn.style.display = 'none'
+    ipcRenderer.send('resume-order')
+  })
+}
+
 if (checkoutBtn) {
   checkoutBtn.addEventListener('click', function(){
     productsSub = 0;
@@ -345,8 +364,6 @@ const formatter = new Intl.NumberFormat('en-US', {
 });
 
 function addProductCard(theProduct){  
-  console.log('Hey:');
-  console.log(theProduct);
   let currentProductCard = document.getElementById(theProduct[0] + 'newCard')
   let currentProductCardInfo = document.getElementById(theProduct[0] + 'cardHeader')
   if (currentProductCard) {
@@ -755,4 +772,9 @@ ipcRenderer.on('send-customer-info', (event, arg) => {
 
 ipcRenderer.on('send-product-info', (event, arg) => {
   addProductCard(arg)
+})
+
+ipcRenderer.on('order-suspended', (event, arg) => {
+  resumeBtn.style.display = ''
+  suspendBtn.style.display = 'none'
 })
