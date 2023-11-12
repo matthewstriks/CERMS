@@ -3355,9 +3355,10 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditCategory: arg[4],
     permissionEditProducts: arg[5],
     permissionEditDiscounts: arg[6],
-    permissionEditCoreProducts: arg[7],
-    permissionEditSystemSettings: arg[8],
-    permissionEditRegisters: arg[9]
+    permissionWaiveProducts: arg[7],
+    permissionEditCoreProducts: arg[8],
+    permissionEditSystemSettings: arg[9],
+    permissionEditRegisters: arg[10]
   });
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')

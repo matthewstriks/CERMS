@@ -35,6 +35,7 @@ let permissionEditCategory = document.getElementById('permissionEditCategory')
 let permissionEditProducts = document.getElementById('permissionEditProducts')
 let permissionEditCoreProducts = document.getElementById('permissionEditCoreProducts')
 let permissionEditDiscounts = document.getElementById('permissionEditDiscounts')
+let permissionWaiveProducts = document.getElementById('permissionWaiveProducts')
 let permissionEditSystemSettings = document.getElementById('permissionEditSystemSettings')
 let permissionEditRegisters = document.getElementById('permissionEditRegisters')
 
@@ -144,7 +145,7 @@ function formWasSubmitted(){
 
 function formWasSubmitted2(){
   //RANK
-  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked))
+  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked))
 }
 
 ipcRenderer.send('request-account')
@@ -214,6 +215,7 @@ if (employeeInput) {
         permissionEditCategory.checked = value[1].permissionEditCategory
         permissionEditProducts.checked = value[1].permissionEditProducts
         permissionEditDiscounts.checked = value[1].permissionEditDiscounts
+        permissionWaiveProducts.checked = value[1].permissionWaiveProducts
         permissionEditCoreProducts.checked = value[1].permissionEditCoreProducts
         permissionEditSystemSettings.checked = value[1].permissionEditSystemSettings
         permissionEditRegisters.checked = value[1].permissionEditRegisters
@@ -224,6 +226,7 @@ if (employeeInput) {
         permissionEditCategory.checked = false
         permissionEditProducts.checked = false
         permissionEditDiscounts.checked = false
+        permissionWaiveProducts.checked = false
         permissionEditCoreProducts.checked = false
         permissionEditSystemSettings.checked = false
         permissionEditRegisters.checked = false
@@ -236,7 +239,10 @@ if (employeeInput) {
 
 ipcRenderer.on('quickbooks-test-test', (event, arg) => {
   console.log('hey\n\n');
-  console.log(arg['json']['Invoice']['Id']);
+  console.log(
+    
+    
+    ['Id']);
 })
 
 ipcRenderer.on('account-edit-success', (event, arg) => {

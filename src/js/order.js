@@ -278,6 +278,7 @@ if (checkoutBtn) {
       let currentProductCard = document.getElementById(item + 'newCard')
       let currQuantity = currentProductCard.getAttribute('quantity');
       let discountInfo = currentProductCard.getAttribute('discount')
+      let discountInfoWaive = (currentProductCard.getAttribute('waived'))
       let theDiscountInfo;
       discountsData.forEach((discountItem, di) => {
         if (discountItem[0] == discountInfo){
@@ -301,10 +302,15 @@ if (checkoutBtn) {
                 theProductPrice = theProductPrice - theOff
                 newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (Discount ' + theDiscountInfo[1].code + ': ' + theDiscountInfo[1].amount + '% OFF ' + formatter.format(item2[1].price) + ')'                
                 discountApplied = true
-              }             
+              }    
             } else{
               newP.innerHTML = item2[1].name + ' - ' + formatter.format(item2[1].price)
-            }            
+            } 
+            if (discountInfoWaive == "1") {
+              theProductPrice = 0
+              newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (WAIVED)'
+              discountApplied = true
+            }    
             productCheckoutList.appendChild(newP)
             productsSub = productsSub + Number(theProductPrice)
             productsOGTot = productsOGTot + Number(theProductPrice)
@@ -386,6 +392,7 @@ function addProductCard(theProduct){
   productsTotal.push(theProduct[0])
   let newCard = document.createElement('div')
   newCard.setAttribute("quantity", 1)
+  newCard.setAttribute('waived', 0)
   newCard.className = 'card'
   newCard.id = theProduct[0] + 'newCard'
 
@@ -401,7 +408,7 @@ function addProductCard(theProduct){
   cardBody.id = theProduct[0] + 'cardBody'
 
   let cardInfo = document.createElement('p')
-  cardInfo.innerHTML = '<a id="' + theProduct[0] + 'trash" href="#" class="btn btn-danger"><i class="fa-solid fa-trash"></i></a> <a class="btn btn-primary" href="#" id="' + theProduct[0] + 'startDiscount"><i class="fa-solid fa-tag"></i></a><p id="' + theProduct[0] + 'orderDiscountWarning" style="color:red"></p><input id = "' + theProduct[0] + 'orderDiscount" type = "text" class="form-control" placeholder = "Discount Code (case sensitive)"><button id="' + theProduct[0] + 'orderDiscountBtn" type="button" class="btn btn-success" name="button">Add discount to item</button><button id = "' + theProduct[0] + 'removeDiscountBtn" type = "button" class="btn btn-danger" name = "button" > Remove discount from item</button>'
+  cardInfo.innerHTML = '<a id="' + theProduct[0] + 'trash" href="#" class="btn btn-danger"><i class="fa-solid fa-trash"></i></a> <a class="btn btn-primary" href="#" id="' + theProduct[0] + 'startDiscount"><i class="fa-solid fa-tag"></i></a><p id="' + theProduct[0] + 'orderDiscountWarning" style="color:red"></p><input id = "' + theProduct[0] + 'orderDiscount" type = "text" class="form-control" placeholder = "Discount Code (case sensitive)"><button id="' + theProduct[0] + 'orderDiscountBtn" type="button" class="btn btn-success" name="button">Add discount to item</button><button id = "' + theProduct[0] + 'removeDiscountBtn" type = "button" class="btn btn-danger" name = "button" > Remove discount from item</button><button id = "' + theProduct[0] + 'waiveProductBtn" class="btn btn-warning" name="button">Waive Item</button>'
   cardInfo.id = theProduct[0] + 'cardInfo'
 
   let endBreak = document.createElement('br')
@@ -418,23 +425,27 @@ function addProductCard(theProduct){
   let productDiscountWarning = document.getElementById(theProduct[0] + 'orderDiscountWarning')
   let productDiscount = document.getElementById(theProduct[0] + 'orderDiscount')
   let productDiscountBtn = document.getElementById(theProduct[0] + 'orderDiscountBtn')
+  let productWaiveBtn = document.getElementById(theProduct[0] + 'waiveProductBtn')
   let removeProductDiscountBtn = document.getElementById(theProduct[0] + 'removeDiscountBtn')
 
   if (removeProductDiscountBtn) {
     removeProductDiscountBtn.style.display = 'none'
     removeProductDiscountBtn.addEventListener('click', function(){
-      removeProductDiscount(productDiscountWarning, productDiscount, productDiscountBtn, removeProductDiscountBtn, newCard)
+      removeProductDiscount(productDiscountWarning, productDiscount, productDiscountBtn, productWaiveBtn, removeProductDiscountBtn, newCard)
       productDiscount.style.display = 'none'
       productDiscountBtn.style.display = 'none'
+      productWaiveBtn.style.display = 'none'
     })
   }
 
   if (sDiscountBtn) {
     productDiscount.style.display = 'none'
     productDiscountBtn.style.display = 'none'
+    productWaiveBtn.style.display = 'none'
     sDiscountBtn.addEventListener('click', function(){
       productDiscount.style.display = ''
       productDiscountBtn.style.display = ''
+      productWaiveBtn.style.display = ''
     })    
   }
 
@@ -452,7 +463,13 @@ function addProductCard(theProduct){
 
   if(productDiscountBtn){
     productDiscountBtn.addEventListener('click', function(){
-      startProductDiscount(productDiscount.value, productDiscountWarning, productDiscount, productDiscountBtn, removeProductDiscountBtn, currentProductCard)
+      startProductDiscount(productDiscount.value, productDiscountWarning, productDiscount, productDiscountBtn, productWaiveBtn, removeProductDiscountBtn, currentProductCard)
+    })
+  }
+
+  if(productWaiveBtn){
+    productWaiveBtn.addEventListener('click', function(){
+      startWaiveProduct(productDiscountWarning, productDiscount, productDiscountBtn, productWaiveBtn, removeProductDiscountBtn, currentProductCard)
     })
   }
 
@@ -460,7 +477,7 @@ function addProductCard(theProduct){
     if (discount[1].asCheck && (discount[1].asPro == theProduct[0])) {
       sDiscountBtn.style.display = "none"
       removeProductDiscountBtn.disabled = true
-      startProductDiscount(discount[1].code, productDiscountWarning, productDiscount, productDiscountBtn, removeProductDiscountBtn, currentProductCard)
+      startProductDiscount(discount[1].code, productDiscountWarning, productDiscount, productDiscountBtn, productWaiveBtn, removeProductDiscountBtn, currentProductCard)
     }
   });
 
@@ -518,6 +535,7 @@ function startOrderDiscount(discountCode){
       discountsSelected = item
       removeDiscountBtn.style.display = ''
       orderDiscountBtn.style.display = 'none'
+      productWaiveBtn.style.display = 'none'
       discountFound = true
     }
   });
@@ -527,10 +545,11 @@ function startOrderDiscount(discountCode){
   }
 }
 
-function removeProductDiscount(theDiscountWarning, theOrderDiscount, theOrderDiscountBtn, theRemoveDiscountBtn, theProductCard){
+function removeProductDiscount(theDiscountWarning, theOrderDiscount, theOrderDiscountBtn, theWaiveProductBtn, theRemoveDiscountBtn, theProductCard){
   discountFound = false
   discountsSelected = false
   theProductCard.setAttribute('discount', false)
+  theProductCard.setAttribute('waived', 0)
   theDiscountWarning.innerHTML = 'Discount removed!'
   theDiscountWarning.style = 'color:red'
   theOrderDiscount.disabled = false
@@ -538,9 +557,10 @@ function removeProductDiscount(theDiscountWarning, theOrderDiscount, theOrderDis
   theOrderDiscountBtn.disabled = false
   theRemoveDiscountBtn.style.display = 'none'
   theOrderDiscountBtn.style.display = ''
+  theWaiveProductBtn.style.display = ''
 }
 
-function startProductDiscount(discountCode, theDiscountWarning, theProductDiscount, theProductDiscountBtn, theRemoveDiscountBtn, theProductCard){
+function startProductDiscount(discountCode, theDiscountWarning, theProductDiscount, theProductDiscountBtn, theProductWaiveBtn, theRemoveDiscountBtn, theProductCard){
   let failReason = 'Discount does not exist!'
   let discountFound = false
   discountsSelected = false
@@ -561,6 +581,7 @@ function startProductDiscount(discountCode, theDiscountWarning, theProductDiscou
       theProductDiscountBtn.disabled = true
       theRemoveDiscountBtn.style.display = ''
       theProductDiscountBtn.style.display = 'none'
+      theProductWaiveBtn.style.display = 'none'
       discountFound = true
       discountsSelected = item
     }
@@ -569,6 +590,17 @@ function startProductDiscount(discountCode, theDiscountWarning, theProductDiscou
     theDiscountWarning.innerHTML = failReason
     theDiscountWarning.style = 'color:red'
   }
+}
+function startWaiveProduct(theDiscountWarning, theProductDiscount, theProductDiscountBtn, theProductWaiveBtn, theRemoveDiscountBtn, theProductCard){
+  theProductCard.setAttribute('waived', 1)
+  theDiscountWarning.innerHTML = 'Product Waived!'
+  theDiscountWarning.style = 'color:green'
+  theProductDiscount.disabled = true
+  theProductDiscountBtn.disabled = true
+  theRemoveDiscountBtn.style.display = ''
+  theProductDiscountBtn.style.display = 'none'
+  theProductWaiveBtn.style.display = 'none'
+  discountFound = true
 }
 
 if (orderDiscountBtn) {
