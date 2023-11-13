@@ -1221,15 +1221,15 @@ async function startRegisterReport(registerID, isFinal) {
 
     startDateStr = startDateS + ' ' + startTime
     startDates = new Date(registerInfo.timestampStart['seconds'] * 1000)
-    q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID));
+    q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID), where("access", "==", getSystemAccess()));
   } else if (!registerID && isFinal) {
     reportType = 'Final'
     startDates = new Date(yesterDate + ' 07:00');
-    q1 = query(ordersRef, where("timestamp", ">", startDates));
+    q1 = query(ordersRef, where("timestamp", ">", startDates), where("access", "==", getSystemAccess()));
   } else {
     reportType = 'Generated'
     startDates = new Date(currentDate + ' 07:00');
-    q1 = query(ordersRef, where("timestamp", ">", startDates));
+    q1 = query(ordersRef, where("timestamp", ">", startDates), where("access", "==", getSystemAccess()));
   }
 
   const startDate = startDates;
@@ -2088,6 +2088,65 @@ async function startRegisterReport(registerID, isFinal) {
   summaryWB.cell(17, 11)
     .string("<-- Over Credit/(Under Debit)")
     .style(boldStyle)
+
+  if (isFinal) {
+    summaryWB.cell(19, 1)
+      .string('Vending Deposit')
+      .style(boldStyle)
+
+    summaryWB.cell(19, 4)
+      .string('Revenue')
+      .style(boldStyle)
+
+    summaryWB.cell(19, 5)
+      .string('Sales Tax')
+      .style(boldStyle)
+
+    summaryWB.cell(19, 7)
+      .string('Facility/Sound Deposit')
+      .style(boldStyle)
+
+    summaryWB.cell(19, 7)
+      .string('Facility/Sound Deposit')
+      .style(boldStyle)
+
+    summaryWB.cell(20, 3)
+      .number(0)
+      .style(moneyStyle)
+
+    summaryWB.cell(20, 4)
+      .formula('C20/1.07')
+      .style(moneyStyle)
+
+    summaryWB.cell(20, 5)
+      .formula('C20-D20')
+      .style(moneyStyle)
+
+    summaryWB.cell(20, 7)
+      .string('Sound System Reserve')
+      .style(boldStyle)
+
+    summaryWB.cell(20, 10)
+      .string('Facility Rental')
+      .style(boldStyle)
+
+    summaryWB.cell(21, 7)
+      .string('Total:')
+      .style(boldStyle)
+
+    summaryWB.cell(21, 8)
+      .number(0)
+      .style(moneyStyle)
+
+    summaryWB.cell(21, 10)
+      .string('Total:')
+      .style(boldStyle)
+
+    summaryWB.cell(21, 11)
+      .number(0)
+      .style(moneyStyle)
+  }
+
 
   let writeSaveDir = systemData.fileSaveSystemDir + '/' + currentDateFile + '-' + currentTimeFile + '-' + reportType + '.xlsx'
   wb.write(writeSaveDir)
