@@ -287,13 +287,13 @@ if(completeCheckIn){
 
 if(editmemberInfoDNABtn){
   editmemberInfoDNABtn.addEventListener('click', function(){
-    ipcRenderer.send('member-dna', memberEditing)
+    ipcRenderer.send('member-dna', Array(memberEditing, editnotesInput.value))
   })
 }
 
 if(editmemberInfoDNABtn2){
   editmemberInfoDNABtn2.addEventListener('click', function(){
-    ipcRenderer.send('member-undna', memberEditing)
+    ipcRenderer.send('member-undna', Array(memberEditing, editnotesInput.value))
   })
 }
 

@@ -282,16 +282,18 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 }
 
 async function memberDNA(memberInfo){
-  const docRef = doc(db, "members", memberInfo);
+  const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     dna: true,
+    notes: memberInfo[1]
   });
 }
 
 async function memberUNDNA(memberInfo){
-  const docRef = doc(db, "members", memberInfo);
+  const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     dna: false,
+    notes: memberInfo[1]
   });
 }
 
