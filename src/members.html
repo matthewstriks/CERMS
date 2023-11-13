@@ -88,6 +88,12 @@
           <div class="modal-body">
             <h1 id="memberInfoTagC" style="color:orange">READ NOTES</h1>
             <textarea class='form-control' rows='4' cols='80' disabled id="memberInfoNotesC">Notes</textarea>
+            <div class="form-check" id="memberInfoTagCBDiv">
+              <input class="form-check-input" type="checkbox" id="memberInfoTagCB">
+              <label class="form-check-label" for="memberInfoTagCB">
+                I read the above listed notes
+              </label>
+            </div>
             <p style="color:red" id="addLockerRoomWarning"></p>
             <select required class="form-select" id="addRentalSelect">
               <option value="">Select Rental</option>
@@ -111,7 +117,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" id="completeCheckIn" disabled data-bs-dismiss="modal" class="btn btn-primary">Complete check in</button>
+            <button type="button" id="completeCheckIn" disabled class="btn btn-primary">Complete check in</button>
           </div>
         </div>
       </div>

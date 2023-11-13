@@ -17,6 +17,8 @@ let completeCheckIn = document.getElementById('completeCheckIn');
 let memberInfoDNA = document.getElementById('memberInfoDNA');
 let memberInfoTag = document.getElementById('memberInfoTag');
 let memberInfoTagC = document.getElementById('memberInfoTagC');
+let memberInfoTagCBDiv = document.getElementById('memberInfoTagCBDiv');
+let memberInfoTagCB = document.getElementById('memberInfoTagCB');
 let memberInfoName = document.getElementById('memberInfoName');
 let memberHistoryInfoName = document.getElementById('memberHistoryInfoName');
 let memberInfoDOB = document.getElementById('memberInfoDOB');
@@ -78,6 +80,7 @@ let selectStatus = false;
 let inputStatus = false;
 let viwingMore = false;
 let rank;
+let isTagged = false
 
 let errorMsg = document.getElementById('errorMsg');
 ipcRenderer.on('notification-system', (event, arg) => {
@@ -272,6 +275,10 @@ if (addLockerRoomInput) {
 
 if(completeCheckIn){
   completeCheckIn.addEventListener('click', function(){
+    if (isTagged && !memberInfoTagCB.checked) {
+      addLockerRoomWarning.innerHTML = 'Make sure you read the notes and check the box.'      
+      return
+    }
     if (addRentalSelect.value == "" || addLockerRoomInput.value == "") {
       addLockerRoomWarning.innerHTML = 'Please fill the below information.'
     }else{
@@ -281,6 +288,7 @@ if(completeCheckIn){
       addLockerRoomInput2.value = "";
       addLockerRoomCheck.checked = false
       addLockerRoomWaiverCheck.checked = false
+      memberInfoTagCB.checked = false
     }
   })
 }
@@ -576,12 +584,15 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       addLockerRoomWaiverCheck.style.display = ''
       addLockerRoomWaiverCheckLbl.style.display = ''
     }
+    isTagged = arg[1].tag
     if (arg[1].tag) {
       memberInfoTagC.style.display = ''
-      memberInfoNotesC.style.display = ''      
+      memberInfoNotesC.style.display = ''  
+      memberInfoTagCBDiv.style.display = ''  
     }else{
       memberInfoTagC.style.display = 'none'
       memberInfoNotesC.style.display = 'none'
+      memberInfoTagCBDiv.style.display = 'none'
       memberInfoNotesC.innerHTML = arg[1].notes
     }
     memberCheckingIn = arg[0];
