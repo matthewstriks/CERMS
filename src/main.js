@@ -654,7 +654,7 @@ async function completeOrder(orderInfo){
     theCustomerID = 0
   }
 
-  if (orderInfo[2]) {
+  if (orderInfo[2] && (orderInfo[2][0] != 0)) {
     const discountRef = doc(db, "discounts", orderInfo[2][0]);
 
     await updateDoc(discountRef, {

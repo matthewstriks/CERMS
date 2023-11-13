@@ -601,6 +601,7 @@ function startWaiveProduct(theDiscountWarning, theProductDiscount, theProductDis
   theProductDiscountBtn.style.display = 'none'
   theProductWaiveBtn.style.display = 'none'
   discountFound = true
+  discountsSelected = Array(0, 'Waived')
 }
 
 if (orderDiscountBtn) {
