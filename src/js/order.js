@@ -811,3 +811,7 @@ ipcRenderer.on('order-suspended', (event, arg) => {
   resumeBtn.style.display = ''
   suspendBtn.style.display = 'none'
 })
+
+ipcRenderer.on('resume-order-data', (event, arg) => {
+  console.log(arg);
+})

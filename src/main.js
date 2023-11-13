@@ -468,6 +468,8 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
 
   pendingOrderType = orderType
   pendingOrderInfo = thePendingOrder
+  pendingOrders.push(Array(memberInfo, orderType, thePendingOrder))
+
   let theMembersData
   if (memberInfo[0]) {
     theMembersData = await getMemberInfo(memberInfo[0]);
@@ -496,11 +498,46 @@ async function suspendOrder(orderInfo) {
     return
   }
   orderSuspended = true
-  pendingOrders = orderInfo
 }
 
 async function resumeOrder(){
-  theClient.send('resume-order', pendingOrders)
+  await goOrder()
+  theClient.send('resume-order-data', pendingOrders)
+  let memberChosenTF = false
+  let memberChosen
+  let theMemberChosen
+  pendingOrders.forEach(async porder => {
+    //Array(memberInfo, orderType, thePendingOrder)
+    let memberInfo = porder[0]
+//    let orderType = porder[1]
+//    let thePendingOrder = porder[3]
+    let theMembersData
+    if (memberChosenTF) {
+      theMembersData = memberChosen
+      theMembersName = theMemberChosen;
+    } else{
+      if (memberInfo[0]) {
+        theMembersData = await getMemberInfo(memberInfo[0]);
+        theMembersName = theMembersData.name;
+        memberChosenTF = true
+        memberChosen = await getMemberInfo(memberInfo[0]);
+        theMemberChosen = theMembersData.name;
+      } else {
+        memberChosenTF = true
+        theMembersName = memberInfo[2]
+        theMemberChosen = memberInfo[2]
+      }
+    }
+    setTimeout(function () {
+      theClient.send('send-customer-info', Array(theMembersName, theMembersData, memberInfo[0]))
+      productsData.forEach((item, i) => {
+        if (item[1].name == memberInfo[1]) {
+          theClient.send('send-product-info', item)
+        }
+      });
+    }, 1000)
+  });
+
 }
 
 async function viewOrderReciept(theOrderNumber){
@@ -692,41 +729,21 @@ async function completeOrder(orderInfo){
   let registerInfo = await getActiveRegister()
   updateRegisterSub(registerInfo, orderInfo[4], orderInfo[3], false)
 
-  if (pendingOrderType == 'membership') {
-    pendingOrderID = docRef.id
-    goMembers()
-    setTimeout(function(){
-      orderInfo[1].forEach(product => {
-        productsData.forEach(mproduct => {
-          if(product == mproduct[0]){
-            if (mproduct[1].rental) {
-              setTimeout(function(){
-                createActivity(Array(lastMemberCreated, mproduct[1].name, orderInfo[8], orderInfo[9], false, false))
-              }, 3000);
-            }
-          }
-        })
-      });
-      createMembership(pendingOrderInfo);
-    }, 1000)
-  }else if (pendingOrderType == 'updatemembership') {
-    goMembers()
-    setTimeout(function () {
-      editMembership(pendingOrderInfo);
-    }, 1000)
-  }else if (pendingOrderType == 'activity') {
-    goHome()
-    setTimeout(function () {
-      createActivity(pendingOrderInfo)
-    }, 1000)
-  }else if (pendingOrderType == 'renew') {
-    goHome()
-    setTimeout(function () {
-      renewActivity(pendingOrderInfo)
-    }, 1000)
-  }else if (pendingOrderType == 'order') {
-    goHome()
-  }
+  pendingOrders.forEach(porder => {
+    if (porder[1] == 'membership') {
+      pendingOrderID = docRef.id
+      createMembership(porder[2])
+    } else if (porder[1] == 'updatemembership'){
+      editMembership(porder[2])
+    } else if (porder[1] == 'activity'){
+      createActivity(porder[2])
+    } else if (porder[1] == 'renew'){
+      renewActivity(porder[2])
+    }
+  }); 
+  goHome()
+  orderSuspended = false
+  pendingOrders = Array()
 
   for (let i = 0; i < orderInfo[1].length; i += 1) {
     await editProductInventory(orderInfo[1][i])
@@ -3701,6 +3718,11 @@ ipcMain.on('order-checkout', (event, arg) => {
 ipcMain.on('suspend-order', (event, arg) => {
   theClient = event.sender;
   suspendOrder(arg)
+})
+
+ipcMain.on('resume-order', (event, arg) => {
+  theClient = event.sender;
+  resumeOrder()
 })
 
 ipcMain.on('member-create-order', (event, arg) => {
