@@ -2400,7 +2400,7 @@ async function editProduct(productInfo){
     barcode: productInfo[15]
   });
   notificationSystem('success', 'Product Edited!')
-  goProducts()
+//  goProducts()
 }
 
 async function editProductInventory(productInfo) {
