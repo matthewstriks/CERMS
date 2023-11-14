@@ -9,14 +9,19 @@
     "test": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "build": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "echo \"No linting configured\""
+    "lint": "echo \"No linting configured\"",
+    "build": "electron-builder build --win --publish never",
+    "deploy": "electron-builder build --win --publish always"
   },
   "keywords": [],
   "author": {
     "name": "Matthew Striks",
     "email": "developer@clubentertainmentrms.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matthewstriks/CERMS.git"
   },
   "license": "MIT",
   "dependencies": {
@@ -25,6 +30,7 @@
     "chart.js": "^3.8.0",
     "delay": "^5.0.0",
     "electron-squirrel-startup": "^1.0.0",
+    "electron-updater": "^6.1.4",
     "excel4node": "^1.8.0",
     "firebase": "^10.1.0",
     "intuit-oauth": "^4.0.0",
@@ -41,6 +47,7 @@
     "@electron-forge/maker-squirrel": "^6.2.1",
     "@electron-forge/maker-zip": "^6.2.1",
     "@electron-forge/plugin-auto-unpack-natives": "^6.2.1",
+    "electron-builder": "^22.14.13",
     "electron": "^25.8.2"
   }
 }

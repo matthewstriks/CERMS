@@ -1,5 +1,6 @@
 const devMode = true;
 const { app, BrowserWindow, ipcMain, dialog, webContents, shell, systemPreferences } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const xl = require('excel4node');
@@ -115,6 +116,7 @@ async function getVersionLive() {
 function loadAuth(){
   mainWin.unmaximize()
   mainWin.loadFile(path.join(__dirname, 'login.html'));
+  autoUpdater.checkForUpdatesAndNotify();
 }
 
 function goHome(firstTime){
@@ -3421,7 +3423,26 @@ app.on('activate', () => {
   }
 });
 
+ipcMain.on('app_version', (event) => {
+  theClient = event.sender
+  theClient.send('app_version', { version: app.getVersion() });
+});
+
+autoUpdater.on('update-available', () => {
+  notificationSystem('success', 'A new update is available. Downloading now...')
+  theClient.send('update_available');
+});
+
+autoUpdater.on('update-downloaded', () => {
+  notificationSystem('success', 'Update Downloaded. It will be installed on restart.')
+  theClient.send('update_downloaded');
+});
+
 // IPCMain's
+
+ipcMain.on('restart_app', () => {
+  autoUpdater.quitAndInstall();
+});
 
 ipcMain.on('getClient', (event, arg) => {
   if (!theClient) {
