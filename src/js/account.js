@@ -25,6 +25,8 @@ let connectQuickBooksInput = document.getElementById('connectQuickBooksInput')
 let quickBooksTestBtn = document.getElementById('quickBooksTestBtn')
 let editRecieptTxt = document.getElementById('editRecieptTxt')
 let editRegisterRecieptTxt = document.getElementById('editRegisterRecieptTxt')
+let editRecieptTxtBtn = document.getElementById('editRecieptTxtBtn')
+let editRegisterRecieptTxtBtn = document.getElementById('editRegisterRecieptTxtBtn')
 
 let editAccountBtn = document.getElementById('editAccountBtn')
 let editAccountForm = document.getElementById('editAccountForm')
@@ -119,6 +121,18 @@ if (editInvWarnEMail) {
 if (editRenewTimeBtn) {
   editRenewTimeBtn.addEventListener('click', function(){
     ipcRenderer.send('edit-renew-time', editRenewTime.value)
+  })
+}
+
+if (editRecieptTxtBtn) {
+  editRecieptTxtBtn.addEventListener('click', function(){
+    ipcRenderer.send('edit-reciept', editRecieptTxt.value)
+  })
+}
+
+if (editRegisterRecieptTxtBtn) {
+  editRegisterRecieptTxtBtn.addEventListener('click', function(){
+    ipcRenderer.send('edit-register-reciept', editRegisterRecieptTxt.value)
   })
 }
 

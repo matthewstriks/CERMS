@@ -3882,6 +3882,32 @@ ipcMain.on('edit-renew-time', async (event, arg) => {
   }
 })
 
+ipcMain.on('edit-reciept', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (userAllowed) {
+    const docRef = doc(db, "system", userData.access);
+    await updateDoc(docRef, {
+      reciept: arg
+    });
+    await getSystemData()
+    goHome()      
+  }
+})
+
+ipcMain.on('edit-register-reciept', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (userAllowed) {
+    const docRef = doc(db, "system", userData.access);
+    await updateDoc(docRef, {
+      registerReciept: arg
+    });
+    await getSystemData()
+    goHome()      
+  }
+})
+
 ipcMain.on('quick-sale', (event, arg) => {
   theClient = event.sender;
   goOrder()
