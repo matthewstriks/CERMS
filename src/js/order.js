@@ -34,6 +34,7 @@ let searchProducts = document.getElementById('searchProducts');
 
 let totalLeftAmt;
 let ran = false
+let discountingOrder = false
 
 let errorMsg = document.getElementById('errorMsg');
 ipcRenderer.on('notification-system', (event, arg) => {
@@ -606,9 +607,15 @@ function startWaiveProduct(theDiscountWarning, theProductDiscount, theProductDis
 
 if (orderDiscountBtn) {
   removeDiscountBtn.style.display = 'none'
+  orderDiscount.style.display = 'none'
 
   orderDiscountBtn.addEventListener('click', function(){
-    startOrderDiscount(orderDiscount.value)
+    if (discountingOrder) {
+      startOrderDiscount(orderDiscount.value)      
+    } else {
+      discountingOrder = true
+      orderDiscount.style.display = ''
+    }
   })
 
   removeDiscountBtn.addEventListener('click', function(){
