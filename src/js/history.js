@@ -28,7 +28,7 @@ if (document.getElementById('testTable')) {
 }
 
 if (activityDiv) {
-  activityDiv.style.display = 'none'
+//  activityDiv.style.display = 'none'
   ordersDiv.style.display = 'none'
 }
 
