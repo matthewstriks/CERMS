@@ -755,6 +755,10 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   }else{
     productImg.setAttribute('src', './286x180.svg')    
   }
+  productImg.addEventListener('click', function(){
+    addProductCard(arg)
+    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
+  })
   
   var productBody = document.createElement('div')
   productBody.className = 'card-body'
@@ -767,6 +771,7 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   productBodyTxt.className = 'card-text'
   productBodyTxt.innerHTML = arg[1].desc
 
+  /*
   var productFooter = document.createElement('a')
   productFooter.innerHTML = 'Add to order'
   productFooter.className = 'btn btn-success'
@@ -775,11 +780,11 @@ ipcRenderer.on('return-products-order', (event, arg) => {
     productFooter.setAttribute('data-bs-toggle', 'modal')
     productFooter.setAttribute('data-bs-target', '#myModal3')
   }
-
   productFooter.addEventListener('click', function(){
     addProductCard(arg)
     ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
   })
+  */
 
   var productBreak = document.createElement('br')
 
@@ -790,7 +795,7 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   productCard.appendChild(productBody)
   productBody.appendChild(productTitle)
   productBody.appendChild(productBodyTxt)
-  productBody.appendChild(productFooter)
+//  productBody.appendChild(productFooter)
   theAccordionBody.appendChild(productBreak)
 })
 
