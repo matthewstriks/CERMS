@@ -1,4 +1,4 @@
-const devMode = true;
+const devMode = false;
 const { app, BrowserWindow, ipcMain, dialog, webContents, shell, systemPreferences } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
@@ -104,29 +104,15 @@ const formatter = new Intl.NumberFormat('en-US', {
   currency: 'USD',
 });
 
-async function getVersionLive() {
-  const response = await fetch('https://matthewstriks.com/cerms/version.txt');
-  liveVersion = await response.text();
-  theAppVersion = app.getVersion()
-  if (liveVersion != theAppVersion) {
-    notificationSystem('warning', 'New Version Available! (' + liveVersion + ')')
-  }
-}
-
 function loadAuth(){
   mainWin.unmaximize()
   mainWin.loadFile(path.join(__dirname, 'login.html'));
   autoUpdater.checkForUpdatesAndNotify();
 }
 
-function goHome(firstTime){
+function goHome(){
   mainWin.loadFile(path.join(__dirname, 'home.html'));
   mainWin.maximize()
-  setTimeout(() => {
-    if (firstTime) {
-      getVersionLive()
-    }
-  }, 1000);
 }
 
 function goOrder(){
@@ -3429,7 +3415,7 @@ ipcMain.on('app_version', (event) => {
 });
 
 autoUpdater.on('update-available', () => {
-  notificationSystem('success', 'A new update is available. Downloading now...')
+  notificationSystem('warning', 'A new update is available. Downloading now...')
   theClient.send('update_available');
 });
 
