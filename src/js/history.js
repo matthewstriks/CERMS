@@ -247,9 +247,9 @@ ipcRenderer.on('history-request-return', (event, arg) => {
   var date = a.getDate();
   let hour = String(a.getHours()).padStart(2, '0');
   let ampm = "AM"
-  if (hour > 12) {
+  if (Number(hour) > 12) {
     ampm = "PM"
-    hour = hour - 12
+    hour = Number(hour) - 12
   }
   var min = String(a.getMinutes()).padStart(2, '0');
   var sec = a.getSeconds();
@@ -275,10 +275,10 @@ ipcRenderer.on('history-request-return', (event, arg) => {
   let theOutDate;
   if (date == date2) {
     theInDate = month + '/' + date + '/' + year + ' ' + hour + ':' + min + ' ' + ampm
-    theOutDate = hour2 + ':' + min2 + ' ' + ampm
+    theOutDate = hour2 + ':' + min2 + ' ' + ampm2
   }else{
     theInDate = month + '/' + date + '/' + year + ' ' + hour + ':' + min + ' ' + ampm
-    theOutDate = month2 + '/' + date2 + '/' + year2 + ' ' + hour2 + ':' + min2 + ' ' + ampm
+    theOutDate = month2 + '/' + date2 + '/' + year2 + ' ' + hour2 + ':' + min2 + ' ' + ampm2
   }
 
   row.setAttribute('activityid', arg[0]);
