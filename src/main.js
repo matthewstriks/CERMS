@@ -351,7 +351,7 @@ async function createCategory(catName, catDesc, catColor){
   goProducts()
 }
 
-async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode){
+async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proFavorite, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode){
   notificationSystem('warning', 'Creating Product...')
   let userAllowed = canUser('permissionEditProducts')
   let userAllowedCore = canUser('permissionEditCoreProducts')
@@ -392,6 +392,7 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     desc: proDesc,
     inventory: proInv,
     inventoryPar: proInvPar,
+    taxable: proFavorite,
     taxable: proTaxable,
     active: proActive,
     core: theProCore,
@@ -2390,16 +2391,17 @@ async function editProduct(productInfo){
     invWarning: productInfo[4],
     desc: productInfo[5],
     inventory: productInfo[6],
-    inventoryPar: productInfo[14],
-    taxable: productInfo[7],
-    active: productInfo[8],
-    core: productInfo[9],
-    rental: productInfo[10],
-    membership: productInfo[11],
+    favorite: productInfo[7],
+    taxable: productInfo[8],
+    active: productInfo[9],
+    core: productInfo[10],
+    rental: productInfo[11],
+    membership: productInfo[12],
     membershipLength: theMembershipLength,
-    membershipLengthRaw: productInfo[12],
-    membershipLengthType: productInfo[13],
-    barcode: productInfo[15]
+    membershipLengthRaw: productInfo[13],
+    membershipLengthType: productInfo[14],
+    inventoryPar: productInfo[15],
+    barcode: productInfo[16]
   });
   notificationSystem('success', 'Product Edited!')
 //  goProducts()
@@ -3747,7 +3749,7 @@ ipcMain.on('remove-category', (event, arg) => {
 
 ipcMain.on('create-product', (event, arg) => {
   theClient = event.sender;
-  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14])
+  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15])
 })
 
 ipcMain.on('gather-products-order', (event, arg) => {

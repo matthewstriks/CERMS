@@ -21,6 +21,7 @@ let productName = document.getElementById('productName')
 let productBarcode = document.getElementById('productBarcode')
 let productPrice = document.getElementById('productPrice')
 let productInvWarning = document.getElementById('productInvWarning')
+let productFavorite = document.getElementById('productFavorite')
 let productTaxable = document.getElementById('productTaxable')
 let productActive = document.getElementById('productActive')
 let productCore = document.getElementById('productCore')
@@ -41,6 +42,7 @@ let editProductName = document.getElementById('editProductName')
 let editProductBarcode = document.getElementById('editProductBarcode')
 let editProductPrice = document.getElementById('editProductPrice')
 let editProductInvWarning = document.getElementById('editProductInvWarning')
+let editProductFavorite = document.getElementById('editProductFavorite')
 let editProductTaxable = document.getElementById('editProductTaxable')
 let editProductActive = document.getElementById('editProductActive')
 let editProductCore = document.getElementById('editProductCore')
@@ -207,11 +209,11 @@ function removeCategory(){
 }
 
 function addProduct(){
-  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value))
+  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productFavorite.checked, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value))
 }
 
 function editProduct(){
-  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value))
+  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductFavorite.checked, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value))
 }
 
 function removeProduct(){
@@ -452,6 +454,7 @@ ipcRenderer.on('return-products', (event, arg) => {
     editProductBarcode.value = arg[1].barcode
     editProductPrice.value = arg[1].price
     editProductInvWarning.value = arg[1].invWarning
+    editProductFavorite.checked = arg[1].favorite
     editProductTaxable.checked = arg[1].taxable
     editProductActive.checked = arg[1].active
     editProductCore.checked = arg[1].core
@@ -503,6 +506,7 @@ ipcRenderer.on('return-products-update', (event, arg) => {
     editProductBarcode.value = arg[1].barcode
     editProductPrice.value = arg[1].price
     editProductInvWarning.value = arg[1].invWarning
+    editProductFavorite.checked = arg[1].favorite
     editProductTaxable.checked = arg[1].taxable
     editProductActive.checked = arg[1].active
     editProductCore.checked = arg[1].core

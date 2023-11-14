@@ -788,8 +788,9 @@ ipcRenderer.on('return-products-order', (event, arg) => {
 
   var productBreak = document.createElement('br')
 
-  theAccordionBodyRow.appendChild(theAccordionBodyRowCol)
+  theAccordionBodyRow.appendChild(theAccordionBodyRowCol) 
   theAccordionBodyRowCol.appendChild(productCard)
+//  document.getElementById('productCardRow').appendChild(productCard)
   theAccordionBodyRowCol.appendChild(theAccordionBodyRowColBr)
   productCard.appendChild(productImg)
   productCard.appendChild(productBody)
