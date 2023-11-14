@@ -576,6 +576,69 @@ async function viewOrderReciept(theOrderNumber){
   }
 }
 
+async function registerReciept(registerID){
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theDisplayName = await getDisplayName()
+  let p2 = path.join(__dirname, '.', 'last-reciept.html');
+
+  const docRef = doc(db, "registers", registerID);
+  const docSnap = await getDoc(docRef);
+  let registerInfo = docSnap.data()
+
+  let theHTML
+  let withDate
+  let withCashier
+  let withInput100
+  let withInput50
+  let withInput20
+  let withInput10
+  let withInput5
+  let withInput1
+  let withInput25C
+  let withInput10C
+  let withInput5C
+  let withInput1C
+
+  formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100)
+  
+
+  theHTML = systemData.registerReciept
+  withDate = theHTML.replace('TheDate', theStringTime)
+  withCashier = withDate.replace('TheCashier', theDisplayName)
+  withInput100 = withDate.replace('Input100', registerInfo.input100)
+  withInput50 = withInput100.replace('Input50', registerInfo.input50)
+  withInput20 = withInput50.replace('Input20', registerInfo.input20)
+  withInput10 = withInput20.replace('Input10', registerInfo.input10)
+  withInput5 = withInput10.replace('Input5', registerInfo.input5)
+  withInput1 = withInput5.replace('Input1', registerInfo.input1)
+  withInput25C = withInput1.replace('Input25c', registerInfo.input25c)
+  withInput10C = withInput25C.replace('Input10c', registerInfo.input10c)
+  withInput5C = withInput10C.replace('Input05c', registerInfo.input5c)
+  withInput1C = withInput5C.replace('Input01c', registerInfo.input1c)
+  withTotal = withInput1C.replace('TheTotal', registerInfo.ending)
+  withStarting = withTotal.replace('TheExpTotal', registerInfo.starting)
+  withDiff = withStarting.replace('TheDifference', (formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100) - formatter.format(Math.round((Number(registerInfo.ending) + Number.EPSILON) * 100) / 100)))
+  withChargeTotal = withDiff.replace('TheTotalCharge', formatter.format(Math.round((Number(registerInfo.ccard) + Number.EPSILON) * 100) / 100))
+
+  fs.writeFile(p2, withChargeTotal, err => {
+    if (err) {
+      console.error(err);
+    }
+    createRecieptScreen(false)
+  });
+
+  await updateDoc(docRef, {
+    reciept: withChargeTotal
+  });
+}
+
 async function recieptProcess(orderInfo, theOrderNumber){
   let recieptStyle = orderInfo[6]
   let theTimestamp = new Date(Math.floor(Date.now()))
@@ -1038,6 +1101,7 @@ async function endRegister(registerInfo, logoutTF){
     input1c: registerInfo[10],
     active: false
   });
+  registerReciept(regStatusID)
   startRegisterReport(regStatusID, false)
   regStatus = false
   regStatusID = false

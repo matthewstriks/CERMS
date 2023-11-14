@@ -23,6 +23,8 @@ let connectQuickBooksBtn = document.getElementById('connectQuickBooksBtn')
 let connectQuickBooksDiv = document.getElementById('connectQuickBooksDiv')
 let connectQuickBooksInput = document.getElementById('connectQuickBooksInput')
 let quickBooksTestBtn = document.getElementById('quickBooksTestBtn')
+let editRecieptTxt = document.getElementById('editRecieptTxt')
+let editRegisterRecieptTxt = document.getElementById('editRegisterRecieptTxt')
 
 let editAccountBtn = document.getElementById('editAccountBtn')
 let editAccountForm = document.getElementById('editAccountForm')
@@ -186,6 +188,8 @@ ipcRenderer.on('recieve-account', (event, arg) => {
   }else {
     rankInfo.innerHTML = 'Rank: Unknown';
   }
+  editRecieptTxt.value = arg[2].reciept
+  editRegisterRecieptTxt.value = arg[2].registerReciept
 })
 
 ipcRenderer.on('recieve-users', (event, arg) => {
