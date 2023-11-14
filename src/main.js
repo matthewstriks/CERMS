@@ -470,7 +470,7 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
 
   pendingOrderType = orderType
   pendingOrderInfo = thePendingOrder
-  pendingOrders.push(Array(memberInfo, orderType, thePendingOrder))
+  pendingOrders.unshift(Array(memberInfo, orderType, thePendingOrder))
 
   let theMembersData
   if (memberInfo[0]) {
@@ -491,7 +491,7 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
 
 async function addToOrder(memberInfo, thePendingOrder){
   let pendingOrderType = 'order'
-  pendingOrders.push(Array(memberInfo, pendingOrderType, thePendingOrder))
+  pendingOrders.unshift(Array(memberInfo, pendingOrderType, thePendingOrder))
 
   let theMembersData
   if (memberInfo[0]) {
@@ -560,18 +560,20 @@ async function viewOrderReciept(theOrderNumber){
   let p2 = path.join(__dirname, '.', 'last-reciept.html');
   let theReciept = ""
 
-  const querySnapshot = await getDocs(collection(db, "orders"), where('access', '==', getSystemAccess()));
-  querySnapshot.forEach((doc) => {
-    if (doc.id == theOrderNumber) {
-      theReciept = doc.data().reciept
-      fs.writeFile(p2, theReciept, err => {
-        if (err) {
-          console.error(err);
-        }
-        createRecieptScreen(true)
-      });
-    }
-  });
+  const docRef = doc(db, "orders", theOrderNumber);
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    theReciept = docSnap.data().reciept
+    fs.writeFile(p2, theReciept, err => {
+      if (err) {
+        console.error(err);
+      }
+      createRecieptScreen(true)
+    });
+  } else {
+    return false;
+  }
 }
 
 async function recieptProcess(orderInfo, theOrderNumber){
@@ -2625,8 +2627,7 @@ async function displayAllOrders(){
   let theCurrentTimeP24 = theCurrentTime - 604800
   let theCurrentTimeP24Date = new Date(theCurrentTimeP24 * 1000);
   const q = query(collection(db, "orders"), where("timestamp", ">=", theCurrentTimeP24Date), where('access', '==', getSystemAccess()));
-
-  const querySnapshot = await getDocs(q);
+  const querySnapshot = await getDocs(q)
   querySnapshot.forEach(async (doc) => {
     let theMemberInfo = false
     if (doc.data().customerID) {
@@ -3763,9 +3764,9 @@ ipcMain.on('add-to-order', (event, arg) => {
       addToOrder(arg[0], arg[1][0])      
     } else if ((product[0] == arg[1][0]) && (product[1].rental)) {
       if (!arg[0][1]) {
-        pendingOrders.push(Array(0, 'activity', Array(0, product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
+        pendingOrders.unshift(Array(0, 'activity', Array(0, product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
       }else{
-        pendingOrders.push(Array(arg[0], 'activity', Array(arg[0][2], product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
+        pendingOrders.unshift(Array(arg[0], 'activity', Array(arg[0][2], product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
       }
     }
   });
