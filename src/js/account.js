@@ -166,29 +166,13 @@ function formWasSubmitted2(){
 
 ipcRenderer.send('request-account')
 ipcRenderer.on('recieve-account', (event, arg) => {
-  saveDir.innerHTML = 'Report save directory: ' + arg[2].fileSaveSystemDir
-
-  arg[2].fileSaveSystem.forEach(theDir => {
-    var opt = document.createElement('li');
-    var opt2 = document.createElement('br')
-    opt.setAttribute("theDir", theDir)
-    opt.innerHTML = '<button class="btn btn-danger">' + theDir + '</button>';
-    opt.addEventListener('click', function(){
-      ipcRenderer.send('remove-dir', opt.getAttribute('theDir'))
-      opt.style.display = 'none'
-      opt2.style.display = 'none'
-    })
-    editModalDirs.appendChild(opt);
-    editModalDirs.appendChild(opt2);
-
-    if (arg[3]) {
-      connectQuickBooksBtn.disabled = true
-      connectQuickBooksBtn.innerHTML = 'Connected!'
-    }else{
-      connectQuickBooksBtn.innerHTML = 'Connect'
-      connectQuickBooksBtn.disabled = false
-    }
-  });
+  if (arg[3]) {
+    connectQuickBooksBtn.disabled = true
+    connectQuickBooksBtn.innerHTML = 'Connected!'
+  } else {
+    connectQuickBooksBtn.innerHTML = 'Connect'
+    connectQuickBooksBtn.disabled = false
+  }
 
   invWarnEMail.value = arg[2].invWarnEMail
   editRenewTime.value = arg[2].renewTime
@@ -204,6 +188,24 @@ ipcRenderer.on('recieve-account', (event, arg) => {
   }
   editRecieptTxt.value = arg[2].reciept
   editRegisterRecieptTxt.value = arg[2].registerReciept
+
+  if (!arg[2] || !Array.isArray(arg[2])) {
+    saveDir.innerHTML = 'Report save directory: ' + arg[2].fileSaveSystemDir
+  } else {
+    arg[2].fileSaveSystem.forEach(theDir => {
+      var opt = document.createElement('li');
+      var opt2 = document.createElement('br')
+      opt.setAttribute("theDir", theDir)
+      opt.innerHTML = '<button class="btn btn-danger">' + theDir + '</button>';
+      opt.addEventListener('click', function () {
+        ipcRenderer.send('remove-dir', opt.getAttribute('theDir'))
+        opt.style.display = 'none'
+        opt2.style.display = 'none'
+      })
+      editModalDirs.appendChild(opt);
+      editModalDirs.appendChild(opt2);
+    });
+  }
 })
 
 ipcRenderer.on('recieve-users', (event, arg) => {

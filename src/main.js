@@ -2559,9 +2559,8 @@ async function gatherUserNameByID(theUserID) {
 }
 
 async function gatherAllUsers(){
-  const querySnapshot = await getDocs(collection(db, "users"), where('access', '==', getSystemAccess()));
-  querySnapshot.forEach((doc) => {
-    theClient.send('recieve-users', Array(doc.id, doc.data()))
+  usersData.forEach(user => {
+    theClient.send('recieve-users', Array(user[0], user[1]))    
   });
 }
 
