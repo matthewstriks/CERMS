@@ -87,6 +87,7 @@ typings/
 
 # Electron-Forge
 out/
+dist/
 .vscode/
 src/last-reciept.html
 src/reciept.html
