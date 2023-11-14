@@ -351,7 +351,7 @@ async function createCategory(catName, catDesc, catColor){
   goProducts()
 }
 
-async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proFavorite, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode){
+async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proFavorite, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode, proRentalLength, proRentalLengthType){
   notificationSystem('warning', 'Creating Product...')
   let userAllowed = canUser('permissionEditProducts')
   let userAllowedCore = canUser('permissionEditCoreProducts')
@@ -368,6 +368,7 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     theProCore = false
   }
   let theMembershipLength = false
+  let theRentalLength = false
   if (proMembership) {
     let theMultiple
     if (proMembershipLengthType == 'hour') {
@@ -382,6 +383,21 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
       theMultiple = 3.154e+7
     }
     theMembershipLength = proMembershipLength * theMultiple
+  }
+  if (proRental) {
+    let theMultiple
+    if (proRentalLengthType == 'hour') {
+      theMultiple = 3600
+    } else if (proRentalLengthType == 'day') {
+      theMultiple = 86400      
+    } else if (proRentalLengthType == 'week') {
+      theMultiple = 604800      
+    } else if (proRentalLengthType == 'month') {
+      theMultiple = 2.628e+6
+    } else if (proRentalLengthType == 'year') {
+      theMultiple = 3.154e+7
+    }
+    theRentalLength = proRentalLength * theMultiple
   }
   const docRef = await addDoc(collection(db, 'products'), {
     access: getSystemAccess(),
@@ -401,6 +417,9 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     membershipLength: theMembershipLength,
     membershipLengthRaw: proMembershipLength,
     membershipLengthType: proMembershipLengthType,
+    rentalLength: theRentalLength,
+    rentalLengthRaw: proRentalLength,
+    rentalLengthType: proRentalLengthType,
     barcode: proBarcode,
     image: false
   });
@@ -832,7 +851,16 @@ async function createActivity(memberInfo){
   // ['memberid', 'type', 'number', 'notes', waitlist, waiver?(false)]
   let theUserID = getUID();
   let theCurrentTime = Math.floor(Date.now() / 1000);
-  let theTimeExpire = theCurrentTime + 21600;
+
+  let theRentalLength = 21600
+
+  productsData.forEach(product => {
+    if (product[1].name == memberInfo[1]) {
+      theRentalLength = product[1].rentalLength
+    }
+  });
+
+  let theTimeExpire = theCurrentTime + theRentalLength;
   let theMemberID = memberInfo[0]
   let useTheLockerRoomInput = memberInfo[2]
   let useTheLockerRoomInput2 = memberInfo[3]
@@ -2345,6 +2373,7 @@ async function getDiscountInfo(discountID){
 }
 
 async function editProduct(productInfo){
+  console.log(productInfo);
   notificationSystem('warning', 'Editing Product...')
   let userAllowed = canUser('permissionEditProducts')
   let isProductCore = await productIsCore(productInfo[0])
@@ -2367,7 +2396,8 @@ async function editProduct(productInfo){
 //  13 - editProductMembershipLengthType.value
 
   let theMembershipLength = false
-  if (productInfo[11]) {
+  let theRentalLength = false
+  if (productInfo[12]) {
     let theMultiple
     if (productInfo[13] == 'hour') {
       theMultiple = 3600
@@ -2381,6 +2411,21 @@ async function editProduct(productInfo){
       theMultiple = 3.154e+7
     }
     theMembershipLength = productInfo[12] * theMultiple
+  }
+  if (productInfo[11]) {
+    let theMultiple
+    if (productInfo[18] == 'hour') {
+      theMultiple = 3600
+    } else if (productInfo[18] == 'day') {
+      theMultiple = 86400
+    } else if (productInfo[18] == 'week') {
+      theMultiple = 604800
+    } else if (productInfo[18] == 'month') {
+      theMultiple = 2.628e+6
+    } else if (productInfo[18] == 'year') {
+      theMultiple = 3.154e+7
+    }
+    theRentalLength = productInfo[17] * theMultiple
   }
 
   const docRef = doc(db, "products", productInfo[0]);
@@ -2400,6 +2445,9 @@ async function editProduct(productInfo){
     membershipLength: theMembershipLength,
     membershipLengthRaw: productInfo[13],
     membershipLengthType: productInfo[14],
+    rentalLength: theRentalLength,
+    rentalLengthRaw: productInfo[17],
+    rentalLengthType: productInfo[18],
     inventoryPar: productInfo[15],
     barcode: productInfo[16]
   });
@@ -3749,7 +3797,7 @@ ipcMain.on('remove-category', (event, arg) => {
 
 ipcMain.on('create-product', (event, arg) => {
   theClient = event.sender;
-  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15])
+  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15], arg[16], arg[17])
 })
 
 ipcMain.on('gather-products-order', (event, arg) => {

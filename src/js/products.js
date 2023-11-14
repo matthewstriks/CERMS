@@ -26,6 +26,9 @@ let productTaxable = document.getElementById('productTaxable')
 let productActive = document.getElementById('productActive')
 let productCore = document.getElementById('productCore')
 let productRental = document.getElementById('productRental')
+let productRentalDiv = document.getElementById('productRentalDiv')
+let productRentalLength = document.getElementById('productRentalLength')
+let productRentalLengthType = document.getElementById('productRentalLengthType')
 let productMembership = document.getElementById('productMembership')
 let productMembershipDiv = document.getElementById('productMembershipDiv')
 let productMembershipLength = document.getElementById('productMembershipLength')
@@ -47,6 +50,9 @@ let editProductTaxable = document.getElementById('editProductTaxable')
 let editProductActive = document.getElementById('editProductActive')
 let editProductCore = document.getElementById('editProductCore')
 let editProductRental = document.getElementById('editProductRental')
+let editProductRentalDiv = document.getElementById('editProductRentalDiv')
+let editProductRentalLength = document.getElementById('editProductRentalLength')
+let editProductRentalLengthType = document.getElementById('editProductRentalLengthType')
 let editProductMembership = document.getElementById('editProductMembership')
 let editProductMembershipDiv = document.getElementById('editProductMembershipDiv')
 let editProductMembershipLength = document.getElementById('editProductMembershipLength')
@@ -113,6 +119,14 @@ if (productMembershipDiv) {
   productMembershipDiv.style.display = 'none'  
 }
 
+if (productRentalDiv) {
+  productRentalDiv.style.display = 'none'  
+}
+
+if (editProductRentalDiv) {
+  editProductRentalDiv.style.display = 'none'  
+}
+
 if (editProductMembershipDiv) {
   editProductMembershipDiv.style.display = 'none'  
 }
@@ -123,6 +137,26 @@ if (productMembership) {
       productMembershipDiv.style.display = ''            
     }else{
       productMembershipDiv.style.display = 'none'            
+    }
+  })
+}
+
+if (productRental) {
+  productRental.addEventListener('change', function(){
+    if (productRental.checked) {
+      productRentalDiv.style.display = ''            
+    }else{
+      productRentalDiv.style.display = 'none'            
+    }
+  })
+}
+
+if (editProductRental) {
+  editProductRental.addEventListener('change', function(){
+    if (editProductRental.checked) {
+      editProductRentalDiv.style.display = ''            
+    }else{
+      editProductRentalDiv.style.display = 'none'            
     }
   })
 }
@@ -209,11 +243,11 @@ function removeCategory(){
 }
 
 function addProduct(){
-  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productFavorite.checked, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value))
+  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productFavorite.checked, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value, productRentalLength.value, productRentalLengthType.value))
 }
 
 function editProduct(){
-  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductFavorite.checked, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value))
+  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductFavorite.checked, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value, editProductRentalLength.value, editProductRentalLengthType.value))
 }
 
 function removeProduct(){
@@ -462,6 +496,8 @@ ipcRenderer.on('return-products', (event, arg) => {
     editProductMembership.checked = arg[1].membership
     editProductMembershipLength.value = arg[1].membershipLengthRaw
     editProductMembershipLengthType.value = arg[1].membershipLengthType
+    editProductRentalLength.value = arg[1].rentalLengthRaw
+    editProductRentalLengthType.value = arg[1].rentalLengthType
     editProductDesc.value = arg[1].desc
     editProductInventory.value = arg[1].inventory
     editProductInventoryPar.value = arg[1].inventoryPar
@@ -472,11 +508,15 @@ ipcRenderer.on('return-products', (event, arg) => {
       editProductMembershipDiv.style.display = 'none'
     }
 
+    if (arg[1].rental) {
+      editProductRentalDiv.style.display = ''
+    } else {
+      editProductRentalDiv.style.display = 'none'
+    }
+
     if (arg[1].image) {
       productImg.setAttribute('src', arg[1].image)      
     }
-
-
   })
 
   document.getElementById("remove"+arg[0]).addEventListener('click', function(){
