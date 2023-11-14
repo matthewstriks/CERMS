@@ -29,12 +29,14 @@ let modal3Body = document.getElementById('modal3Body');
 let modal3Body2 = document.getElementById('modal3Body2');
 let addLockerRoomInput = document.getElementById('addLockerRoomInput');
 let addLockerRoomInput2 = document.getElementById('addLockerRoomInput2');
+let completeCheckIn = document.getElementById('completeCheckIn');
 let productListSearch = document.getElementById('productListSearch');
 let searchProducts = document.getElementById('searchProducts');
 
 let totalLeftAmt;
 let ran = false
 let discountingOrder = false
+let theCustomerInfo;
 
 let errorMsg = document.getElementById('errorMsg');
 ipcRenderer.on('notification-system', (event, arg) => {
@@ -217,6 +219,12 @@ if (printEmailCompleteBtn) {
   })
 }
 
+if (completeCheckIn) {
+  completeCheckIn.addEventListener('click', function(){
+    ipcRenderer.send('complete-rental-info-order', Array(addLockerRoomInput.value, addLockerRoomInput2.value))
+  })
+}
+
 if (finishOrderBtn) {
   finishOrderBtn.style.display = 'none'
 }
@@ -383,6 +391,7 @@ function addProductCard(theProduct){
     if (plusBtn) {
       plusBtn.addEventListener('click', function () {
         addProductCard(theProduct)
+        ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct))
       })
     }
 
@@ -459,6 +468,7 @@ function addProductCard(theProduct){
   if (plusBtn) {
     plusBtn.addEventListener('click', function(){
       addProductCard(theProduct)
+      ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct))
     })
   }
 
@@ -712,10 +722,12 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   productSearchItem.setAttribute('barcode', arg[1].barcode)
   productSearchItem.addEventListener('click', function(){
     addProductCard(arg)
+    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
   })
   productSearchItem.onkeypress = function (event) {
     if (event.key == 'Enter') {
       addProductCard(arg)
+      ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
     }
   };
   productSearchItem.style.display = 'none'
@@ -766,6 +778,7 @@ ipcRenderer.on('return-products-order', (event, arg) => {
 
   productFooter.addEventListener('click', function(){
     addProductCard(arg)
+    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
   })
 
   var productBreak = document.createElement('br')
@@ -782,6 +795,7 @@ ipcRenderer.on('return-products-order', (event, arg) => {
 })
 
 ipcRenderer.on('send-customer-info', (event, arg) => {
+  theCustomerInfo = arg
   modal3Body2.style.display = 'none'  
   theCustomerID = -1
   if (!arg[0]) {
@@ -817,8 +831,4 @@ ipcRenderer.on('send-product-info', (event, arg) => {
 ipcRenderer.on('order-suspended', (event, arg) => {
   resumeBtn.style.display = ''
   suspendBtn.style.display = 'none'
-})
-
-ipcRenderer.on('resume-order-data', (event, arg) => {
-  console.log(arg);
 })

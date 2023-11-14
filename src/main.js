@@ -86,6 +86,8 @@ let pendingOrderInfo;
 let pendingOrderID;
 let lastMemberCreated;
 let orderSuspended = false
+let theLockerRoomInput
+let theLockerRoomInput2
 
 let regStatus = false;
 let regStatusID = false;
@@ -191,7 +193,7 @@ function notificationSystem(notificationType, notificationMsg){
 }
 
 async function getMemberInfo(memberID){
-  if (memberID == -1) {
+  if ((memberID == -1) || (Array.isArray(memberID))) {
     return false
   }
   const docRef = doc(db, "members", memberID);
@@ -487,7 +489,20 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
   }, 1000)
 }
 
-async function suspendOrder(orderInfo) {
+async function addToOrder(memberInfo, thePendingOrder){
+  let pendingOrderType = 'order'
+  pendingOrders.push(Array(memberInfo, pendingOrderType, thePendingOrder))
+
+  let theMembersData
+  if (memberInfo[0]) {
+    theMembersData = await getMemberInfo(memberInfo[0]);
+    theMembersName = theMembersData.name;
+  } else {
+    theMembersName = memberInfo[2]
+  }
+}
+
+async function suspendOrder() {
   if (!regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
@@ -502,15 +517,11 @@ async function suspendOrder(orderInfo) {
 
 async function resumeOrder(){
   await goOrder()
-  theClient.send('resume-order-data', pendingOrders)
   let memberChosenTF = false
   let memberChosen
   let theMemberChosen
   pendingOrders.forEach(async porder => {
-    //Array(memberInfo, orderType, thePendingOrder)
     let memberInfo = porder[0]
-//    let orderType = porder[1]
-//    let thePendingOrder = porder[3]
     let theMembersData
     if (memberChosenTF) {
       theMembersData = memberChosen
@@ -531,13 +542,18 @@ async function resumeOrder(){
     setTimeout(function () {
       theClient.send('send-customer-info', Array(theMembersName, theMembersData, memberInfo[0]))
       productsData.forEach((item, i) => {
-        if (item[1].name == memberInfo[1]) {
+        let theName
+        if (porder[1] == 'membership') {
+          theName = porder[0][1]
+        } else if (porder[1] == 'activity') {
+          theName = porder[2][1]
+        }
+        if (porder[2][1] && (item[1].name == theName)) {
           theClient.send('send-product-info', item)
         }
       });
     }, 1000)
   });
-
 }
 
 async function viewOrderReciept(theOrderNumber){
@@ -736,14 +752,18 @@ async function completeOrder(orderInfo){
     } else if (porder[1] == 'updatemembership'){
       editMembership(porder[2])
     } else if (porder[1] == 'activity'){
-      createActivity(porder[2])
+      setTimeout(() => {
+        createActivity(porder[2])        
+      }, 2000);
     } else if (porder[1] == 'renew'){
       renewActivity(porder[2])
     }
   }); 
+  setTimeout(() => {
+    orderSuspended = false
+    pendingOrders = Array()    
+  }, 2000);
   goHome()
-  orderSuspended = false
-  pendingOrders = Array()
 
   for (let i = 0; i < orderInfo[1].length; i += 1) {
     await editProductInventory(orderInfo[1][i])
@@ -756,10 +776,21 @@ async function completeOrder(orderInfo){
 async function createActivity(memberInfo){
   // [ 'zyTw1YM1bsk9dBigeZSy', 'Locker', '10', '', false, false ]
   // ['memberid', 'type', 'number', 'notes', waitlist, waiver?(false)]
-  notificationSystem('warning', 'Renewing time...')
   let theUserID = getUID();
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theTimeExpire = theCurrentTime + 21600;
+  let theMemberID = memberInfo[0]
+  let useTheLockerRoomInput = memberInfo[2]
+  let useTheLockerRoomInput2 = memberInfo[3]
+  if (!useTheLockerRoomInput && (useTheLockerRoomInput != "")) {
+    useTheLockerRoomInput = theLockerRoomInput
+  }
+  if (!useTheLockerRoomInput2 && (useTheLockerRoomInput2 != "")) {
+    useTheLockerRoomInput2 = theLockerRoomInput2
+  }
+  if (theMemberID == 0) {
+    theMemberID = lastMemberCreated
+  }
   const docRef = await addDoc(collection(db, "activity"), {
     access: getSystemAccess(),
     active: true,
@@ -768,21 +799,21 @@ async function createActivity(memberInfo){
     currIn: false,
     lockerRoomStatus: Array(
       true,
-      memberInfo[2],
+      useTheLockerRoomInput,
       memberInfo[1],
       theUserID,
       theCurrentTime,
       theTimeExpire
     ),
-    memberID: memberInfo[0],
-    notes: memberInfo[3],
+    memberID: theMemberID,
+    notes: useTheLockerRoomInput2,
     timeIn: serverTimestamp(),
     timeOut: null
   });
   notificationSystem('success', 'Customer checked in!')
 
   if (memberInfo[5]) {
-    const memberRef = doc(db, "members", memberInfo[0]);
+    const memberRef = doc(db, "members", theMemberID);
     await updateDoc(memberRef, {
       waiver_status: true
     });
@@ -2460,8 +2491,7 @@ async function gatherUserNameByID(theUserID) {
 }
 
 async function gatherAllUsers(){
-  let theAccessCode = getSystemAccess()
-  const querySnapshot = await getDocs(collection(db, "users"), where('access', '==', theAccessCode));
+  const querySnapshot = await getDocs(collection(db, "users"), where('access', '==', getSystemAccess()));
   querySnapshot.forEach((doc) => {
     theClient.send('recieve-users', Array(doc.id, doc.data()))
   });
@@ -3715,13 +3745,35 @@ ipcMain.on('order-checkout', (event, arg) => {
   completeOrder(arg)
 })
 
+ipcMain.on('complete-rental-info-order', (event, arg) => {
+  theClient = event.sender;
+  theLockerRoomInput = arg[0]
+  theLockerRoomInput2 = arg[1]
+})
+
 ipcMain.on('suspend-order', (event, arg) => {
   theClient = event.sender;
-  suspendOrder(arg)
+  suspendOrder()
+})
+
+ipcMain.on('add-to-order', (event, arg) => {
+  theClient = event.sender;
+  productsData.forEach(product => {
+    if ((product[0] == arg[1][0]) && (!product[1].rental)) {
+      addToOrder(arg[0], arg[1][0])      
+    } else if ((product[0] == arg[1][0]) && (product[1].rental)) {
+      if (!arg[0][1]) {
+        pendingOrders.push(Array(0, 'activity', Array(0, product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
+      }else{
+        pendingOrders.push(Array(arg[0], 'activity', Array(arg[0][2], product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
+      }
+    }
+  });
 })
 
 ipcMain.on('resume-order', (event, arg) => {
   theClient = event.sender;
+  orderSuspended = false
   resumeOrder()
 })
 
