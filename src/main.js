@@ -2275,19 +2275,33 @@ async function editMembership(memberInfo){
   const unixTimestamp = Math.floor(date.getTime() / 1000);
   const docRef = doc(db, "members", memberInfo[0]);
 
-  await updateDoc(docRef, {
-    fname: memberInfo[1],
-    lname: memberInfo[2],
-    dob: memberInfo[3],
-    membership_type: memberInfo[4],
-    id_expiration: unixTimestamp,
-    idnum: memberInfo[6],
-    idstate: memberInfo[7],
-    notes: memberInfo[8],
-    waiver_status: memberInfo[9],
-    name: memberInfo[1] + ' ' + memberInfo[2],
-    email: memberInfo[10]
-  });
+  if (!memberInfo[4]) {
+    await updateDoc(docRef, {
+      fname: memberInfo[1],
+      lname: memberInfo[2],
+      dob: memberInfo[3],
+      idnum: memberInfo[6],
+      idstate: memberInfo[7],
+      notes: memberInfo[8],
+      waiver_status: memberInfo[9],
+      name: memberInfo[1] + ' ' + memberInfo[2],
+      email: memberInfo[10]
+    });
+  } else {
+    await updateDoc(docRef, {
+      fname: memberInfo[1],
+      lname: memberInfo[2],
+      dob: memberInfo[3],
+      membership_type: memberInfo[4],
+      id_expiration: unixTimestamp,
+      idnum: memberInfo[6],
+      idstate: memberInfo[7],
+      notes: memberInfo[8],
+      waiver_status: memberInfo[9],
+      name: memberInfo[1] + ' ' + memberInfo[2],
+      email: memberInfo[10]
+    });
+  }
   notificationSystem('success', 'Member updated!')
 }
 
@@ -3454,6 +3468,7 @@ ipcMain.on('membership-create', (event, arg) => {
 
 ipcMain.on('membership-update', async (event, arg) => {
   theClient = event.sender;
+  console.log(arg);
   if (arg[11]) {
     goOrder()
     createOrder(Array(arg[0], arg[4], arg[1] + ' ' + arg[2]), 'updatemembership', arg)        

@@ -699,7 +699,8 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       editdobInput.value = arg[1].dob;
     }
     editemailInput.value = (arg[1].email || '')
-    editmembershipInput.value = arg[1].membership_type.toLowerCase();
+    console.log(arg[1].membership_type);
+    editmembershipInput.value = arg[1].membership_type;
     editidnumInput.value = arg[1].idnum;
     editidnumStateInput.value = arg[1].idstate;
     editnotesInput.value = arg[1].notes;
@@ -879,7 +880,7 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
       editdobInput.value = arg[1].dob;
     }
     editemailInput.value = (arg[1].email || '')
-    editmembershipInput.value = arg[1].membership_type.toLowerCase();
+    editmembershipInput.value = arg[1].membership_type;
     editidnumInput.value = arg[1].idnum;
     editidnumStateInput.value = arg[1].idstate;
     editnotesInput.value = arg[1].notes;
