@@ -852,54 +852,54 @@ async function createActivity(memberInfo){
   let theUserID = getUID();
   let theCurrentTime = Math.floor(Date.now() / 1000);
 
-  let theRentalLength = 21600
-
-  productsData.forEach(product => {
+  productsData.forEach(async product => {
     if (product[1].name == memberInfo[1]) {
-      theRentalLength = product[1].rentalLength
+      let theRentalLength = product[1].rentalLength
+      if (!product[1].rentalLength) {
+        theRentalLength = 21600
+      }
+      let theTimeExpire = theCurrentTime + theRentalLength;
+      let theMemberID = memberInfo[0]
+      let useTheLockerRoomInput = memberInfo[2]
+      let useTheLockerRoomInput2 = memberInfo[3]
+      if (!useTheLockerRoomInput && (useTheLockerRoomInput != "")) {
+        useTheLockerRoomInput = theLockerRoomInput
+      }
+      if (!useTheLockerRoomInput2 && (useTheLockerRoomInput2 != "")) {
+        useTheLockerRoomInput2 = theLockerRoomInput2
+      }
+      if (theMemberID == 0) {
+        theMemberID = lastMemberCreated
+      }
+      const docRef = await addDoc(collection(db, "activity"), {
+        access: getSystemAccess(),
+        active: true,
+        goingInactive: false,
+        waitlist: memberInfo[4],
+        currIn: false,
+        lockerRoomStatus: Array(
+          true,
+          useTheLockerRoomInput,
+          memberInfo[1],
+          theUserID,
+          theCurrentTime,
+          theTimeExpire
+        ),
+        memberID: theMemberID,
+        notes: useTheLockerRoomInput2,
+        timeIn: serverTimestamp(),
+        timeOut: null
+      });
+      notificationSystem('success', 'Customer checked in!')
+
+      if (memberInfo[5]) {
+        const memberRef = doc(db, "members", theMemberID);
+        await updateDoc(memberRef, {
+          waiver_status: true
+        });
+      }
     }
   });
-
-  let theTimeExpire = theCurrentTime + theRentalLength;
-  let theMemberID = memberInfo[0]
-  let useTheLockerRoomInput = memberInfo[2]
-  let useTheLockerRoomInput2 = memberInfo[3]
-  if (!useTheLockerRoomInput && (useTheLockerRoomInput != "")) {
-    useTheLockerRoomInput = theLockerRoomInput
-  }
-  if (!useTheLockerRoomInput2 && (useTheLockerRoomInput2 != "")) {
-    useTheLockerRoomInput2 = theLockerRoomInput2
-  }
-  if (theMemberID == 0) {
-    theMemberID = lastMemberCreated
-  }
-  const docRef = await addDoc(collection(db, "activity"), {
-    access: getSystemAccess(),
-    active: true,
-    goingInactive: false,
-    waitlist: memberInfo[4],
-    currIn: false,
-    lockerRoomStatus: Array(
-      true,
-      useTheLockerRoomInput,
-      memberInfo[1],
-      theUserID,
-      theCurrentTime,
-      theTimeExpire
-    ),
-    memberID: theMemberID,
-    notes: useTheLockerRoomInput2,
-    timeIn: serverTimestamp(),
-    timeOut: null
-  });
-  notificationSystem('success', 'Customer checked in!')
-
-  if (memberInfo[5]) {
-    const memberRef = doc(db, "members", theMemberID);
-    await updateDoc(memberRef, {
-      waiver_status: true
-    });
-  }
 }
 
 async function editActivity(activityInfo){
@@ -2373,7 +2373,6 @@ async function getDiscountInfo(discountID){
 }
 
 async function editProduct(productInfo){
-  console.log(productInfo);
   notificationSystem('warning', 'Editing Product...')
   let userAllowed = canUser('permissionEditProducts')
   let isProductCore = await productIsCore(productInfo[0])
@@ -3524,7 +3523,6 @@ ipcMain.on('membership-create', (event, arg) => {
 
 ipcMain.on('membership-update', async (event, arg) => {
   theClient = event.sender;
-  console.log(arg);
   if (arg[11]) {
     goOrder()
     createOrder(Array(arg[0], arg[4], arg[1] + ' ' + arg[2]), 'updatemembership', arg)        
