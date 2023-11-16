@@ -847,6 +847,8 @@ async function completeOrder(orderInfo){
 }
 
 async function createActivity(memberInfo){
+  console.log('Here:');
+  console.log(memberInfo);
   // [ 'zyTw1YM1bsk9dBigeZSy', 'Locker', '10', '', false, false ]
   // ['memberid', 'type', 'number', 'notes', waitlist, waiver?(false)]
   let theUserID = getUID();
@@ -3011,6 +3013,7 @@ async function displayAllActivity(){
 }
 
 async function attemptLogin(details){
+  notificationSystem('warning', 'Logging in...')
   loginCreds = details;
   signInWithEmailAndPassword(auth, details[0], details[1])
   .then(async(userCredential) => {
@@ -3892,11 +3895,17 @@ ipcMain.on('suspend-order', (event, arg) => {
 
 ipcMain.on('add-to-order', (event, arg) => {
   theClient = event.sender;
+
+  if (arg[2]) {
+    theLockerRoomInput = arg[2]
+    theLockerRoomInput2 = arg[3]
+  }
   productsData.forEach(product => {
     if ((product[0] == arg[1][0]) && (!product[1].rental)) {
       addToOrder(arg[0], arg[1][0])      
     } else if ((product[0] == arg[1][0]) && (product[1].rental)) {
-      if (!arg[0][1]) {
+      console.log(arg);      
+      if (!arg[0] || !arg[0][1]) {
         pendingOrders.unshift(Array(0, 'activity', Array(0, product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
       }else{
         pendingOrders.unshift(Array(arg[0], 'activity', Array(arg[0][2], product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))

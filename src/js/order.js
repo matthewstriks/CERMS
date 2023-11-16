@@ -391,7 +391,7 @@ function addProductCard(theProduct){
     if (plusBtn) {
       plusBtn.addEventListener('click', function () {
         addProductCard(theProduct)
-        ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct))
+        ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct, addLockerRoomInput.value, addLockerRoomInput2.value))
       })
     }
 
@@ -468,7 +468,7 @@ function addProductCard(theProduct){
   if (plusBtn) {
     plusBtn.addEventListener('click', function(){
       addProductCard(theProduct)
-      ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct))
+      ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct, addLockerRoomInput.value, addLockerRoomInput2.value))
     })
   }
 
@@ -721,13 +721,15 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   productSearchItem.tabIndex = 0
   productSearchItem.setAttribute('barcode', arg[1].barcode)
   productSearchItem.addEventListener('click', function(){
+    console.log('click');
     addProductCard(arg)
-    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
+    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
   })
   productSearchItem.onkeypress = function (event) {
     if (event.key == 'Enter') {
-      addProductCard(arg)
-      ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
+      productSearchItem.click()
+//      addProductCard(arg)
+ //     ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
     }
   };
   productSearchItem.style.display = 'none'
@@ -755,9 +757,13 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   }else{
     productImg.setAttribute('src', './286x180.svg')    
   }
+  if (arg[1].rental) {
+    productImg.setAttribute('data-bs-toggle', 'modal')
+    productImg.setAttribute('data-bs-target', '#myModal3')
+  }
   productImg.addEventListener('click', function(){
     addProductCard(arg)
-    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg))
+    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
   })
   
   var productBody = document.createElement('div')
