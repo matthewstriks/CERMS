@@ -1,7 +1,9 @@
 const { ipcRenderer } = require('electron')
 let logoutBtn = document.getElementById('logoutBtn');
+let systemName = document.getElementById('systemName');
 let displayName = document.getElementById('displayName');
 let rankInfo = document.getElementById('rankInfo');
+let updateBtn = document.getElementById('updateBtn');
 let changePasswordBtn = document.getElementById('changePasswordBtn');
 let editAccountBtnSubmitPassReset = document.getElementById('editAccountBtnSubmitPassReset');
 let editAccountBtnDeleteUser = document.getElementById('editAccountBtnDeleteUser');
@@ -55,6 +57,12 @@ ipcRenderer.on('notification-system', (event, arg) => {
 if (logoutBtn) {
   logoutBtn.addEventListener('click', function(){
     ipcRenderer.send('account-logout')
+  })
+}
+
+if (updateBtn) {
+  updateBtn.addEventListener('click', function(){
+    ipcRenderer.send('request-update')
   })
 }
 
@@ -176,6 +184,7 @@ ipcRenderer.on('recieve-account', (event, arg) => {
 
   invWarnEMail.value = arg[2].invWarnEMail
   editRenewTime.value = arg[2].renewTime
+  systemName.innerHTML = arg[2].businessName;
   displayName.innerHTML = 'Display Name: ' + arg[0];
   if (arg[1] == 1) {
     rankInfo.innerHTML = 'Rank: Manager';
@@ -258,11 +267,7 @@ if (employeeInput) {
 }
 
 ipcRenderer.on('quickbooks-test-test', (event, arg) => {
-  console.log('hey\n\n');
-  console.log(
-    
-    
-    ['Id']);
+
 })
 
 ipcRenderer.on('account-edit-success', (event, arg) => {

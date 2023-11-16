@@ -847,8 +847,6 @@ async function completeOrder(orderInfo){
 }
 
 async function createActivity(memberInfo){
-  console.log('Here:');
-  console.log(memberInfo);
   // [ 'zyTw1YM1bsk9dBigeZSy', 'Locker', '10', '', false, false ]
   // ['memberid', 'type', 'number', 'notes', waitlist, waiver?(false)]
   let theUserID = getUID();
@@ -3465,6 +3463,11 @@ ipcMain.on('app_version', (event) => {
   theClient.send('app_version', { version: app.getVersion() });
 });
 
+autoUpdater.on('checking-for-update', () => {
+  notificationSystem('primary', 'Checking for new updates...')
+  theClient.send('update_available');
+});
+
 autoUpdater.on('update-available', () => {
   notificationSystem('warning', 'A new update is available. Downloading now...')
   theClient.send('update_available');
@@ -3474,6 +3477,10 @@ autoUpdater.on('update-downloaded', () => {
   notificationSystem('success', 'Update Downloaded. It will be installed on restart.')
   theClient.send('update_downloaded');
 });
+
+autoUpdater.on('update-not-available', () => {
+  notificationSystem('success', 'No new updates. You have the latest version!')
+})
 
 // IPCMain's
 
@@ -3904,7 +3911,6 @@ ipcMain.on('add-to-order', (event, arg) => {
     if ((product[0] == arg[1][0]) && (!product[1].rental)) {
       addToOrder(arg[0], arg[1][0])      
     } else if ((product[0] == arg[1][0]) && (product[1].rental)) {
-      console.log(arg);      
       if (!arg[0] || !arg[0][1]) {
         pendingOrders.unshift(Array(0, 'activity', Array(0, product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
       }else{
@@ -4030,22 +4036,26 @@ ipcMain.on('edit-product-img-remove', async (event, arg) => {
 })
 
 ipcMain.on('reciept-choice-print', (event, arg) => {
+  theClient = event.sender;
   recieptWin.close()
   createRecieptScreen(false)
 })
 
 ipcMain.on('reciept-choice-email', (event, arg) => {
+  theClient = event.sender;
   recieptWin.close()
   emailReciept(arg)
 })
 
 ipcMain.on('reciept-choice-pande', (event, arg) => {
+  theClient = event.sender;
   recieptWin.close()
   createRecieptScreen(false)
   emailReciept(arg)
 })
 
 ipcMain.on('reciept-choice-close', (event, arg) => {
+  theClient = event.sender;
   recieptWin.close()
 })
 
@@ -4221,4 +4231,8 @@ ipcMain.on('quickbooks-connect', (event, arg) => {
 
 ipcMain.on('quickbooks-login', (event, arg) => {
   quickBooksLogin(arg)
+})
+
+ipcMain.on('request-update', (event, arg) => {
+  theClient = event.sender;
 })

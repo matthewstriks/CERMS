@@ -721,7 +721,6 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   productSearchItem.tabIndex = 0
   productSearchItem.setAttribute('barcode', arg[1].barcode)
   productSearchItem.addEventListener('click', function(){
-    console.log('click');
     addProductCard(arg)
     ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
   })
