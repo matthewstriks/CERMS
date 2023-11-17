@@ -131,7 +131,7 @@ if (dobInput) {
     } else if (theirAge < 18){
       memberUnder18 = true
       updateBaby()
-    } else if ((theirAge == 18) && (currMonth >= theMonth) && (currDay >= theDay)){
+    } else if ((theirAge == 18) && ((currMonth > theMonth) || ((currMonth <= theMonth) && (currDay >= theDay)))) {
       memberUnder18 = false
       updateBaby()
     } else {
