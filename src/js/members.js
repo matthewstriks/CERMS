@@ -61,6 +61,7 @@ let editexpiresInput = document.getElementById('editexpiresInput');
 let editidnumInput = document.getElementById('editidnumInput');
 let editidnumStateInput = document.getElementById('editidnumStateInput');
 let editnotesInput = document.getElementById('editnotesInput');
+let editnotesInputNew = document.getElementById('editnotesInputNew');
 let editwaiverInput = document.getElementById('editwaiverInput');
 let editmemberInfoDeleteBtn = document.getElementById('editmemberInfoDeleteBtn');
 let editmemberInfoDeleteBtnCloseConfirm = document.getElementById('editmemberInfoDeleteBtnCloseConfirm');
@@ -295,13 +296,15 @@ if(completeCheckIn){
 
 if(editmemberInfoDNABtn){
   editmemberInfoDNABtn.addEventListener('click', function(){
-    ipcRenderer.send('member-dna', Array(memberEditing, editnotesInput.value))
+    ipcRenderer.send('member-dna', Array(memberEditing, editnotesInputNew.value))
+    editnotesInputNew.value = ""
   })
 }
 
 if(editmemberInfoDNABtn2){
   editmemberInfoDNABtn2.addEventListener('click', function(){
-    ipcRenderer.send('member-undna', Array(memberEditing, editnotesInput.value))
+    ipcRenderer.send('member-undna', Array(memberEditing, editnotesInputNew.value))
+    editnotesInputNew.value = ""
   })
 }
 
@@ -322,7 +325,7 @@ document.getElementById('editmemberSubmitForm').addEventListener('click', functi
 })
 
 function formWasSubmitted(){
-  ipcRenderer.send('membership-update', Array(memberEditing, editfnameInput.value, editlnameInput.value, editdobInput.value, editmembershipInput.value, editexpiresInput.value, editidnumInput.value, editidnumStateInput.value, editnotesInput.value, editwaiverInput.checked, editemailInput.value, memberTypeEdited));
+  ipcRenderer.send('membership-update', Array(memberEditing, editfnameInput.value, editlnameInput.value, editdobInput.value, editmembershipInput.value, editexpiresInput.value, editidnumInput.value, editidnumStateInput.value, editnotesInputNew.value, editwaiverInput.checked, editemailInput.value, memberTypeEdited));
   memberTypeEdited = false
   editMembershipForm.reset();
 }
@@ -593,7 +596,15 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       memberInfoTagC.style.display = 'none'
       memberInfoNotesC.style.display = 'none'
       memberInfoTagCBDiv.style.display = 'none'
-      memberInfoNotesC.innerHTML = arg[1].notes
+      if (Array.isArray(arg[1].notes)) {
+        let theNotesString = ""
+        arg[1].notes.forEach(note => {
+          theNotesString = theNotesString + note + '\n'
+        });
+        memberInfoNotesC.innerHTML = theNotesString
+      } else {
+        memberInfoNotesC.innerHTML = arg[1].notes
+      }
     }
     memberCheckingIn = arg[0];
     memberCheckingInName = arg[1].name;
@@ -656,7 +667,15 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     memberInfoIDNum3.innerHTML = 'ID State: ' + arg[1].idstate;
     memberInfoCT.innerHTML = 'Creation Time: ' + time;
     memberInfoWS.innerHTML = 'Waiver Status: ' + arg[1].waiver_status;
-    memberInfoNotes.value = arg[1].notes;
+    if (Array.isArray(arg[1].notes)) {
+      let theNotesString = ""
+      arg[1].notes.forEach(note => {
+        theNotesString = theNotesString + note + '\n'
+      });
+      memberInfoNotes.value = theNotesString
+    } else {
+      memberInfoNotes.value = arg[1].notes
+    }
   })
 
   document.getElementById("edit"+arg[0]).addEventListener('click', function(){
@@ -699,11 +718,18 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       editdobInput.value = arg[1].dob;
     }
     editemailInput.value = (arg[1].email || '')
-    console.log(arg[1].membership_type);
     editmembershipInput.value = arg[1].membership_type;
     editidnumInput.value = arg[1].idnum;
     editidnumStateInput.value = arg[1].idstate;
-    editnotesInput.value = arg[1].notes;
+    if (Array.isArray(arg[1].notes)) {
+      let theNotesString = ""
+      arg[1].notes.forEach(note => {
+        theNotesString = theNotesString + note + '\n'
+      });
+      editnotesInput.value = theNotesString
+    } else {
+      editnotesInput.value = arg[1].notes
+    }
     if (arg[1].waiver_status) {
       editwaiverInput.checked = true;
     }else {
@@ -774,7 +800,15 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
     } else {
       memberInfoTagC.style.display = 'none'
       memberInfoNotesC.style.display = 'none'
-      memberInfoNotesC.innerHTML = arg[1].notes
+      if (Array.isArray(arg[1].notes)) {
+        let theNotesString = ""
+        arg[1].notes.forEach(note => {
+          theNotesString = theNotesString + note + '\n'
+        });
+        memberInfoNotesC.value = theNotesString
+      } else {
+        memberInfoNotesC.value = arg[1].notes
+      }
     }
     memberCheckingIn = arg[0];
     memberCheckingInName = arg[1].name;
@@ -837,7 +871,15 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
     memberInfoIDNum3.innerHTML = 'ID State: ' + arg[1].idstate;
     memberInfoCT.innerHTML = 'Creation Time: ' + time;
     memberInfoWS.innerHTML = 'Waiver Status: ' + arg[1].waiver_status;
-    memberInfoNotes.value = arg[1].notes;
+    if (Array.isArray(arg[1].notes)) {
+      let theNotesString = ""
+      arg[1].notes.forEach(note => {
+        theNotesString = theNotesString + note + '\n'
+      });
+      memberInfoNotes.value = theNotesString
+    } else {
+      memberInfoNotes.value = arg[1].notes
+    }
   })
 
   document.getElementById("edit" + arg[0]).addEventListener('click', function () {
@@ -883,7 +925,15 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
     editmembershipInput.value = arg[1].membership_type;
     editidnumInput.value = arg[1].idnum;
     editidnumStateInput.value = arg[1].idstate;
-    editnotesInput.value = arg[1].notes;
+    if (Array.isArray(arg[1].notes)) {
+      let theNotesString = ""
+      arg[1].notes.forEach(note => {
+        theNotesString = theNotesString + note + '\n'
+      });
+      editnotesInput.value = theNotesString
+    } else {
+      editnotesInput.value = arg[1].notes
+    }
     if (arg[1].waiver_status) {
       editwaiverInput.checked = true;
     } else {

@@ -251,6 +251,16 @@ async function updateMembershipEMail(memberID, newEMail){
 async function updateMembership(memberID, theOldDoc, memberInfo){
   let idExpiration = "";
   let theCurrentTime = Math.floor(Date.now() / 1000);
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
+  console.log("update: " + stringStarter);
 
   let theProductInfo
   productsData.forEach(product => {
@@ -263,7 +273,7 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 
   const docRef = doc(db, "members", memberID);
   await updateDoc(docRef, {
-    notes: theOldDoc.notes + " // " + memberInfo[4],
+    notes: arrayUnion(stringStarter + memberInfo[4]),
     dna: false,
     id_expiration: idExpiration,
     membership_type: memberInfo[3]
@@ -272,21 +282,40 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 }
 
 async function memberDNA(memberInfo){
+  await updateMemberNotes(memberInfo[0])
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     dna: true,
-    notes: memberInfo[1]
+    notes: arrayUnion(stringStarter + memberInfo[1]),
   });
 }
 
 async function memberUNDNA(memberInfo){
+  await updateMemberNotes(memberInfo[0])
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     dna: false,
-    notes: memberInfo[1]
+    notes: arrayUnion(stringStarter + memberInfo[1]),
   });
 }
-
 async function memberTag(memberInfo){
   const docRef = doc(db, "members", memberInfo);
   await updateDoc(docRef, {
@@ -2284,6 +2313,20 @@ async function startRegisterReport(registerID, isFinal) {
   notificationSystem('success', "Report written and saved to '" + writeSaveDir + "'")
 }
 
+async function updateMemberNotes(memberID){
+  let currMemberInfo = await getMemberInfo(memberID)
+  let currNotes = currMemberInfo['notes']
+  const docRef = doc(db, "members", memberID);
+  if (!Array.isArray(currNotes)) {
+    await updateDoc(docRef, {
+      notes: Array('(old system): ' + currNotes),
+    })
+    return true
+  }else{
+    return true
+  }
+}
+
 async function editMembership(memberInfo){
   notificationSystem('warning', 'Updating member...')
   const dateStr = memberInfo[5];
@@ -2291,6 +2334,16 @@ async function editMembership(memberInfo){
   const timestampInMs = date.getTime();
   const unixTimestamp = Math.floor(date.getTime() / 1000);
   const docRef = doc(db, "members", memberInfo[0]);
+  await updateMemberNotes(memberInfo[0])
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   if (!memberInfo[4]) {
     await updateDoc(docRef, {
@@ -2299,7 +2352,7 @@ async function editMembership(memberInfo){
       dob: memberInfo[3],
       idnum: memberInfo[6],
       idstate: memberInfo[7],
-      notes: memberInfo[8],
+      notes: arrayUnion(stringStarter + memberInfo[8]),
       waiver_status: memberInfo[9],
       name: memberInfo[1] + ' ' + memberInfo[2],
       email: memberInfo[10]
@@ -2313,7 +2366,7 @@ async function editMembership(memberInfo){
       id_expiration: unixTimestamp,
       idnum: memberInfo[6],
       idstate: memberInfo[7],
-      notes: memberInfo[8],
+      notes: arrayUnion(stringStarter + memberInfo[8]),
       waiver_status: memberInfo[9],
       name: memberInfo[1] + ' ' + memberInfo[2],
       email: memberInfo[10]
@@ -2528,6 +2581,16 @@ async function createMembership(memberInfo){
   let update = false;
   let idExpiration;
   let theCurrentTime = Math.floor(Date.now() / 1000);
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
+  console.log(stringStarter);
 
   let theProductInfo
   productsData.forEach(product => {
@@ -2560,7 +2623,7 @@ async function createMembership(memberInfo){
   if (!update) {
     const docRef = await addDoc(collection(db, "members"), {
       access: getSystemAccess(),
-      notes: memberInfo[4],
+      notes: Array(stringStarter + memberInfo[4]),
       name: memberInfo[0] + " " + memberInfo[1],
       fname: memberInfo[0],
       lname: memberInfo[1],
