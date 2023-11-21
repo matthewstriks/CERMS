@@ -4235,4 +4235,10 @@ ipcMain.on('quickbooks-login', (event, arg) => {
 
 ipcMain.on('request-update', (event, arg) => {
   theClient = event.sender;
+  autoUpdater.checkForUpdatesAndNotify();
+})
+
+ipcMain.on('github-link', (event, arg) => {
+  theClient = event.sender;
+  shell.openExternal('https://github.com/matthewstriks/cerms/issues')
 })
