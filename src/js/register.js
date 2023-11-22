@@ -65,7 +65,7 @@ if (document.getElementById('quickSaleBtn')) {
 function editEndingTotal(){
   endingAmt.value = (Number(input100.value) * 100) + (Number(input50.value) * 50) + (Number(input20.value) * 20) + (Number(input10.value) * 10) + (Number(input5.value) * 5) + (Number(input1.value) * 1) + (Number(input25c.value) * .25) + (Number(input10c.value) * .10) + (Number(input5c.value) * .05) + (Number(input1c.value) * .01)   
   let endAmt = Number(endingAmt.value)
-  let expAmt = Number(endingExpAmt.value)
+  let expAmt = Math.round((Number(endingExpAmt.value) + Number.EPSILON) * 100) / 100
   endingDiffAmt.value = (endAmt - expAmt)
 }
 
@@ -187,7 +187,7 @@ personalRegClose.addEventListener('click', function(){
   endingAmtContainer.style.display = ''
   dropAmtContainer.style.display = 'none'
   endingAmt.focus()
-  endingExpAmt.value = theRegInfo.starting
+  endingExpAmt.value = Math.round((Number(theRegInfo.starting) + Number.EPSILON) * 100) / 100
 })
 
 personalRegDrop.addEventListener('click', function(){
