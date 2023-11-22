@@ -4187,8 +4187,7 @@ async function quickBooksLogin(parseRedirect) {
     });
     return true
   } else {
-    console.log('Something went wrong');
-    console.log('hey');
+    console.log('Something went wrong - Quickbooks is not connected.');
     return false
   }
 }
