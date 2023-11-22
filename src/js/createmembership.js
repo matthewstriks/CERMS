@@ -51,6 +51,11 @@ if (scanIDBtn) {
 function scanIDFunction(){
   const text = scanIDTxt.value
   const characters = text.split("\n");
+  let fname
+  let lname
+  let dob
+  let clientID
+  let clientState
 
   if (characters.length <= 5) {
     scanIDBtn.disabled = false
@@ -59,17 +64,24 @@ function scanIDFunction(){
     return
   }
 
-  const rawfname = characters[7];
-  const fname = rawfname.replace(/DAC/g, "");
-
-  const rawlname = characters[6];
-  const lname = rawlname.replace(/DCS/g, "");
-
-  const rawdob = characters[10];
-  const dob = rawdob.replace(/DBB/g, "");
-
-  const rawclientID = characters[18];
-  const clientID = rawclientID.replace(/DAQ/g, "");
+  for (let index = 0; index < characters.length; index++) {
+    const element = characters[index];
+    if (element.includes("DAC")) {
+      fname = element.replace(/DAC/g, "");
+    }
+    if (element.includes('DCS')) {
+      lname = element.replace(/DCS/g, "");
+    }
+    if (element.includes('DBB')) {
+      dob = element.replace(/DBB/g, "");
+    }
+    if (element.includes('DAQ')) {
+      clientID = element.replace(/DAQ/g, "");
+    }
+    if (element.includes('DAJ')) {
+      clientState = element.replace(/DAJ/g, "");
+    }
+  }
 
   fnameInput.value = capitalizeFirstLetter(fname.toLowerCase())
   lnameInput.value = capitalizeFirstLetter(lname.toLowerCase())
@@ -80,6 +92,7 @@ function scanIDFunction(){
 
   dobInput.value = theYear + '-' + theMonth + '-' + theDay
   idnumInput.value = clientID
+  idnumStateInput.value = clientState
 
   scanIDBtn.disabled = false
   scanIDTxt.value = ""
