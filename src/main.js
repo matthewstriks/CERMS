@@ -649,7 +649,7 @@ async function registerReciept(registerID){
   theHTML = systemData.registerReciept
   withDate = theHTML.replace('TheDate', theStringTime)
   withCashier = withDate.replace('TheCashier', theDisplayName)
-  withInput100 = withDate.replace('Input100', registerInfo.input100)
+  withInput100 = withCashier.replace('Input100', registerInfo.input100)
   withInput50 = withInput100.replace('Input50', registerInfo.input50)
   withInput20 = withInput50.replace('Input20', registerInfo.input20)
   withInput10 = withInput20.replace('Input10', registerInfo.input10)
@@ -4188,6 +4188,7 @@ async function quickBooksLogin(parseRedirect) {
     return true
   } else {
     console.log('Something went wrong');
+    console.log('hey');
     return false
   }
 }
