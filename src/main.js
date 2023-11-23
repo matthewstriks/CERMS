@@ -107,7 +107,6 @@ const formatter = new Intl.NumberFormat('en-US', {
 function loadAuth(){
   mainWin.unmaximize()
   mainWin.loadFile(path.join(__dirname, 'login.html'));
-  autoUpdater.checkForUpdatesAndNotify();
 }
 
 function goHome(){
@@ -3086,6 +3085,7 @@ async function attemptLogin(details){
       mainWin.loadFile(path.join(__dirname, 'index.html'));
       user = userCredential.user;
       setTimeout(function () { startLoading() }, 1000);
+      setTimeout(function () { autoUpdater.checkForUpdatesAndNotify() }, 30000);
     }      
   })
   .catch((error) => {
