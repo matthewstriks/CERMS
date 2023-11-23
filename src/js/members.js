@@ -532,6 +532,29 @@ function removeAllRows(){
 }
 
 ipcRenderer.on('membership-request-return', (event, arg) => {
+  let currYear = new Date().getFullYear();
+  let currDay = new Date().getDate();
+  let currMonth = new Date().getMonth() + 1
+  let str = arg[1].dob;
+  let theYear = Number(str.substring(0, 4));
+  let theMonth = Number(str.substring(5, 7));
+  let theDay = Number(str.substring(8, 10));
+  console.log(str);
+  console.log(theYear);
+  console.log(theMonth);
+  console.log(theDay);
+  let theirAge = (currYear - theYear)    
+  let memberUnder21 = ""
+  if (theirAge > 21) {
+    memberUnder21 = ""
+  } else if (theirAge < 21) {
+    memberUnder21 = "(UNDER 21)"
+  } else if ((theirAge == 21) && ((currMonth > theMonth) || ((currMonth <= theMonth) && (currDay >= theDay)))) {
+    memberUnder21 = ""
+  } else {
+    memberUnder21 = "(UNDER 21)"
+  }
+
   var row = membershipTable.insertRow(1);
   row.id = 'row'+arg[0];
 
@@ -563,7 +586,7 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
 
   row.setAttribute('memberid', arg[0]);
   cell1.innerHTML = arg[1].name;
-  cell2.innerHTML = arg[1].dob;
+  cell2.innerHTML = arg[1].dob + " <p style='color: red'>" + memberUnder21 + "</p>";
   cell3.innerHTML = arg[1].membership_type;
   cell4.innerHTML = time2;
   cell5.innerHTML = "<button data-bs-toggle='modal' data-bs-target='#myModal' id='checkIn"+arg[0]+"' type='button' class='btn btn-success'>Check-In</button> <button id='viewinfo" +arg[0] + "' data-bs-toggle='modal' data-bs-target='#myModal2' type='button' class='btn btn-primary'>View Member</button> <button id='edit" +arg[0] + "' data-bs-toggle='modal' data-bs-target='#myModal3' type='button' class='btn btn-warning'>Edit Member</button>";
@@ -671,7 +694,7 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     }
 
     memberInfoName.innerHTML = arg[1].name;
-    memberInfoDOB.innerHTML = 'DOB: ' + arg[1].dob;
+    memberInfoDOB.innerHTML = 'DOB: ' + arg[1].dob + " <p style='color: red'>" + memberUnder21 + "</p>";
     memberInfoEMail.innerHTML = 'EMail: ' + (arg[1].email || 'N/A');
     memberInfoType.innerHTML = 'Membership Type: ' + arg[1].membership_type;
     memberInfoExpires.innerHTML = 'ID Expires: ' + time2;

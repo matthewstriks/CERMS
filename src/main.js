@@ -4303,5 +4303,5 @@ ipcMain.on('request-update', (event, arg) => {
 
 ipcMain.on('github-link', (event, arg) => {
   theClient = event.sender;
-  shell.openExternal('https://github.com/matthewstriks/cerms/issues')
+  shell.openExternal('https://github.com/matthewstriks/CERMS/issues/new/choose')
 })
