@@ -259,7 +259,6 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
   let theSecs = theTimestamp.getSeconds()
   let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
-  console.log("update: " + stringStarter);
 
   let theProductInfo
   productsData.forEach(product => {
@@ -2589,7 +2588,6 @@ async function createMembership(memberInfo){
   let theSecs = theTimestamp.getSeconds()
   let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
-  console.log(stringStarter);
 
   let theProductInfo
   productsData.forEach(product => {
@@ -2608,7 +2606,7 @@ async function createMembership(memberInfo){
     updateLID()
     getSystemData();
     update = true;
-    setTimeout(function(){createMembership(memberInfo)}, 3000);
+    setTimeout(function(){createMembership(memberInfo)}, 1000);
   });
   if (!update){
     const q2 = query(collection(db, "members"), where("name", "==", memberInfo[0] + " " + memberInfo[1]), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]), where('access', '==', getSystemAccess()));
@@ -3345,9 +3343,9 @@ ipcMain.on('remove-dir', async (event, arg) => {
 
 async function updateLID(){
   const docRef = doc(db, "system", userData.access);
-  systemData.lid = systemData.lid + 1
+  systemData.lid = Number(systemData.lid) + 1
   await updateDoc(docRef, {
-    lid: systemData.lid
+    lid: Number(systemData.lid)
   });
 }
 
