@@ -3219,8 +3219,27 @@ async function startLoading(){
   loadingProgress = loadingProgress + 1
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Finished loading!'))
+
+  setInterval(function () {
+    searchForMessage()
+  }, 300000);
+
   goHome(true);
   await updateTLID();
+}
+
+async function searchForMessage(){
+  console.log('searching');
+  let theCurrentTime = Math.floor(Date.now() / 1000);
+  let theCurrentTimeMS = new Date(theCurrentTime * 1000);
+
+  const messagesRef = collection(db, "messages");
+
+  const querySnapshot1 = await getDocs(query(messagesRef, where('expire', '>', theCurrentTimeMS)));
+  querySnapshot1.forEach((doc) => {
+    let theMsg = doc.data()
+    notificationSystem(theMsg.type, theMsg.message)
+  })
 }
 
 async function getSystemData(){
