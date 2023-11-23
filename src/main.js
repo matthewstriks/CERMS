@@ -3229,7 +3229,6 @@ async function startLoading(){
 }
 
 async function searchForMessage(){
-  console.log('searching');
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeMS = new Date(theCurrentTime * 1000);
 

@@ -33,6 +33,9 @@ let completeCheckIn = document.getElementById('completeCheckIn');
 let productListSearch = document.getElementById('productListSearch');
 let searchProducts = document.getElementById('searchProducts');
 
+let accordionFavoriteheadingZero = document.getElementById('accordionFavoriteheadingZero');
+let favoriteProductCardRow = document.getElementById('favoriteProductCardRow');
+
 let totalLeftAmt;
 let ran = false
 let discountingOrder = false
@@ -767,6 +770,10 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   
   var productBody = document.createElement('div')
   productBody.className = 'card-body'
+  productBody.addEventListener('click', function () {
+    addProductCard(arg)
+    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
+  })
 
   var productTitle = document.createElement('h5')
   productTitle.className = 'card-title'
@@ -795,7 +802,9 @@ ipcRenderer.on('return-products-order', (event, arg) => {
 
   theAccordionBodyRow.appendChild(theAccordionBodyRowCol) 
   theAccordionBodyRowCol.appendChild(productCard)
-//  document.getElementById('productCardRow').appendChild(productCard)
+  if (arg[1].favorite) {
+    document.getElementById('favoriteProductCardRow').appendChild(productCard)  
+  }
   theAccordionBodyRowCol.appendChild(theAccordionBodyRowColBr)
   productCard.appendChild(productImg)
   productCard.appendChild(productBody)
