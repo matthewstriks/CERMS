@@ -95,6 +95,8 @@ let categoryEditing;
 let productEditing;
 let discountEditing;
 
+let productsData = Array()
+
 let enterPressed
 
 let errorMsg = document.getElementById('errorMsg');
@@ -213,10 +215,14 @@ function productSearchFunct(){
     td = tr[i].getElementsByTagName("td")[0];
     td2 = tr[i].getElementsByTagName("td")[3];
     if (td) {
-      txtValue = td.textContent || td.innerText;
-      txtValue2 = td2.textContent || td2.innerText;
+      let txtValue = td.textContent || td.innerText;
+      let txtValue2 = td2.textContent || td2.innerText;
+      let txtValue3 = tr[i].getAttribute('categoryName');
+      if (!txtValue3){
+        txtValue3 = ""
+      }
       if (!enterPressed) {
-        if (txtValue.toUpperCase().indexOf(filter) > -1 || txtValue2.toUpperCase().indexOf(filter) > -1) {
+        if (txtValue.toUpperCase().indexOf(filter) > -1 || txtValue2.toUpperCase().indexOf(filter) > -1 || txtValue3.toUpperCase().indexOf(filter) > -1) {
           tr[i].style.display = "";
         } else {
           tr[i].style.display = "none";
@@ -259,8 +265,6 @@ function addDiscount(){
 }
 
 function editDiscount(){
-  console.log(editDiscountUses.value);
-  console.log(editDiscountUsed.value);
   ipcRenderer.send('edit-discount', Array(discountEditing, editDiscountCode.value, editDiscountDollar.checked, editDiscountPercent.checked, editDiscountAmount.value, editAsCheck.checked, editAsPro.value, editDiscountExpDate.value, editDiscountTypeP.checked, editDiscountTypeO.checked, editDiscountUses.value, editDiscountUsed.value))
 }
 
@@ -316,7 +320,106 @@ if (categoryTable) {
 
 if (productTable) {
   ipcRenderer.send('gather-products')
-  new Tablesort(productTable);
+  new Tablesort(productTable);  
+  setTimeout(() => {
+    productsData.forEach(product => {
+      product[1].forEach(arg => {
+        if (asPro) {
+          var opt = document.createElement('option');
+          opt.value = arg[0];
+          opt.innerHTML = arg[1].name;
+          var opt2 = document.createElement('option');
+          opt2.value = arg[0];
+          opt2.innerHTML = arg[1].name;
+          asPro.appendChild(opt);
+          editAsPro.appendChild(opt2);
+        }
+
+        var row = productTable.insertRow(1);
+        row.id = 'row' + arg[0];
+        row.setAttribute('categoryName', arg[2].name);
+        if (arg[2] && arg[1].active != false) {
+          row.style.backgroundColor = arg[2].color
+        } else if (!arg[1].active) {
+          row.style.backgroundColor = 'Crimson'
+        }
+
+        var cell1 = row.insertCell(0);
+        cell1.id = 'namecell' + arg[0];
+        var cell2 = row.insertCell(1);
+        cell2.id = 'pricecell' + arg[0];
+        var cell3 = row.insertCell(2);
+        cell3.id = 'invwarncell' + arg[0];
+        var cell4 = row.insertCell(3);
+        cell4.id = 'desccell' + arg[0];
+        var cell5 = row.insertCell(4);
+        cell5.id = 'invcell' + arg[0];
+        var cell6 = row.insertCell(5);
+        cell6.id = 'buttoncell' + arg[0];
+
+        cell1.innerHTML = arg[1].name;
+        cell2.innerHTML = arg[1].price;
+        if (arg[1].invWarning) {
+          cell3.innerHTML = arg[1].invWarning;
+        } else {
+          cell3.innerHTML = 'N/A';
+        }
+        cell4.innerHTML = arg[1].desc;
+
+        if (arg[1].inventory === 0) {
+          cell5.innerHTML = arg[1].inventory + '/' + arg[1].inventoryPar;
+        } else if (!arg[1].inventory) {
+          cell5.innerHTML = 'unlimited';
+        } else {
+          cell5.innerHTML = arg[1].inventory + '/' + arg[1].inventoryPar;
+        }
+
+        cell6.innerHTML = "<button data-bs-toggle='modal' data-bs-target='#myModal5' id='edit" + arg[0] + "' type='button' class='btn btn-warning'>Edit Product</button> <button id='remove" + arg[0] + "' data-bs-toggle='modal' data-bs-target='#myModal6' type='button' class='btn btn-danger'>Remove Product</button>";
+
+        document.getElementById("edit" + arg[0]).addEventListener('click', function () {
+          productEditing = arg[0];
+          editProductCategory.value = arg[1].cat
+          editProductName.value = arg[1].name
+          editProductBarcode.value = arg[1].barcode
+          editProductPrice.value = arg[1].price
+          editProductInvWarning.value = arg[1].invWarning
+          editProductFavorite.checked = arg[1].favorite
+          editProductTaxable.checked = arg[1].taxable
+          editProductActive.checked = arg[1].active
+          editProductCore.checked = arg[1].core
+          editProductRental.checked = arg[1].rental
+          editProductMembership.checked = arg[1].membership
+          editProductMembershipLength.value = arg[1].membershipLengthRaw
+          editProductMembershipLengthType.value = arg[1].membershipLengthType
+          editProductRentalLength.value = arg[1].rentalLengthRaw
+          editProductRentalLengthType.value = arg[1].rentalLengthType
+          editProductDesc.value = arg[1].desc
+          editProductInventory.value = arg[1].inventory
+          editProductInventoryPar.value = arg[1].inventoryPar
+
+          if (arg[1].membership) {
+            editProductMembershipDiv.style.display = ''
+          } else {
+            editProductMembershipDiv.style.display = 'none'
+          }
+
+          if (arg[1].rental) {
+            editProductRentalDiv.style.display = ''
+          } else {
+            editProductRentalDiv.style.display = 'none'
+          }
+
+          if (arg[1].image) {
+            productImg.setAttribute('src', arg[1].image)
+          }
+        })
+
+        document.getElementById("remove" + arg[0]).addEventListener('click', function () {
+          productEditing = arg[0];
+        })
+      });
+    });
+  }, 3000);
 }
 
 if (discountsTable) {
@@ -340,6 +443,7 @@ ipcRenderer.on('return-categories', (event, arg) => {
   if (!arg) {
     return
   }
+  productsData.push(Array(arg[0], Array()))
   var row = categoryTable.insertRow(1);
   row.id = 'row'+arg[0];
   row.style.backgroundColor = arg[1].color
@@ -428,100 +532,12 @@ ipcRenderer.on('return-products', (event, arg) => {
   if (!arg) {
     return
   }
-  console.log(arg);
-
-  if (asPro) {
-    var opt = document.createElement('option');
-    opt.value = arg[0];
-    opt.innerHTML = arg[1].name;
-    var opt2 = document.createElement('option');
-    opt2.value = arg[0];
-    opt2.innerHTML = arg[1].name;
-    asPro.appendChild(opt);
-    editAsPro.appendChild(opt2);
-  }
-
-  var row = productTable.insertRow(1);
-  row.id = 'row'+arg[0];
-  if (arg[2] && arg[1].active != false) {
-    row.style.backgroundColor = arg[2].color
-  } else if (!arg[1].active) {
-    row.style.backgroundColor = 'Crimson'
-  }
-
-  var cell1 = row.insertCell(0);
-  cell1.id = 'namecell'+arg[0];
-  var cell2 = row.insertCell(1);
-  cell2.id = 'pricecell'+arg[0];
-  var cell3 = row.insertCell(2);
-  cell3.id = 'invwarncell'+arg[0];
-  var cell4 = row.insertCell(3);
-  cell4.id = 'desccell'+arg[0];
-  var cell5 = row.insertCell(4);
-  cell5.id = 'invcell'+arg[0];
-  var cell6 = row.insertCell(5);
-  cell6.id = 'buttoncell'+arg[0];
-
-  cell1.innerHTML = arg[1].name;
-  cell2.innerHTML = arg[1].price;
-  if (arg[1].invWarning) {
-    cell3.innerHTML = arg[1].invWarning;
-  }else{
-    cell3.innerHTML = 'N/A';
-  }
-  cell4.innerHTML = arg[1].desc;
-
-  if (arg[1].inventory === 0) {
-    cell5.innerHTML = arg[1].inventory + '/' + arg[1].inventoryPar;
-  } else if (!arg[1].inventory) {
-    cell5.innerHTML = 'unlimited';
-  } else {
-    cell5.innerHTML = arg[1].inventory + '/' + arg[1].inventoryPar;
-  }
-
-  cell6.innerHTML = "<button data-bs-toggle='modal' data-bs-target='#myModal5' id='edit"+arg[0]+"' type='button' class='btn btn-warning'>Edit Product</button> <button id='remove" +arg[0] + "' data-bs-toggle='modal' data-bs-target='#myModal6' type='button' class='btn btn-danger'>Remove Product</button>";
-
-  document.getElementById("edit"+arg[0]).addEventListener('click', function(){
-    productEditing = arg[0];
-    editProductCategory.value = arg[1].cat
-    editProductName.value = arg[1].name
-    editProductBarcode.value = arg[1].barcode
-    editProductPrice.value = arg[1].price
-    editProductInvWarning.value = arg[1].invWarning
-    editProductFavorite.checked = arg[1].favorite
-    editProductTaxable.checked = arg[1].taxable
-    editProductActive.checked = arg[1].active
-    editProductCore.checked = arg[1].core
-    editProductRental.checked = arg[1].rental
-    editProductMembership.checked = arg[1].membership
-    editProductMembershipLength.value = arg[1].membershipLengthRaw
-    editProductMembershipLengthType.value = arg[1].membershipLengthType
-    editProductRentalLength.value = arg[1].rentalLengthRaw
-    editProductRentalLengthType.value = arg[1].rentalLengthType
-    editProductDesc.value = arg[1].desc
-    editProductInventory.value = arg[1].inventory
-    editProductInventoryPar.value = arg[1].inventoryPar
-
-    if (arg[1].membership) {
-      editProductMembershipDiv.style.display = ''
-    } else {
-      editProductMembershipDiv.style.display = 'none'
+  productsData.forEach(product => {
+    if (arg[1].cat == product[0]) {
+      product[1].push(arg)
     }
-
-    if (arg[1].rental) {
-      editProductRentalDiv.style.display = ''
-    } else {
-      editProductRentalDiv.style.display = 'none'
-    }
-
-    if (arg[1].image) {
-      productImg.setAttribute('src', arg[1].image)      
-    }
-  })
-
-  document.getElementById("remove"+arg[0]).addEventListener('click', function(){
-    productEditing = arg[0];
-  })
+  });
+ 
 })
 
 ipcRenderer.on('return-products-update', (event, arg) => {
