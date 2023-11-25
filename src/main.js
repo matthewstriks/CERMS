@@ -4,6 +4,7 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const xl = require('excel4node');
+const { firebaseConfig } = require('./assets/firebase-config.js');
 const { initializeApp } = require("firebase/app");
 const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword } = require("firebase/auth");
 const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, orderBy, limit, FieldValue, arrayUnion, increment } = require("firebase/firestore");
@@ -15,7 +16,6 @@ const os = require('os');
 const { getSystemMemoryInfo } = require('process');
 const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
-
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
   .then((url) => {
@@ -25,18 +25,6 @@ const OAuthClient = require('intuit-oauth');
     console.log(error);
   });
 */
-
-// Live
-const firebaseConfig = {
-  apiKey: "AIzaSyBLgcEx6bUsvCxZo6_Ieyo23J3duVQSjo4",
-  authDomain: "cerms-7af24.firebaseapp.com",
-  projectId: "cerms-7af24",
-  storageBucket: "cerms-7af24.appspot.com",
-  messagingSenderId: "448459034729",
-  appId: "1:448459034729:web:f73e546ecd1ceb9bd8d2f8",
-  measurementId: "G-Y7RNQZP9KB",
-  databaseURL: "gs://cerms-7af24.appspot.com"
-};
 
 function initializeAppFunct(){
   firebaseApp = initializeApp(firebaseConfig);
