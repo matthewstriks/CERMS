@@ -3531,12 +3531,12 @@ ipcMain.on('app_version', (event) => {
 });
 
 autoUpdater.on('checking-for-update', () => {
-  notificationSystem('primary', 'Checking for new updates...')
+  notificationSystem('primary', 'Checking for new updates... You are currently using ' + app.getVersion())
   theClient.send('update_available');
 });
 
 autoUpdater.on('update-available', () => {
-  notificationSystem('warning', 'A new update is available. Downloading now...')
+  notificationSystem('warning', 'A new update is available. Downloading now... (' + app.getVersion() + ')')
   theClient.send('update_available');
 });
 
@@ -3546,7 +3546,7 @@ autoUpdater.on('update-downloaded', () => {
 });
 
 autoUpdater.on('update-not-available', () => {
-  notificationSystem('success', 'No new updates. You have the latest version!')
+  notificationSystem('success', 'No new updates. You have the latest version! (' + app.getVersion() + ')')
 })
 
 // IPCMain's
