@@ -2,7 +2,9 @@ const { ipcRenderer } = require('electron');
 const { fn } = require('jquery');
 let createMembershipForm = document.getElementById('createMembershipForm');
 let fnameInput = document.getElementById('fnameInput');
+let mnameInput = document.getElementById('mnameInput');
 let lnameInput = document.getElementById('lnameInput');
+let suffixInput = document.getElementById('suffixInput');
 let under21Txt = document.getElementById('under21Txt');
 let babyImg = document.getElementById('babyImg');
 let babyImg2 = document.getElementById('babyImg2');
@@ -53,11 +55,13 @@ if (scanIDBtn) {
 function scanIDFunction(){
   const text = scanIDTxt.value
   const characters = text.split("\n");
-  let fname
-  let lname
+  let fname = ""
+  let mname = ""
+  let suffix = ""
+  let lname = ""
   let dob
-  let clientID
-  let clientState
+  let clientID = ""
+  let clientState = ""
 
   if (characters.length <= 5) {
     scanIDBtn.disabled = false
@@ -71,8 +75,17 @@ function scanIDFunction(){
     if (element.includes("DAC")) {
       fname = element.replace(/DAC/g, "");
     }
+    if (element.includes("DAD")) {
+      mname = element.replace(/DAD/g, "");
+    }
     if (element.includes('DCS')) {
       lname = element.replace(/DCS/g, "");
+    }
+    if (element.includes('DAE')) {
+      suffix = element.replace(/DAE/g, "");      
+      console.log('Here: ' + suffix);
+      errorMsg.className = 'alert alert-warning'
+      errorMsg.innerHTML = "License has the suffix '" + suffix + "' please ensure it is entered correctly in the form."
     }
     if (element.includes('DBB')) {
       dob = element.replace(/DBB/g, "");
@@ -86,7 +99,9 @@ function scanIDFunction(){
   }
 
   fnameInput.value = capitalizeFirstLetter(fname.toLowerCase())
+  mnameInput.value = capitalizeFirstLetter(mname.toLowerCase())
   lnameInput.value = capitalizeFirstLetter(lname.toLowerCase())
+  suffixInput.value = suffix
 
   let theYear = dob.substring(4, 8)
   let theMonth = dob.substring(0, 2)
@@ -191,7 +206,7 @@ function formWasSubmitted(){
     errorMsg.className = 'alert alert-danger'
     errorMsg.innerHTML = theError;
   }
-  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value))
+  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value))
 }
 
 if (logoutBtn) {

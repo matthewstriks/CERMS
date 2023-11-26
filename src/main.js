@@ -2334,7 +2334,9 @@ async function editMembership(memberInfo){
   if (!memberInfo[4]) {
     await updateDoc(docRef, {
       fname: memberInfo[1],
+      mname: memberInfo[12],
       lname: memberInfo[2],
+      suffix: memberInfo[13],
       dob: memberInfo[3],
       idnum: memberInfo[6],
       idstate: memberInfo[7],
@@ -2346,7 +2348,9 @@ async function editMembership(memberInfo){
   } else {
     await updateDoc(docRef, {
       fname: memberInfo[1],
+      mname: memberInfo[12],
       lname: memberInfo[2],
+      suffix: memberInfo[13],
       dob: memberInfo[3],
       membership_type: memberInfo[4],
       id_expiration: unixTimestamp,
@@ -2612,6 +2616,8 @@ async function createMembership(memberInfo){
       name: memberInfo[0] + " " + memberInfo[1],
       fname: memberInfo[0],
       lname: memberInfo[1],
+      mname: memberInfo[9],
+      suffix: memberInfo[10],
       dna: false,
       id_number: systemData.lid + 1,
       waiver_status: memberInfo[5],

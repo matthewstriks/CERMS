@@ -52,7 +52,9 @@ let editmemberInfoDNABtn2 = document.getElementById('editmemberInfoDNABtn2');
 let editMembershipForm = document.getElementById('editMembershipForm');
 let editmemberInfoName = document.getElementById('editmemberInfoName');
 let editfnameInput = document.getElementById('editfnameInput');
+let editmnameInput = document.getElementById('editmnameInput');
 let editlnameInput = document.getElementById('editlnameInput');
+let editsuffixInput = document.getElementById('editsuffixInput');
 let editdobInput = document.getElementById('editdobInput');
 let editemailInput = document.getElementById('editemailInput');
 let editmembershipInput = document.getElementById('editmembershipInput');
@@ -337,7 +339,7 @@ document.getElementById('editmemberSubmitForm').addEventListener('click', functi
 })
 
 function formWasSubmitted(){
-  ipcRenderer.send('membership-update', Array(memberEditing, editfnameInput.value, editlnameInput.value, editdobInput.value, editmembershipInput.value, editexpiresInput.value, editidnumInput.value, editidnumStateInput.value, editnotesInputNew.value, editwaiverInput.checked, editemailInput.value, memberTypeEdited));
+  ipcRenderer.send('membership-update', Array(memberEditing, editfnameInput.value, editlnameInput.value, editdobInput.value, editmembershipInput.value, editexpiresInput.value, editidnumInput.value, editidnumStateInput.value, editnotesInputNew.value, editwaiverInput.checked, editemailInput.value, memberTypeEdited, editmnameInput.value, editsuffixInput.value));
   memberTypeEdited = false
   editMembershipForm.reset();
 }
@@ -693,7 +695,16 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       memberInfoDNA.innerHTML = ''
     }
 
-    memberInfoName.innerHTML = arg[1].name;
+    let memName = arg[1].name
+    if (arg[1].mname && arg[1].suffix) {
+      memName = arg[1].fname + ' ' + arg[1].mname + ' ' + arg[1].lname + ' ' + arg[1].suffix
+    } else if (arg[1].mname && !arg[1].suffix) {
+      memName = arg[1].fname + ' ' + arg[1].mname + ' ' + arg[1].lname
+    } else if (!arg[1].mname && arg[1].suffix) {
+      memName = arg[1].fname + ' ' + arg[1].lname + ' ' + arg[1].suffix
+    }
+
+    memberInfoName.innerHTML = memName;
     memberInfoDOB.innerHTML = 'DOB: ' + arg[1].dob + " <p style='color: red'>" + memberUnder21 + "</p>";
     memberInfoEMail.innerHTML = 'EMail: ' + (arg[1].email || 'N/A');
     memberInfoType.innerHTML = 'Membership Type: ' + arg[1].membership_type;
@@ -741,7 +752,9 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     }
 
     editfnameInput.value = arg[1].fname;
+    editmnameInput.value = arg[1].mname;
     editlnameInput.value = arg[1].lname;
+    editsuffixInput.value = arg[1].suffix;
     if (arg[1].dob.includes("/")) {
       let oldDOB = arg[1].dob;
       let newDOBM = oldDOB.substring(0, 2)
@@ -897,7 +910,16 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
       memberInfoDNA.innerHTML = ''
     }
 
-    memberInfoName.innerHTML = arg[1].name;
+    let memName = arg[1].name
+    if (arg[1].mname && arg[1].suffix) {
+      memName = arg[1].fname + ' ' + arg[1].mname + ' ' + arg[1].lname + ' ' + arg[1].suffix
+    } else if (arg[1].mname && !arg[1].suffix) {
+      memName = arg[1].fname + ' ' + arg[1].mname + ' ' + arg[1].lname
+    } else if (!arg[1].mname && arg[1].suffix) {
+      memName = arg[1].fname + ' ' + arg[1].lname + ' ' + arg[1].suffix
+    }
+
+    memberInfoName.innerHTML = memName;
     memberInfoDOB.innerHTML = 'DOB: ' + arg[1].dob;
     memberInfoEMail.innerHTML = 'EMail: ' + (arg[1].email || 'N/A');
     memberInfoType.innerHTML = 'Membership Type: ' + arg[1].membership_type;
@@ -945,7 +967,9 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
     }
 
     editfnameInput.value = arg[1].fname;
+    editmnameInput.value = arg[1].mname;
     editlnameInput.value = arg[1].lname;
+    editsuffixInput.value = arg[1].suffix;
     if (arg[1].dob.includes("/")) {
       let oldDOB = arg[1].dob;
       let newDOBM = oldDOB.substring(0, 2)
