@@ -492,11 +492,6 @@ ipcRenderer.on('recieve-login-info', (event, arg) => {
   welcomeMsg.innerHTML = "Welcome "+arg+"!";
 })
 
-ipcRenderer.on('recieve-renew-time', (event, arg) => {
-  theRenewTime = arg
-  renewTxt.innerHTML = 'Are you sure you want to add ' + theRenewTime + ' hours?'
-})
-
 ipcRenderer.on('rentals-request-return', (event, arg) => {
   var opt = document.createElement('option');
   opt.value = arg;

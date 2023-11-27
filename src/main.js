@@ -309,12 +309,36 @@ async function memberUNTag(memberInfo){
   });
 }
 
+// HERE
 async function renewActivity(memberInfo){
+  console.log(memberInfo);
   notificationSystem('warning', 'Renewing time...')
   let theUserID = getUID();
   let theCurrentTime = memberInfo[1][4];
   let theCurrentTimeExp = memberInfo[1][5];
-  let theTimeToAdd = systemData.renewTime * 3600
+  let theTimeToAdd = 6 * 3600
+
+  productsData.forEach(product => {
+    if ((product[1].name == memberInfo[1][2]) && (product[1].rental) && (product[1].rentalLength)) {
+      theTimeToAdd = product[1].rentalLength
+    }
+  });
+  /*
+  let theMultiple
+  if (proMembershipLengthType == 'hour') {
+    theMultiple = 3600
+  } else if (proMembershipLengthType == 'day') {
+    theMultiple = 86400
+  } else if (proMembershipLengthType == 'week') {
+    theMultiple = 604800
+  } else if (proMembershipLengthType == 'month') {
+    theMultiple = 2.628e+6
+  } else if (proMembershipLengthType == 'year') {
+    theMultiple = 3.154e+7
+  }
+  theMembershipLength = proMembershipLength * theMultiple
+  */
+
   let theTimeExpire = theCurrentTimeExp + theTimeToAdd;
   const docRef = doc(db, "activity", memberInfo[0]);
   await updateDoc(docRef, {
@@ -3767,7 +3791,6 @@ ipcMain.on('activity-close', (event, arg) => {
 ipcMain.on('activity-request', (event, arg) => {
   theClient = event.sender;
   displayAllActivity();
-  theClient.send('recieve-renew-time', systemData.renewTime)
 })
 
 ipcMain.on('activity-update-lockerroom', (event, arg) => {
@@ -4054,19 +4077,6 @@ ipcMain.on('edit-invWarn', async (event, arg) => {
     const docRef = doc(db, "system", userData.access);
     await updateDoc(docRef, {
       invWarnEMail: arg
-    });
-    await getSystemData()
-    goHome()      
-  }
-})
-
-ipcMain.on('edit-renew-time', async (event, arg) => {
-  theClient = event.sender;
-  let userAllowed = canUser("permissionEditSystemSettings");
-  if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
-      renewTime: arg
     });
     await getSystemData()
     goHome()      

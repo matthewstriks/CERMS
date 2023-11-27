@@ -19,8 +19,6 @@ let importMembershipsBtn = document.getElementById('importMembershipsBtn')
 let editSaveDir = document.getElementById('editSaveDir')
 let editModalDirs = document.getElementById('editModalDirs')
 let invWarnEMail = document.getElementById('invWarnEMail')
-let editRenewTime = document.getElementById('editRenewTime')
-let editRenewTimeBtn = document.getElementById('editRenewTimeBtn')
 let editInvWarnEMail = document.getElementById('editInvWarnEMail')
 let connectQuickBooksBtn = document.getElementById('connectQuickBooksBtn')
 let connectQuickBooksDiv = document.getElementById('connectQuickBooksDiv')
@@ -135,12 +133,6 @@ if (editInvWarnEMail) {
   })
 }
 
-if (editRenewTimeBtn) {
-  editRenewTimeBtn.addEventListener('click', function(){
-    ipcRenderer.send('edit-renew-time', editRenewTime.value)
-  })
-}
-
 if (editRecieptTxtBtn) {
   editRecieptTxtBtn.addEventListener('click', function(){
     ipcRenderer.send('edit-reciept', editRecieptTxt.value)
@@ -192,7 +184,6 @@ ipcRenderer.on('recieve-account', (event, arg) => {
   }
 
   invWarnEMail.value = arg[2].invWarnEMail
-  editRenewTime.value = arg[2].renewTime
   systemName.innerHTML = arg[2].businessName;
   displayName.innerHTML = 'Display Name: ' + arg[0];
   if (arg[1] == 1) {
