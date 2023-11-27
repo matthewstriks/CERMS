@@ -11,7 +11,6 @@ ipcRenderer.on('notification-system', (event, arg) => {
 }) 
 
 if (loginForm) {
-  ipcRenderer.send('account-auto-login')
   loginForm.addEventListener('submit', function(){
   })  
 }

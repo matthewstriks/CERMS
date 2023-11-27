@@ -15,6 +15,7 @@ let emailInput = document.getElementById('emailInput')
 let displayNameInput = document.getElementById('displayNameInput')
 let rankInput = document.getElementById('rankInput')
 let saveDir = document.getElementById('saveDir')
+let importMembershipsBtn = document.getElementById('importMembershipsBtn')
 let editSaveDir = document.getElementById('editSaveDir')
 let editModalDirs = document.getElementById('editModalDirs')
 let invWarnEMail = document.getElementById('invWarnEMail')
@@ -44,6 +45,7 @@ let permissionEditDiscounts = document.getElementById('permissionEditDiscounts')
 let permissionWaiveProducts = document.getElementById('permissionWaiveProducts')
 let permissionEditSystemSettings = document.getElementById('permissionEditSystemSettings')
 let permissionEditRegisters = document.getElementById('permissionEditRegisters')
+let permissionImportMemberMode = document.getElementById('permissionImportMemberMode')
 
 let usersArray = Array();
 
@@ -114,6 +116,13 @@ if (editAccountBtnDeleteUser) {
   })
 }
 
+if (importMembershipsBtn) {
+  ipcRenderer.send('import-memberships-mode-status')
+  importMembershipsBtn.addEventListener('click', function(){
+    ipcRenderer.send('import-memberships-mode-change')
+  })
+}
+
 if (editSaveDir) {
   editSaveDir.addEventListener('click', function(){
     ipcRenderer.send('edit-save-dir')
@@ -169,7 +178,7 @@ function formWasSubmitted(){
 
 function formWasSubmitted2(){
   //RANK
-  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked))
+  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked))
 }
 
 ipcRenderer.send('request-account')
@@ -248,6 +257,7 @@ if (employeeInput) {
         permissionEditCoreProducts.checked = value[1].permissionEditCoreProducts
         permissionEditSystemSettings.checked = value[1].permissionEditSystemSettings
         permissionEditRegisters.checked = value[1].permissionEditRegisters
+        permissionImportMemberMode.checked = value[1].permissionImportMemberMode
       }else if (!employeeInput.value) {
         changeDisplayNameInput.value = ""
         changeRankInput.value = ""
@@ -259,6 +269,7 @@ if (employeeInput) {
         permissionEditCoreProducts.checked = false
         permissionEditSystemSettings.checked = false
         permissionEditRegisters.checked = false
+        permissionImportMemberMode.checked = false
       }{
 
       }
@@ -283,4 +294,14 @@ ipcRenderer.on('account-edit-success', (event, arg) => {
   changeRankInput.value = "";
   editAccountForm.reset()
   editAccountDiv.style.display = "none";
+})
+
+ipcRenderer.on('import-memberships-mode-status-return', (event, arg) => {
+  if (arg) {
+    importMembershipsBtn.className = 'btn btn-danger'
+    importMembershipsBtn.innerHTML = 'Disable'
+  } else {
+    importMembershipsBtn.className = 'btn btn-success'
+    importMembershipsBtn.innerHTML = 'Enable'
+  }
 })

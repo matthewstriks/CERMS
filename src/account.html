@@ -87,6 +87,9 @@
       <p id="saveDir">Report save directory: </p>
       <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#myModal">Edit Save Dir</button>
       <hr>
+      <p id="saveDir">Import Memberships Mode</p>
+      <button class="btn btn-warning" id="importMembershipsBtn" type="button">Enable</button>
+      <hr>
       <p>Where to send the inventory warning emails</p>
       <input class="form-control" type="text" id="invWarnEMail"></input>
       <br>
@@ -228,6 +231,12 @@
           <input class="form-check-input" type="checkbox" value="" id="permissionEditRegisters">
           <label class="form-check-label" for="permissionEditRegisters">
             Edit Registers
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="" id="permissionImportMemberMode">
+          <label class="form-check-label" for="permissionImportMemberMode">
+            Import Membership Mode (bypass order screen to create member)
           </label>
         </div>
         <br>

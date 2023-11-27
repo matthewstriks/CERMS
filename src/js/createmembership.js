@@ -12,6 +12,9 @@ let babyImg3 = document.getElementById('babyImg3');
 let dobInput = document.getElementById('dobInput');
 let emailInput = document.getElementById('emailInput');
 let membershipInput = document.getElementById('membershipInput');
+let membershipInputDiv = document.getElementById('membershipInputDiv')
+let membershipCreationInput = document.getElementById('membershipCreationInput');
+let membershipExpireInput = document.getElementById('membershipExpireInput');
 let notesInput = document.getElementById('notesInput');
 let waiverInput = document.getElementById('waiverInput');
 let idnumInput = document.getElementById('idnumInput');
@@ -206,7 +209,7 @@ function formWasSubmitted(){
     errorMsg.className = 'alert alert-danger'
     errorMsg.innerHTML = theError;
   }
-  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value))
+  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value))
 }
 
 if (logoutBtn) {
@@ -226,6 +229,7 @@ ipcRenderer.on('membership-pending-waiting-for-id', (event, arg) => {
 ipcRenderer.on('membership-success', (event, arg) => {
   submitBtn.disabled = false;
   createMembershipForm.reset()
+  fnameInput.focus()
   document.getElementById(arg).addEventListener('click', function(){
     ipcRenderer.send('open-membership', arg)
   })
@@ -236,4 +240,16 @@ ipcRenderer.on('product-membership-request-return', (event, arg) => {
   opt.value = arg[0];
   opt.innerHTML = arg[1].name;
   membershipInput.appendChild(opt);
+})
+
+ipcRenderer.send('import-memberships-mode-status')
+
+if (membershipInputDiv) {
+  membershipInputDiv.style.display = 'none'
+}
+
+ipcRenderer.on('import-memberships-mode-status-return', (event, arg) => {
+  if (arg) {
+    membershipInputDiv.style.display = ''    
+  }
 })

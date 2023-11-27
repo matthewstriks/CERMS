@@ -7,7 +7,7 @@ const xl = require('excel4node');
 const { firebaseConfig } = require('./assets/firebase-config.js');
 const { initializeApp } = require("firebase/app");
 const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword } = require("firebase/auth");
-const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, orderBy, limit, FieldValue, arrayUnion, increment } = require("firebase/firestore");
+const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment } = require("firebase/firestore");
 const { getStorage, ref, getDownloadURL } = require("firebase/storage");
 const { log } = require('console');
 const delay = require('delay');
@@ -52,7 +52,6 @@ const usersData = Array();
 let mainWin;
 let uploadImgWin;
 let recieptWin;
-let recieptWinChild;
 let theClient;
 let theClient2;
 let theProductImgID;
@@ -70,8 +69,6 @@ let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
 
 let pendingOrders = Array()
-let pendingOrderType;
-let pendingOrderInfo;
 let pendingOrderID;
 let lastMemberCreated;
 let orderSuspended = false
@@ -80,12 +77,8 @@ let theLockerRoomInput2
 
 let regStatus = false;
 let regStatusID = false;
-let regStatusShift = false;
 
-let autoLogin = true
-
-let liveVersion;
-let theAppVersion;
+let importMembershipsMode = false
 
 const formatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -2588,7 +2581,7 @@ async function createMembership(memberInfo){
     }
   });
 
-  idExpiration = theCurrentTime + theProductInfo[1].membershipLength
+  idExpiration = Number(theCurrentTime) + Number(theProductInfo[1].membershipLength)
 
   const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1), where('access', '==', getSystemAccess()));
   const querySnapshot1 = await getDocs(q1);
@@ -2610,6 +2603,22 @@ async function createMembership(memberInfo){
     });
   }
   if (!update) {
+    let creationTime = serverTimestamp()
+    let expireTime = idExpiration
+    if (importMembershipsMode) {
+      if (memberInfo[11]) {
+        let dateStr = memberInfo[11];
+        let date = new Date(dateStr);
+        creationTime = Timestamp.fromDate(new Date(date))        
+      }
+      if (memberInfo[12]) {
+        let dateStr2 = memberInfo[12];
+        let date2 = new Date(dateStr2);
+        let unixTimestamp2 = Math.floor(date2.getTime() / 1000);
+        expireTime = unixTimestamp2        
+      }
+    }
+
     const docRef = await addDoc(collection(db, "members"), {
       access: getSystemAccess(),
       notes: Array(stringStarter + memberInfo[4]),
@@ -2621,9 +2630,9 @@ async function createMembership(memberInfo){
       dna: false,
       id_number: systemData.lid + 1,
       waiver_status: memberInfo[5],
-      id_expiration: idExpiration,
+      id_expiration: expireTime,
       dob: memberInfo[2],
-      creation_time: serverTimestamp(),
+      creation_time: creationTime,
       membership_type: memberInfo[3],
       checkedIn: false,
       idnum: memberInfo[6],
@@ -2639,7 +2648,9 @@ async function createMembership(memberInfo){
     notificationSystem('success', theMsg)
 //    let theMembersData = await getMemberInfo(docRef.id);
 //    theClient.send('membership-request-return', Array(docRef.id, theMembersData))
-    updateOrderCustomerID(pendingOrderID, docRef.id)
+    if (!importMembershipsMode) {
+      updateOrderCustomerID(pendingOrderID, docRef.id)      
+    }
     updateLID();
     lastMemberCreated = docRef.id
   }
@@ -3353,7 +3364,6 @@ async function updateOrderCustomerID(orderID, theCustomerID){
 function userLogout(){
   user = null;
   userData = null;
-  autoLogin = false;
   loadAuth();
 }
 
@@ -3578,16 +3588,6 @@ ipcMain.on('account-access', (event, arg) => {
   addAccess(arg)
 })
 
-ipcMain.on('account-auto-login', (event, arg) => {
-  theClient = event.sender;
-  if (autoLogin) {
-    // Dev
-    if (devMode) {
-      attemptLogin(Array('matthew@striks.com', 'P@SSW0RD'))
-    }
-  }
-})
-
 ipcMain.on('request-login-info', (event, arg) => {
   theClient = event.sender;
   let theDisplayName = getDisplayName();
@@ -3600,8 +3600,12 @@ ipcMain.on('account-logout', (event, arg) => {
 
 ipcMain.on('membership-create', (event, arg) => {
   theClient = event.sender;
-  goOrder()
-  createOrder(Array(false, arg[3], arg[0] + ' ' + arg[1]), 'membership', arg)
+  if (importMembershipsMode) {
+    createMembership(arg)
+  } else {
+    goOrder()
+    createOrder(Array(false, arg[3], arg[0] + ' ' + arg[1]), 'membership', arg)
+  }
 })
 
 ipcMain.on('membership-update', async (event, arg) => {
@@ -3683,10 +3687,31 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionWaiveProducts: arg[7],
     permissionEditCoreProducts: arg[8],
     permissionEditSystemSettings: arg[9],
-    permissionEditRegisters: arg[10]
+    permissionEditRegisters: arg[10],
+    permissionImportMemberMode: arg[11]
   });
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')
+})
+
+ipcMain.on('import-memberships-mode-status', (event, arg) => {
+  theClient = event.sender;
+  theClient.send('import-memberships-mode-status-return', importMembershipsMode)
+})
+
+ipcMain.on('import-memberships-mode-change', async (event, arg) => {
+  theClient = event.sender;
+  let isAllowed = await canUser('permissionImportMemberMode')
+  if (!isAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+  if (importMembershipsMode) {
+    importMembershipsMode = false
+  } else {
+    importMembershipsMode = true
+  }
+  theClient.send('import-memberships-mode-status-return', importMembershipsMode)
 })
 
 ipcMain.on('account-change-password', (event, arg) => {
