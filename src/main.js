@@ -2605,6 +2605,7 @@ async function createMembership(memberInfo){
   if (!update) {
     let creationTime = serverTimestamp()
     let expireTime = idExpiration
+    let idNumber = systemData.lid + 1
     if (importMembershipsMode) {
       if (memberInfo[11]) {
         let dateStr = memberInfo[11];
@@ -2617,18 +2618,26 @@ async function createMembership(memberInfo){
         let unixTimestamp2 = Math.floor(date2.getTime() / 1000);
         expireTime = unixTimestamp2        
       }
+      if (memberInfo[13]) {
+        idNumber = memberInfo[13]
+      }
+    }
+
+    let theNotes = Array()
+    if (memberInfo[4]) {
+      theNotes = Array(stringStarter + memberInfo[4])      
     }
 
     const docRef = await addDoc(collection(db, "members"), {
       access: getSystemAccess(),
-      notes: Array(stringStarter + memberInfo[4]),
+      notes: theNotes,
       name: memberInfo[0] + " " + memberInfo[1],
       fname: memberInfo[0],
       lname: memberInfo[1],
       mname: memberInfo[9],
       suffix: memberInfo[10],
       dna: false,
-      id_number: systemData.lid + 1,
+      id_number: idNumber,
       waiver_status: memberInfo[5],
       id_expiration: expireTime,
       dob: memberInfo[2],

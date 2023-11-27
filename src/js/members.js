@@ -22,6 +22,7 @@ let memberInfoTagCB = document.getElementById('memberInfoTagCB');
 let memberInfoName = document.getElementById('memberInfoName');
 let memberHistoryInfoName = document.getElementById('memberHistoryInfoName');
 let memberInfoDOB = document.getElementById('memberInfoDOB');
+let memberInfoID = document.getElementById('memberInfoID');
 let memberInfoEMail = document.getElementById('memberInfoEMail');
 let memberInfoType = document.getElementById('memberInfoType');
 let memberInfoExpires = document.getElementById('memberInfoExpires');
@@ -233,6 +234,7 @@ if(myModal2){
     memberInfoDNA.innerHTML = '';
     memberInfoName.innerHTML = '';
     memberInfoDOB.innerHTML = '';
+    memberInfoID.innerHTML = '';
     memberInfoEMail.innerHTML = '';
     memberInfoType.innerHTML = '';
     memberInfoExpires.innerHTML = '';
@@ -249,6 +251,7 @@ if (memberInfoClose) {
     memberInfoDNA.innerHTML = '';
     memberInfoName.innerHTML = '';
     memberInfoDOB.innerHTML = '';
+    memberInfoID.innerHTML = '';
     memberInfoEMail.innerHTML = '';
     memberInfoType.innerHTML = '';
     memberInfoExpires.innerHTML = '';
@@ -541,10 +544,6 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   let theYear = Number(str.substring(0, 4));
   let theMonth = Number(str.substring(5, 7));
   let theDay = Number(str.substring(8, 10));
-  console.log(str);
-  console.log(theYear);
-  console.log(theMonth);
-  console.log(theDay);
   let theirAge = (currYear - theYear)    
   let memberUnder21 = ""
   if (theirAge > 21) {
@@ -572,6 +571,8 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   cell5.id = 'buttoncell'+arg[0];
 
   var a2 = new Date(arg[1].id_expiration * 1000);
+  console.log(arg[1].id_expiration);
+  console.log(a2);
   var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var year2 = a2.getFullYear();
   var month2 = months[a2.getMonth()];
@@ -706,9 +707,10 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
 
     memberInfoName.innerHTML = memName;
     memberInfoDOB.innerHTML = 'DOB: ' + arg[1].dob + " <p style='color: red'>" + memberUnder21 + "</p>";
+    memberInfoID.innerHTML = 'Membership ID: ' + (arg[1].id_number || 'N/A');
     memberInfoEMail.innerHTML = 'EMail: ' + (arg[1].email || 'N/A');
     memberInfoType.innerHTML = 'Membership Type: ' + arg[1].membership_type;
-    memberInfoExpires.innerHTML = 'ID Expires: ' + time2;
+    memberInfoExpires.innerHTML = 'Membership Expires: ' + time2;
     memberInfoIDNum2.innerHTML = 'State ID Number: ' + arg[1].idnum;
     memberInfoIDNum3.innerHTML = 'ID State: ' + arg[1].idstate;
     memberInfoCT.innerHTML = 'Creation Time: ' + time;
@@ -921,9 +923,10 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
 
     memberInfoName.innerHTML = memName;
     memberInfoDOB.innerHTML = 'DOB: ' + arg[1].dob;
+    memberInfoID.innerHTML = 'Membership ID: ' + (arg[1].id_number || 'N/A');
     memberInfoEMail.innerHTML = 'EMail: ' + (arg[1].email || 'N/A');
     memberInfoType.innerHTML = 'Membership Type: ' + arg[1].membership_type;
-    memberInfoExpires.innerHTML = 'ID Expires: ' + time2;
+    memberInfoExpires.innerHTML = 'Membership Expires: ' + time2;
     memberInfoIDNum2.innerHTML = 'State ID Number: ' + arg[1].idnum;
     memberInfoIDNum3.innerHTML = 'ID State: ' + arg[1].idstate;
     memberInfoCT.innerHTML = 'Creation Time: ' + time;

@@ -15,6 +15,7 @@ let membershipInput = document.getElementById('membershipInput');
 let membershipInputDiv = document.getElementById('membershipInputDiv')
 let membershipCreationInput = document.getElementById('membershipCreationInput');
 let membershipExpireInput = document.getElementById('membershipExpireInput');
+let membershipMemberNumber = document.getElementById('membershipMemberNumber');
 let notesInput = document.getElementById('notesInput');
 let waiverInput = document.getElementById('waiverInput');
 let idnumInput = document.getElementById('idnumInput');
@@ -209,7 +210,7 @@ function formWasSubmitted(){
     errorMsg.className = 'alert alert-danger'
     errorMsg.innerHTML = theError;
   }
-  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value))
+  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value, membershipMemberNumber.value))
 }
 
 if (logoutBtn) {
