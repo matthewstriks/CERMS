@@ -228,6 +228,17 @@ if (completeCheckIn) {
   })
 }
 
+if (addLockerRoomInput) {
+  addLockerRoomInput.addEventListener('change', function () {
+    if (addLockerRoomInput.value == "") {
+      completeCheckIn.disabled = true;
+    } else {
+      completeCheckIn.disabled = false;
+    }
+  })
+}
+
+
 if (finishOrderBtn) {
   finishOrderBtn.style.display = 'none'
 }
