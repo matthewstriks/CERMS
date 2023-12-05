@@ -4,6 +4,7 @@ let systemName = document.getElementById('systemName');
 let displayName = document.getElementById('displayName');
 let rankInfo = document.getElementById('rankInfo');
 let updateBtn = document.getElementById('updateBtn');
+let changelogBtn = document.getElementById('changelogBtn');
 let changePasswordBtn = document.getElementById('changePasswordBtn');
 let editAccountBtnSubmitPassReset = document.getElementById('editAccountBtnSubmitPassReset');
 let editAccountBtnDeleteUser = document.getElementById('editAccountBtnDeleteUser');
@@ -63,6 +64,12 @@ if (logoutBtn) {
 if (updateBtn) {
   updateBtn.addEventListener('click', function(){
     ipcRenderer.send('request-update')
+  })
+}
+
+if (changelogBtn) {
+  changelogBtn.addEventListener('click', function(){
+    ipcRenderer.send('request-changelog')
   })
 }
 
