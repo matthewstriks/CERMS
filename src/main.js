@@ -3878,11 +3878,15 @@ ipcMain.on('searchForMember', (event, arg) => {
     for (i = 0; i < membersData.length; i++) {
       let theName = membersData[i][1].name.toUpperCase()
       let theID = Number(membersData[i][1].idnum)
+      let theMemID = Number(membersData[i][1].id_number)
       let brokenArg = arg.split(" ");
       if (theName.includes(arg)) {
         wasFound = true
         theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
       } else if (theID == Number(arg)) {
+        wasFound = true
+        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
+      } else if (theMemID == Number(arg)) {
         wasFound = true
         theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
       }else{
