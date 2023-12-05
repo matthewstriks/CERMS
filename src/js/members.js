@@ -571,8 +571,6 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   cell5.id = 'buttoncell'+arg[0];
 
   var a2 = new Date(arg[1].id_expiration * 1000);
-  console.log(arg[1].id_expiration);
-  console.log(a2);
   var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var year2 = a2.getFullYear();
   var month2 = months[a2.getMonth()];

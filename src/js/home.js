@@ -53,6 +53,11 @@ ipcRenderer.on('notification-system', (event, arg) => {
   errorMsg.innerHTML = arg[1]
 }) 
 
+function openMembership(){
+  let memID = document.getElementById('lastCreatedID').innerHTML
+  ipcRenderer.send('open-membership', memID)
+}
+
 if (editRentalInfoType) {
   ipcRenderer.send('rentals-request')
 }

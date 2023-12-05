@@ -2675,7 +2675,7 @@ async function createMembership(memberInfo){
     theClient.send('membership-success', docRef.id)
     let theID = 'Unknown ID'
     if (docRef.id) {
-      theID = "<a id='" + docRef.id + "' href='#'>" + docRef.id + "</a>"
+      theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + docRef.id + "</a>"
     }
     let theMsg = "Membership created! ID: " + theID
     notificationSystem('success', theMsg)
