@@ -3879,6 +3879,7 @@ ipcMain.on('searchForMember', (event, arg) => {
       let theName = membersData[i][1].name.toUpperCase()
       let theID = Number(membersData[i][1].idnum)
       let theMemID = Number(membersData[i][1].id_number)
+      let theDOB = membersData[i][1].dob
       let brokenArg = arg.split(" ");
       if (theName.includes(arg)) {
         wasFound = true
@@ -3887,6 +3888,9 @@ ipcMain.on('searchForMember', (event, arg) => {
         wasFound = true
         theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
       } else if (theMemID == Number(arg)) {
+        wasFound = true
+        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
+      } else if (theDOB == arg) {
         wasFound = true
         theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
       }else{
