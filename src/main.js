@@ -2795,6 +2795,9 @@ async function displayAllProductsOrder(){
   theClient.send('return-category-order-all', Array(categoriesData))
   productsData.forEach((products) => {
     theClient.send('return-products-order', Array(products[0], products[1]))
+    if (products[1].favorite) {
+      theClient.send('return-products-order', Array(products[0], products[1]))      
+    }
   })
   theClient.send('return-products-order-all', Array(productsData, discountsData))
 }

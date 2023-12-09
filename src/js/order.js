@@ -40,6 +40,7 @@ let totalLeftAmt;
 let ran = false
 let discountingOrder = false
 let theCustomerInfo;
+let favPros = Array()
 
 let errorMsg = document.getElementById('errorMsg');
 ipcRenderer.on('notification-system', (event, arg) => {
@@ -813,7 +814,8 @@ ipcRenderer.on('return-products-order', (event, arg) => {
 
   theAccordionBodyRow.appendChild(theAccordionBodyRowCol) 
   theAccordionBodyRowCol.appendChild(productCard)
-  if (arg[1].favorite) {
+  if (arg[1].favorite && !favPros.includes(arg[0])) {
+    favPros.push(arg[0])
     document.getElementById('favoriteProductCardRow').appendChild(productCard)  
   }
   theAccordionBodyRowCol.appendChild(theAccordionBodyRowColBr)
