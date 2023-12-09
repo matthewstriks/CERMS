@@ -232,6 +232,13 @@ ipcRenderer.on('register-status-change', (event, arg) => {
   }
 })
 
+ipcRenderer.on('register-shift-times-return', (event, arg) => {
+  console.log(arg);
+  document.getElementById('shiftA').innerHTML = arg[0]
+  document.getElementById('shiftB').innerHTML = arg[1]
+  document.getElementById('shiftC').innerHTML = arg[2]
+})
+
 ipcRenderer.on('register-all-request-return', (event, arg) => {
   let newCard = document.createElement('div')
   newCard.setAttribute("regID", arg[0])

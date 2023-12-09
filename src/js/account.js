@@ -21,6 +21,10 @@ let editSaveDir = document.getElementById('editSaveDir')
 let editModalDirs = document.getElementById('editModalDirs')
 let invWarnEMail = document.getElementById('invWarnEMail')
 let editInvWarnEMail = document.getElementById('editInvWarnEMail')
+let editShiftTimes = document.getElementById('editShiftTimes')
+let editShiftTimesA = document.getElementById('editShiftTimesA')
+let editShiftTimesB = document.getElementById('editShiftTimesB')
+let editShiftTimesC = document.getElementById('editShiftTimesC')
 let connectQuickBooksBtn = document.getElementById('connectQuickBooksBtn')
 let connectQuickBooksDiv = document.getElementById('connectQuickBooksDiv')
 let connectQuickBooksInput = document.getElementById('connectQuickBooksInput')
@@ -140,6 +144,12 @@ if (editInvWarnEMail) {
   })
 }
 
+if (editShiftTimes) {
+  editShiftTimes.addEventListener('click', function(){
+    ipcRenderer.send('edit-shifttimes', Array(editShiftTimesA.value, editShiftTimesB.value, editShiftTimesC.value))
+  })
+}
+
 if (editRecieptTxtBtn) {
   editRecieptTxtBtn.addEventListener('click', function(){
     ipcRenderer.send('edit-reciept', editRecieptTxt.value)
@@ -191,6 +201,9 @@ ipcRenderer.on('recieve-account', (event, arg) => {
   }
 
   invWarnEMail.value = arg[2].invWarnEMail
+  editShiftTimesA.value = arg[2].shiftTimeA
+  editShiftTimesB.value = arg[2].shiftTimeB
+  editShiftTimesC.value = arg[2].shiftTimeC
   systemName.innerHTML = arg[2].businessName;
   displayName.innerHTML = 'Display Name: ' + arg[0];
   if (arg[1] == 1) {
