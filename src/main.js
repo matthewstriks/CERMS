@@ -3668,6 +3668,7 @@ ipcMain.on('rentals-request', (event, arg) => {
   productsData.forEach(product => {
     if (product[1].rental) {
       theClient.send('rentals-request-return', product[1].name)
+      theClient.send('home-checkoutmsg-return', systemData.checkoutMsg)
     }
   });
 })
@@ -4087,6 +4088,19 @@ ipcMain.on('edit-invWarn', async (event, arg) => {
     const docRef = doc(db, "system", userData.access);
     await updateDoc(docRef, {
       invWarnEMail: arg
+    });
+    await getSystemData()
+    goHome()      
+  }
+})
+
+ipcMain.on('edit-checkoutmsg', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (userAllowed) {
+    const docRef = doc(db, "system", userData.access);
+    await updateDoc(docRef, {
+      checkoutMsg: arg
     });
     await getSystemData()
     goHome()      

@@ -21,6 +21,8 @@ let editSaveDir = document.getElementById('editSaveDir')
 let editModalDirs = document.getElementById('editModalDirs')
 let invWarnEMail = document.getElementById('invWarnEMail')
 let editInvWarnEMail = document.getElementById('editInvWarnEMail')
+let editCheckoutMsg = document.getElementById('editCheckoutMsg')
+let checkoutMsg = document.getElementById('checkoutMsg')
 let editShiftTimes = document.getElementById('editShiftTimes')
 let editShiftTimesA = document.getElementById('editShiftTimesA')
 let editShiftTimesB = document.getElementById('editShiftTimesB')
@@ -144,6 +146,12 @@ if (editInvWarnEMail) {
   })
 }
 
+if (editCheckoutMsg) {
+  editCheckoutMsg.addEventListener('click', function(){
+    ipcRenderer.send('edit-checkoutmsg', checkoutMsg.value)
+  })
+}
+
 if (editShiftTimes) {
   editShiftTimes.addEventListener('click', function(){
     ipcRenderer.send('edit-shifttimes', Array(editShiftTimesA.value, editShiftTimesB.value, editShiftTimesC.value))
@@ -201,6 +209,7 @@ ipcRenderer.on('recieve-account', (event, arg) => {
   }
 
   invWarnEMail.value = arg[2].invWarnEMail
+  checkoutMsg.value = arg[2].checkoutMsg
   editShiftTimesA.value = arg[2].shiftTimeA
   editShiftTimesB.value = arg[2].shiftTimeB
   editShiftTimesC.value = arg[2].shiftTimeC

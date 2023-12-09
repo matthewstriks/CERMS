@@ -46,6 +46,7 @@ let currActivityViewingLT;
 let currActivityViewingLN;
 let currActivityViewingNotes;
 let theRenewTime;
+let theCheckoutMsg = "Member has all belongings"
 
 let errorMsg = document.getElementById('errorMsg');
 ipcRenderer.on('notification-system', (event, arg) => {
@@ -322,6 +323,14 @@ ipcRenderer.on('activity-request-return-update', (event, arg) => {
   pageDetails.innerHTML = 'Current checked-in members: ' + currCheckedIn;
 })
 
+ipcRenderer.on('home-checkoutmsg-return', (event, arg) => {
+  console.log(arg);
+  if (arg) {
+    theCheckoutMsg = arg
+    confirmCheckoutLbl.innerHTML = arg
+  }
+})
+
 ipcRenderer.on('activity-request-return', (event, arg) => {
   if (!arg[1].active || arg[1].goingInactive) {
     return;
@@ -440,7 +449,7 @@ ipcRenderer.on('activity-request-return', (event, arg) => {
     if (arg[1].lockerRoomStatus[2] == 'Room') {
       confirmCheckoutLbl .innerHTML = "Did you remember to get the remote?";
     }else{
-      confirmCheckoutLbl .innerHTML = "Member has all personal belongings";
+      confirmCheckoutLbl .innerHTML = theCheckoutMsg;
     }
   })
 
