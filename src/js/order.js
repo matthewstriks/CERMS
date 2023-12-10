@@ -865,3 +865,30 @@ ipcRenderer.on('order-suspended', (event, arg) => {
   resumeBtn.style.display = ''
   suspendBtn.style.display = 'none'
 })
+
+if (document.getElementById('openRegisterDiv')) {
+  document.getElementById('openRegisterDiv').style.display = 'none'
+  ipcRenderer.send('register-status-request')
+}
+
+ipcRenderer.on('no-register-active', (event, arg) => {
+  document.getElementById('openRegisterDiv').style.display = ''
+  document.getElementById('orderPageDiv').style.display = 'none'
+  document.getElementById('orderPageDiv2').style.display = 'none'
+})
+
+ipcRenderer.on('register-started', (event, arg) => {
+  document.getElementById('openRegisterDiv').style.display = 'none'
+  document.getElementById('orderPageDiv').style.display = ''
+  document.getElementById('orderPageDiv2').style.display = ''
+})
+
+document.getElementById("startingSubmitBtn").addEventListener('click', function () {
+  ipcRenderer.send('starting-register-no-redirect', Array(document.getElementById("startingAmt").value, document.getElementById("startingShift").value))
+})
+
+ipcRenderer.on('register-shift-times-return', (event, arg) => {
+  document.getElementById('shiftA').innerHTML = arg[0]
+  document.getElementById('shiftB').innerHTML = arg[1]
+  document.getElementById('shiftC').innerHTML = arg[2]
+})

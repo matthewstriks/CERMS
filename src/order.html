@@ -150,8 +150,26 @@
     </div>
     <br>
 
+    <div class="container" id="openRegisterDiv">
+      <p>Starting Register Amount</p>
+      <input id="startingAmt" class="form-control" type="number" name="" value="0">
+      <br>
+      <p>Select shift working</p>
+      <select class="form-control" id="startingShift">
+        <option value="">---</option>
+        <option id="shiftB" value="B">7am - 3pm</option>
+        <option id="shiftC" value="C">3pm - 11pm</option>
+        <option id="shiftA" value="A">11pm - 7am</option>
+        <option value="D">No shift assigned</option>
+      </select>
+      <br>
+      <button class="btn btn-success" type="button" name="button" id="startingSubmitBtn">Submit</button>
+    </div>
+
+    <br>
+
     <div class="d-flex bd-highlight">
-      <div class="p-2 flex-fill bd-highlight">
+      <div class="p-2 flex-fill bd-highlight" id="orderPageDiv">
         <div class="accordion" id="accordionExample">
           <div class="accordion-item">
             <h2 class="accordion-header" id="headingZero">
@@ -191,7 +209,7 @@
           </div>
         </div>
       </div>
-      <div class="p-2 flex-fill bd-highlight">      
+      <div class="p-2 flex-fill bd-highlight" id="orderPageDiv2">      
       
         <div id="orderCard" class="card">
           <div class="card-header">

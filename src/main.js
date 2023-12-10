@@ -501,11 +501,9 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
   if (!regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
+      theClient.send('no-register-active')
     }, 1000);    
-    setTimeout(() => {
-      goRegister()
-    }, 3000);    
-    return
+//    return
   }
 
   pendingOrderType = orderType
@@ -546,11 +544,9 @@ async function suspendOrder() {
   if (!regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
+      theClient.send('no-register-active')
     }, 1000);
-    setTimeout(() => {
-      goRegister()
-    }, 3000);
-    return
+//    return
   }
   orderSuspended = true
 }
@@ -800,10 +796,8 @@ async function completeOrder(orderInfo){
   if (!regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
+      theClient.send('no-register-active')
     }, 1000);
-    setTimeout(() => {
-      goRegister()
-    }, 3000);    
     return
   }
   let theTimestamp = new Date(Math.floor(Date.now() / 1000))
@@ -1075,7 +1069,7 @@ async function gatherAllRegisters(){
   });
 }
 
-async function startRegister(registerInfo){
+async function startRegister(registerInfo, redirect){
   registerStatus()
   if (regStatus) {
     return
@@ -1098,6 +1092,8 @@ async function startRegister(registerInfo){
     getSystemData()
   }
 
+  theClient.send('register-started')
+
   const docRef = await addDoc(collection(db, "registers"), {
     access: getSystemAccess(),
     active: true,
@@ -1112,7 +1108,9 @@ async function startRegister(registerInfo){
     gcard: 0
   });
 
-  goRegister()
+  if (redirect) {
+    goRegister()    
+  }
 }
 
 async function manageEndRegister(registerInfo){
@@ -4009,7 +4007,12 @@ ipcMain.on('register-all-request', (event, arg) => {
 
 ipcMain.on('starting-register', (event, arg) => {
   theClient = event.sender;
-  startRegister(arg)
+  startRegister(arg, true)
+})
+
+ipcMain.on('starting-register-no-redirect', (event, arg) => {
+  theClient = event.sender;
+  startRegister(arg, false)
 })
 
 ipcMain.on('ending-register', (event, arg) => {
