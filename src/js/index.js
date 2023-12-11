@@ -1,12 +1,5 @@
-const { ipcRenderer } = require('electron')
 let loadingTxt = document.getElementById('loadingTxt')
 let progressBar = document.getElementById('progressBar')
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 if (progressBar) {
   ipcRenderer.send('getClient')

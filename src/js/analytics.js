@@ -1,4 +1,3 @@
-const { ipcRenderer } = require('electron')
 const { Chart, LogarithmicScale } = require('chart.js/auto');
 let startTime = document.getElementById('startTime')
 let endTime = document.getElementById('endTime')
@@ -8,12 +7,6 @@ let tnomLbl = document.getElementById('tnomLbl')
 
 let productInventoryDocChart = document.getElementById('productInventoryChart')
 let productSalesDocChart = document.getElementById('productSalesChart')
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 if (document.getElementById('quickSaleBtn')) {
   document.getElementById('quickSaleBtn').addEventListener('click', function () {

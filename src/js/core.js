@@ -1,5 +1,13 @@
 const { ipcRenderer } = require('electron')
 let errorMsg = document.getElementById('errorMsg');
+let logoutBtn = document.getElementById('logoutBtn');
+
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', function(){
+    ipcRenderer.send('account-logout')
+  })
+}
+
 ipcRenderer.on('notification-system', (event, arg) => {
     let theDiv = document.createElement('div')
     theDiv.className = 'alert alert-' + arg[0] + ' alert-dismissible'

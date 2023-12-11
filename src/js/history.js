@@ -1,4 +1,3 @@
-const { ipcRenderer } = require('electron')
 var Tablesort = require('tablesort');
 let activityBtn = document.getElementById('activityBtn');
 let ordersBtn = document.getElementById('ordersBtn');
@@ -8,15 +7,8 @@ let membershipSearch = document.getElementById('membershipSearch');
 let orderSearch = document.getElementById('orderSearch');
 let membershipTable = document.getElementById('membershipTable');
 let membershipOrderTable = document.getElementById('membershipOrderTable');
-let logoutBtn = document.getElementById('logoutBtn');
 
 let enterPressed = false;
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 const formatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -149,12 +141,6 @@ function orderSearchFunct() {
       }
     }
   }
-}
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
 }
 
 if (document.getElementById('quickSaleBtn')) {

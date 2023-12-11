@@ -1,4 +1,3 @@
-const { ipcRenderer } = require('electron')
 ipcRenderer.send('uploadProductImg')
 
 let theProductID;

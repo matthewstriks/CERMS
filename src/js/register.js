@@ -1,5 +1,3 @@
-const { ipcRenderer } = require('electron')
-let logoutBtn = document.getElementById('logoutBtn');
 let personalRegOpen = document.getElementById('personalRegOpen');
 let personalRegClose = document.getElementById('personalRegClose');
 let personalRegDrop = document.getElementById('personalRegDrop');
@@ -43,18 +41,6 @@ let dropSubmitBtn = document.getElementById('dropSubmitBtn');
 let manageRegisters = document.getElementById('manageRegisters');
 
 let theRegInfo;
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
-}
 
 if (document.getElementById('quickSaleBtn')) {
   document.getElementById('quickSaleBtn').addEventListener('click', function () {

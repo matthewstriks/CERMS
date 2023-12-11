@@ -1,4 +1,3 @@
-const { ipcRenderer } = require('electron')
 let printBtn = document.getElementById('printBtn')
 let emailBtn = document.getElementById('emailBtn')
 let pandeBtn = document.getElementById('pandeBtn')
@@ -6,12 +5,6 @@ let closeBtn = document.getElementById('closeBtn')
 let inputEmail = document.getElementById('inputEmail')
 let submitBtn = document.getElementById('submitBtn')
 let pandeConfirmed = false
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-    errorMsg.className = 'alert alert-' + arg[0]
-    errorMsg.innerHTML = arg[1]
-}) 
 
 printBtn.addEventListener('click', function(){
     ipcRenderer.send('reciept-choice-print')

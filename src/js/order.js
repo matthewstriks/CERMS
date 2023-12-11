@@ -1,5 +1,3 @@
-const { ipcRenderer } = require('electron')
-let logoutBtn = document.getElementById('logoutBtn');
 let productSection = document.getElementById('productSection');
 let customerName = document.getElementById('customerName');
 let checkoutCustomerInfo = document.getElementById('checkoutCustomerInfo');
@@ -41,12 +39,6 @@ let ran = false
 let discountingOrder = false
 let theCustomerInfo;
 let favPros = Array()
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 if (searchProducts) {
   searchProducts.addEventListener('click', function(){
@@ -134,12 +126,6 @@ let theCustomerID;
 let theCustomerEMail;
 let recieptStyle;
 let theProductID;
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
-}
 
 if (document.getElementById('quickSaleBtn')) {
   document.getElementById('quickSaleBtn').addEventListener('click', function () {

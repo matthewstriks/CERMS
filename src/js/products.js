@@ -1,6 +1,4 @@
-const { ipcRenderer } = require('electron')
 var Tablesort = require('tablesort');
-let logoutBtn = document.getElementById('logoutBtn');
 
 let categoryTable = document.getElementById('categoryTable')
 let productSearch = document.getElementById('productSearch')
@@ -98,18 +96,6 @@ let discountEditing;
 let productsData = Array()
 
 let enterPressed
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
-}
 
 if (document.getElementById('quickSaleBtn')) {
   document.getElementById('quickSaleBtn').addEventListener('click', function () {

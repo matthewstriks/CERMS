@@ -1,4 +1,3 @@
-const { ipcRenderer } = require('electron');
 const { fn } = require('jquery');
 let createMembershipForm = document.getElementById('createMembershipForm');
 let fnameInput = document.getElementById('fnameInput');
@@ -27,12 +26,6 @@ let scanIDTxt = document.getElementById('scanIDTxt');
 let scannerOn = false
 let memberUnder18 = false
 let memberUnder21 = false
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1).trim();
@@ -211,12 +204,6 @@ function formWasSubmitted(){
     errorMsg.innerHTML = theError;
   }
   ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value, membershipMemberNumber.value))
-}
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
 }
 
 ipcRenderer.on('membership-pending', (event, arg) => {

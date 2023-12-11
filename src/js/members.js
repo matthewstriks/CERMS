@@ -1,11 +1,9 @@
-const { ipcRenderer } = require('electron')
 var Tablesort = require('tablesort');
 let productsData = Array()
 let viewDNABtn = document.getElementById('viewDNABtn');
 let unViewDNABtn = document.getElementById('unViewDNABtn');
 let membershipSearch = document.getElementById('membershipSearch');
 let membershipTable = document.getElementById('membershipTable');
-let logoutBtn = document.getElementById('logoutBtn');
 let addLockerRoomWarning = document.getElementById('addLockerRoomWarning');
 let addLockerRoomInput = document.getElementById('addLockerRoomInput');
 let addLockerRoomInput2 = document.getElementById('addLockerRoomInput2');
@@ -85,12 +83,6 @@ let inputStatus = false;
 let viwingMore = false;
 let rank;
 let isTagged = false
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 if (scanIDBtn) {
   scanIDTxt.style.display = 'none'
@@ -476,12 +468,6 @@ function changeExpiresTime(expTime){
   }
   let theTime = year + '-' + tmonth + '-' + tday + 'T' + thour + ':' + tmin + ':' + tsec;
   editexpiresInput.value = theTime;
-}
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
 }
 
 //Get the button:

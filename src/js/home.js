@@ -1,10 +1,8 @@
-const { ipcRenderer } = require('electron')
 var Tablesort = require('tablesort');
 let pageDetails = document.getElementById('pageDetails')
 let welcomeMsg = document.getElementById('welcomeMsg')
 let welcomeMsg2 = document.getElementById('welcomeMsg2')
 let activityTable = document.getElementById('activityTable')
-let logoutBtn = document.getElementById('logoutBtn');
 let renewTxt = document.getElementById('renewTxt');
 let checkInMember = document.getElementById('checkInMember');
 let checkInMember2 = document.getElementById('checkInMember2');
@@ -47,12 +45,6 @@ let currActivityViewingLN;
 let currActivityViewingNotes;
 let theRenewTime;
 let theCheckoutMsg = "Member has all belongings"
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 function openMembership(){
   let memID = document.getElementById('lastCreatedID').innerHTML
@@ -160,12 +152,6 @@ if (welcomeMsg) {
 
     welcomeMsg2.innerHTML = "Today is " + tDate + ". The time is " + tTime;
   }, 1000);
-}
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
 }
 
 if (activityTable) {
