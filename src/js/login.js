@@ -1,14 +1,7 @@
-const { ipcRenderer } = require('electron')
 let inputEMail = document.getElementById('inputEMail');
 let inputPassword = document.getElementById('inputPassword');
 let loginForm = document.getElementById('loginForm');
 let resetPassword = document.getElementById('resetPassword');
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
 
 if (loginForm) {
   loginForm.addEventListener('submit', function(){
