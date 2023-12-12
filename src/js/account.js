@@ -1,5 +1,3 @@
-const { ipcRenderer } = require('electron')
-let logoutBtn = document.getElementById('logoutBtn');
 let systemName = document.getElementById('systemName');
 let displayName = document.getElementById('displayName');
 let rankInfo = document.getElementById('rankInfo');
@@ -53,19 +51,6 @@ let permissionEditRegisters = document.getElementById('permissionEditRegisters')
 let permissionImportMemberMode = document.getElementById('permissionImportMemberMode')
 
 let usersArray = Array();
-
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-  window.scrollTo(0, 0);
-  errorMsg.className = 'alert alert-' + arg[0]
-  errorMsg.innerHTML = arg[1]
-}) 
-
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-logout')
-  })
-}
 
 if (updateBtn) {
   updateBtn.addEventListener('click', function(){
