@@ -20,7 +20,6 @@ let waiverInput = document.getElementById('waiverInput');
 let idnumInput = document.getElementById('idnumInput');
 let idnumStateInput = document.getElementById('idnumStateInput');
 let submitBtn = document.getElementById('submitBtn');
-let logoutBtn = document.getElementById('logoutBtn');
 let scanIDBtn = document.getElementById('scanIDBtn');
 let scanIDTxt = document.getElementById('scanIDTxt');
 let scannerOn = false

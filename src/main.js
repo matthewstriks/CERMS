@@ -67,6 +67,7 @@ let startGatherAllProductsA = false
 let startGatherAllDiscountsA = false
 let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
+let darkMode = false
 
 let pendingOrders = Array()
 let pendingOrderID;
@@ -3409,6 +3410,8 @@ async function getUserData(){
 
   if (docSnap.exists()) {
     userData = docSnap.data();    
+    darkMode = userData.darkMode
+    theClient.send('recieve-dark-mode', darkMode)
     return true
   }else{
     theClient.send('send-loading-progress', Array(0, 0, 'ACCOUNT DEACTIVATED!!! CONTACT MANAGER!!! Click <a href="login.html">here</a> to return to login...'))
@@ -4426,4 +4429,20 @@ ipcMain.on('request-changelog', async (event, arg) => {
 ipcMain.on('github-link', (event, arg) => {
   theClient = event.sender;
   shell.openExternal('https://github.com/matthewstriks/CERMS/issues/new/choose')
+})
+
+ipcMain.on('get-dark-mode', (event, arg) => {
+  theClient = event.sender;
+  darkMode = userData.darkMode
+  theClient.send('recieve-dark-mode', (darkMode || false))
+})
+
+ipcMain.on('change-dark-mode', (event, arg) => {
+  theClient = event.sender;
+  darkMode = arg
+  userData.darkMode = arg
+  const docRef = doc(db, "users", user.uid);
+  updateDoc(docRef, {
+    darkMode: arg,
+  })
 })
