@@ -262,6 +262,11 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 }
 
 async function memberDNA(memberInfo){
+  if (!canUser('permissionEditDNAAdd')) {
+    notificationSystem('warning', 'You do not have permisison to add someone to the DNA list.')
+    return
+  }
+
   await updateMemberNotes(memberInfo[0])
   let theTimestamp = new Date(Math.floor(Date.now()))
   let theMonth = theTimestamp.getMonth() + 1
@@ -277,9 +282,14 @@ async function memberDNA(memberInfo){
     dna: true,
     notes: arrayUnion(stringStarter + memberInfo[1]),
   });
+  notificationSystem('success', 'Member added to the DNA list')
 }
 
 async function memberUNDNA(memberInfo){
+  if (!canUser('permissionEditDNARemove')) {
+    notificationSystem('warning', 'You do not have permisison to remove someone from the DNA list.')
+    return
+  }
   await updateMemberNotes(memberInfo[0])
   let theTimestamp = new Date(Math.floor(Date.now()))
   let theMonth = theTimestamp.getMonth() + 1
@@ -295,22 +305,34 @@ async function memberUNDNA(memberInfo){
     dna: false,
     notes: arrayUnion(stringStarter + memberInfo[1]),
   });
+  notificationSystem('success', 'Member removed from the DNA list')
 }
 async function memberTag(memberInfo){
+  if (!canUser('permissionEditTagAdd')) {
+    notificationSystem('warning', 'You do not have permisison to add someone to the Tag list.')
+    return
+  }
+
   const docRef = doc(db, "members", memberInfo);
   await updateDoc(docRef, {
     tag: true,
   });
+  notificationSystem('success', 'Member added to the Tag list')
 }
 
 async function memberUNTag(memberInfo){
+  if (!canUser('permissionEditTagRemove')) {
+    notificationSystem('warning', 'You do not have permisison to remove someone from the Tag list.')
+    return
+  }
+
   const docRef = doc(db, "members", memberInfo);
   await updateDoc(docRef, {
     tag: false,
   });
+  notificationSystem('success', 'Member removed from the Tag list')
 }
 
-// HERE
 async function renewActivity(memberInfo){
   console.log(memberInfo);
   notificationSystem('warning', 'Renewing time...')
@@ -3728,7 +3750,11 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditCoreProducts: arg[8],
     permissionEditSystemSettings: arg[9],
     permissionEditRegisters: arg[10],
-    permissionImportMemberMode: arg[11]
+    permissionImportMemberMode: arg[11],
+    permissionEditDNAAdd: arg[12],
+    permissionEditDNARemove: arg[13],
+    permissionEditTagAdd: arg[14],
+    permissionEditTagRemove: arg[15]
   });
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')
@@ -4414,7 +4440,7 @@ ipcMain.on('request-changelog', async (event, arg) => {
     title: 'Changelog',
     icon: './assets/cerms-icon.icns',
     message: "View what is new in this update!\n\n" + changelog + "\n",
-    detail: 'nWould you like to open this on GitHub?',
+    detail: 'Would you like to open this on GitHub?',
     buttons: ['Yes', 'No']
   }
   dialog.showMessageBox(options, function (index) {

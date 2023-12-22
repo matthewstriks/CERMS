@@ -49,6 +49,10 @@ let permissionWaiveProducts = document.getElementById('permissionWaiveProducts')
 let permissionEditSystemSettings = document.getElementById('permissionEditSystemSettings')
 let permissionEditRegisters = document.getElementById('permissionEditRegisters')
 let permissionImportMemberMode = document.getElementById('permissionImportMemberMode')
+let permissionEditDNAAdd = document.getElementById('permissionEditDNAAdd')
+let permissionEditDNARemove = document.getElementById('permissionEditDNARemove')
+let permissionEditTagAdd = document.getElementById('permissionEditTagAdd')
+let permissionEditTagRemove = document.getElementById('permissionEditTagRemove')
 
 let usersArray = Array();
 
@@ -180,7 +184,7 @@ function formWasSubmitted(){
 
 function formWasSubmitted2(){
   //RANK
-  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked))
+  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked))
 }
 
 ipcRenderer.send('request-account')
@@ -263,6 +267,10 @@ if (employeeInput) {
         permissionEditSystemSettings.checked = value[1].permissionEditSystemSettings
         permissionEditRegisters.checked = value[1].permissionEditRegisters
         permissionImportMemberMode.checked = value[1].permissionImportMemberMode
+        permissionEditDNAAdd.checked = value[1].permissionEditDNAAdd
+        permissionEditDNARemove.checked = value[1].permissionEditDNARemove
+        permissionEditTagAdd.checked = value[1].permissionEditTagAdd
+        permissionEditTagRemove.checked = value[1].permissionEditTagRemove
       }else if (!employeeInput.value) {
         changeDisplayNameInput.value = ""
         changeRankInput.value = ""
@@ -275,6 +283,10 @@ if (employeeInput) {
         permissionEditSystemSettings.checked = false
         permissionEditRegisters.checked = false
         permissionImportMemberMode.checked = false
+        permissionEditDNAAdd.checked = false
+        permissionEditDNARemove.checked = false
+        permissionEditTagAdd.checked = false
+        permissionEditTagRemove.checked = false
       }{
 
       }
