@@ -262,6 +262,7 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 }
 
 async function memberDNA(memberInfo){
+  console.log(memberInfo[1]);
   if (!canUser('permissionEditDNAAdd')) {
     notificationSystem('warning', 'You do not have permisison to add someone to the DNA list.')
     return
@@ -277,10 +278,15 @@ async function memberDNA(memberInfo){
   let theSecs = theTimestamp.getSeconds()
   let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
+  let stringEnd = 'Added to the DNA List. '
+  let theNotes = memberInfo[1]
+  if (theNotes) {
+    stringEnd = stringEnd + '(' + theNotes + ')'
+  }
   const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     dna: true,
-    notes: arrayUnion(stringStarter + memberInfo[1]),
+    notes: arrayUnion(stringStarter + stringEnd),
   });
   notificationSystem('success', 'Member added to the DNA list')
 }
@@ -300,22 +306,44 @@ async function memberUNDNA(memberInfo){
   let theSecs = theTimestamp.getSeconds()
   let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
+  let stringEnd = 'Removed from the DNA List. '
+  let theNotes = memberInfo[1]
+  if (theNotes) {
+    stringEnd = stringEnd + '(' + theNotes + ')'
+  }
   const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     dna: false,
-    notes: arrayUnion(stringStarter + memberInfo[1]),
+    notes: arrayUnion(stringStarter + stringEnd),
   });
   notificationSystem('success', 'Member removed from the DNA list')
 }
+
 async function memberTag(memberInfo){
   if (!canUser('permissionEditTagAdd')) {
     notificationSystem('warning', 'You do not have permisison to add someone to the Tag list.')
     return
   }
 
+  await updateMemberNotes(memberInfo[0])
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
+  let stringEnd = 'Added to the Tag List. '
+  let theNotes = memberInfo[1]
+  if (theNotes) {
+    stringEnd = stringEnd + '(' + theNotes + ')'
+  }
   const docRef = doc(db, "members", memberInfo);
   await updateDoc(docRef, {
     tag: true,
+    notes: arrayUnion(stringStarter + stringEnd),
   });
   notificationSystem('success', 'Member added to the Tag list')
 }
@@ -325,10 +353,26 @@ async function memberUNTag(memberInfo){
     notificationSystem('warning', 'You do not have permisison to remove someone from the Tag list.')
     return
   }
+  await updateMemberNotes(memberInfo[0])
+  let theTimestamp = new Date(Math.floor(Date.now()))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
+  let stringEnd = 'Removed from the Tag List. '
+  let theNotes = memberInfo[1]
+  if (theNotes) {
+    stringEnd = stringEnd + '(' + theNotes + ')'
+  }
 
   const docRef = doc(db, "members", memberInfo);
   await updateDoc(docRef, {
     tag: false,
+    notes: arrayUnion(stringStarter + stringEnd),
   });
   notificationSystem('success', 'Member removed from the Tag list')
 }
