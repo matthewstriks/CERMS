@@ -51,10 +51,12 @@ const usersData = Array();
 
 let mainWin;
 let uploadImgWin;
+let uploadFileWin;
 let recieptWin;
 let theClient;
 let theClient2;
 let theProductImgID;
+let theMemberFileID;
 let loadingProgress;
 let systemData;
 let user;
@@ -3572,6 +3574,21 @@ const createUploadImageScreen = () => {
   uploadImgWin = uploadImgWindow
 }
 
+const createUploadFileScreen = () => {
+  const uploadFileWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    }
+  });
+
+  uploadFileWindow.loadFile(path.join(__dirname, 'uploadfile.html'));
+
+  uploadFileWin = uploadFileWindow
+}
+
 function emailReciept(theEMail){
   let p = path.join(__dirname, '.', 'last-reciept.html');
   fs.readFile(p, 'utf-8', (err, data) => {
@@ -4246,6 +4263,13 @@ ipcMain.on('uploadProductImg', (event, arg) => {
   theClient2.send('uploadProductImg-return', Array(theConfig, theProductImgID))
 })
 
+ipcMain.on('uploadProductFile', (event, arg) => {
+  theClient2 = event.sender;
+  let theConfig;
+  theConfig = firebaseConfig    
+  theClient2.send('uploadProductFile-return', Array(theConfig, theMemberFileID))
+})
+
 ipcMain.on('uploadProductImg-complete', async (event, arg) => {
   theClient2 = event.sender;
 
@@ -4254,6 +4278,22 @@ ipcMain.on('uploadProductImg-complete', async (event, arg) => {
     image: arg[1]
   });
   uploadImgWin.close()
+})
+
+ipcMain.on('uploadProductFile-complete', async (event, arg) => {
+  theClient2 = event.sender;
+
+  const docRef = doc(db, "members", arg[0]);
+  await updateDoc(docRef, {
+    files: arrayUnion(arg[1])
+  });
+  uploadFileWin.close()
+})
+
+ipcMain.on('upload-member-file', (event, arg) => {
+  theClient = event.sender;
+  theMemberFileID = arg
+  createUploadFileScreen()
 })
 
 ipcMain.on('edit-product-img', (event, arg) => {

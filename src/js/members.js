@@ -34,6 +34,7 @@ let memberInfoClose = document.getElementById('memberInfoClose');
 let memberCreateOrder = document.getElementById('memberCreateOrder');
 let scanIDBtn = document.getElementById('scanIDBtn');
 let scanIDTxt = document.getElementById('scanIDTxt');
+let uploadFileBtn = document.getElementById('uploadFileBtn');
 let scannerOn = false
 
 // History
@@ -190,6 +191,12 @@ if (memberOrderHistoryTable) {
 if (memberCreateOrder) {
   memberCreateOrder.addEventListener('click', function(){
     ipcRenderer.send('member-create-order', memberCheckingIn)
+  })
+}
+
+if (uploadFileBtn) {
+  uploadFileBtn.addEventListener("click", function(){
+    ipcRenderer.send('upload-member-file', memberEditing)
   })
 }
 
