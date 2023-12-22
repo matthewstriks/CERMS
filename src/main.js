@@ -8,7 +8,7 @@ const { firebaseConfig } = require('./assets/firebase-config.js');
 const { initializeApp } = require("firebase/app");
 const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword } = require("firebase/auth");
 const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment, arrayRemove } = require("firebase/firestore");
-const { getStorage, ref, getDownloadURL } = require("firebase/storage");
+const { getStorage, ref, getDownloadURL, deleteObject } = require("firebase/storage");
 const { log } = require('console');
 const delay = require('delay');
 const { address } = require('address');
@@ -3816,7 +3816,8 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditDNARemove: arg[13],
     permissionEditTagAdd: arg[14],
     permissionEditTagRemove: arg[15],
-    permissionEditMemberNotes: arg[16]
+    permissionEditMemberNotes: arg[16],
+    permissionEditMemberFiles: arg[17]
   });
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')
@@ -4286,16 +4287,26 @@ ipcMain.on('uploadProductImg-complete', async (event, arg) => {
 
 ipcMain.on('uploadProductFile-complete', async (event, arg) => {
   theClient2 = event.sender;
+  if (!canUser('permissionEditMemberFiles')) {
+    notificationSystem('warning', 'You do not have permisison to add/manage member files.')
+    return
+  }
 
   const docRef = doc(db, "members", arg[0]);
   await updateDoc(docRef, {
-    files: arrayUnion(arg[1])
+    files: arrayUnion(arg[1]),
+    filesNames: arrayUnion(arg[2]),
+    filesNamesRaw: arrayUnion(arg[3])
   });
   uploadFileWin.close()
 })
 
 ipcMain.on('upload-member-file', (event, arg) => {
   theClient = event.sender;
+  if (!canUser('permissionEditMemberFiles')) {
+    notificationSystem('warning', 'You do not have permisison to add/manage member files.')
+    return
+  }
   theMemberFileID = arg
   createUploadFileScreen()
 })
@@ -4546,6 +4557,11 @@ ipcMain.on('github-link', (event, arg) => {
   shell.openExternal('https://github.com/matthewstriks/CERMS/issues/new/choose')
 })
 
+ipcMain.on('open-link', (event, arg) => {
+  theClient = event.sender;
+  shell.openExternal(arg)
+})
+
 ipcMain.on('get-dark-mode', (event, arg) => {
   theClient = event.sender;
   darkMode = userData.darkMode
@@ -4576,4 +4592,25 @@ ipcMain.on('trash-note', async (event, arg) => {
       notes: arrayRemove(memberInfo.notes[arg[1]]),
     })
   }
+})
+
+ipcMain.on('trash-member-file', async (event, arg) => {
+  theClient = event.sender;
+  const docRef = doc(db, "members", arg[0]);
+  await updateDoc(docRef, {
+    files: arrayRemove(arg[1]),
+    filesNames: arrayRemove(arg[2]),
+    filesNamesRaw: arrayRemove(arg[3]),
+  })
+  let theFileName = arg[3].substring(1)
+  const desertRef = ref(storage, theFileName);
+
+  deleteObject(desertRef).then(() => {
+    notificationSystem('success', 'File has been deleted!')
+  }).catch((error) => {
+    console.log(error);
+    notificationSystem('danger', 'Something went wrong.')
+  });
+
+
 })

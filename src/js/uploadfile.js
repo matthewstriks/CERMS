@@ -2,6 +2,7 @@ ipcRenderer.send('uploadProductFile')
 
 let theProductID;
 let firebaseConfig
+let fileName = document.getElementById('fileName')
 
 var files = [];
 document.getElementById("files").addEventListener("change", function (e) {
@@ -15,7 +16,7 @@ document.getElementById("files").addEventListener("change", function (e) {
 document.getElementById("send").addEventListener("click", function () {
     if (files.length != 0) {
         for (let i = 0; i < files.length; i++) {
-            var storage = firebase.storage().ref('/member-files/' + files[i].name);
+            var storage = firebase.storage().ref('/member-files/' + theProductID + '-' + files[i].name);
             var upload = storage.put(files[i]);
 
             upload.on(
@@ -36,7 +37,7 @@ document.getElementById("send").addEventListener("click", function () {
                     document.getElementById(
                         "uploading"
                     ).innerHTML += `${files[i].name} uploaded <br />`;
-                    getFileUrl('/member-files/' + files[i].name)
+                    getFileUrl('/member-files/' + theProductID + '-' + files[i].name)
                 }
             );
         }
@@ -51,7 +52,7 @@ function getFileUrl(filename) {
     storage
     .getDownloadURL()
     .then(function (url) {
-        ipcRenderer.send('uploadProductFile-complete', Array(theProductID, url))
+        ipcRenderer.send('uploadProductFile-complete', Array(theProductID, url, fileName.value, filename))
     })
     .catch(function (error) {
         console.log("error encountered");

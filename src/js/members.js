@@ -65,6 +65,7 @@ let editidnumStateInput = document.getElementById('editidnumStateInput');
 let editnotesInput = document.getElementById('editnotesInput');
 let editnotesInputNew = document.getElementById('editnotesInputNew');
 let editwaiverInput = document.getElementById('editwaiverInput');
+let editFileList = document.getElementById('editFileList');
 let editmemberInfoDeleteBtn = document.getElementById('editmemberInfoDeleteBtn');
 let editmemberInfoDeleteBtnCloseConfirm = document.getElementById('editmemberInfoDeleteBtnCloseConfirm');
 
@@ -783,6 +784,25 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     }else {
       editwaiverInput.checked = false;
     }
+
+    if (arg[1].files) {
+      for (let index = 0; index < arg[1].files.length; index++) {
+        let fileURL = arg[1].files[index];
+        let fileName = arg[1].filesNames[index] 
+        let fileNameRaw = arg[1].filesNamesRaw[index] 
+        let newLi = document.createElement('li')
+        newLi.className = 'list-group-item'
+        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button> <button type='button' class='btn btn-danger' id='" + arg[0] + "fileTrash" + index + "'><i class='fa-solid fa-trash'></i></button>"
+        editFileList.appendChild(newLi)
+        document.getElementById(arg[0] + 'fileView' + index).addEventListener('click', function(){
+          ipcRenderer.send('open-link', fileURL)
+        })
+        document.getElementById(arg[0] + 'fileTrash' + index).addEventListener('click', function(){
+          ipcRenderer.send('trash-member-file', Array(arg[0], fileURL, fileName, fileNameRaw))
+          newLi.remove()
+        })
+      }
+    }
   })
 })
 
@@ -998,6 +1018,25 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
       editwaiverInput.checked = true;
     } else {
       editwaiverInput.checked = false;
+    }
+
+    if (arg[1].files) {
+      for (let index = 0; index < arg[1].files.length; index++) {
+        let fileURL = arg[1].files[index];
+        let fileName = arg[1].filesNames[index]
+        let fileNameRaw = arg[1].filesNamesRaw[index]
+        let newLi = document.createElement('li')
+        newLi.className = 'list-group-item'
+        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button> <button type='button' class='btn btn-danger' id='" + arg[0] + "fileTrash" + index + "'><i class='fa-solid fa-trash'></i></button>"
+        editFileList.appendChild(newLi)
+        document.getElementById(arg[0] + 'fileView' + index).addEventListener('click', function () {
+          ipcRenderer.send('open-link', fileURL)
+        })
+        document.getElementById(arg[0] + 'fileTrash' + index).addEventListener('click', function () {
+          ipcRenderer.send('trash-member-file', Array(arg[0], fileURL, fileName, fileNameRaw))
+          newLi.remove()
+        })
+      }
     }
   })
 })
