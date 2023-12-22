@@ -7,7 +7,7 @@ const xl = require('excel4node');
 const { firebaseConfig } = require('./assets/firebase-config.js');
 const { initializeApp } = require("firebase/app");
 const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword } = require("firebase/auth");
-const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment } = require("firebase/firestore");
+const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment, arrayRemove } = require("firebase/firestore");
 const { getStorage, ref, getDownloadURL } = require("firebase/storage");
 const { log } = require('console');
 const delay = require('delay');
@@ -3798,7 +3798,8 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditDNAAdd: arg[12],
     permissionEditDNARemove: arg[13],
     permissionEditTagAdd: arg[14],
-    permissionEditTagRemove: arg[15]
+    permissionEditTagRemove: arg[15],
+    permissionEditMemberNotes: arg[16]
   });
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')
@@ -4515,4 +4516,20 @@ ipcMain.on('change-dark-mode', (event, arg) => {
   updateDoc(docRef, {
     darkMode: arg,
   })
+})
+
+ipcMain.on('trash-note', async (event, arg) => {
+  theClient = event.sender;
+  if (!canUser('permissionEditMemberNotes')) {
+    notificationSystem('warning', 'You do not have permission to remove member notes')
+    return
+  }
+
+  let memberInfo = await getMemberInfo(arg[0])
+  if (Array.isArray(memberInfo.notes)) {
+    const docRef = doc(db, "members", arg[0]);
+    await updateDoc(docRef, {
+      notes: arrayRemove(memberInfo.notes[arg[1]]),
+    })
+  }
 })

@@ -756,13 +756,20 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     editidnumInput.value = arg[1].idnum;
     editidnumStateInput.value = arg[1].idstate;
     if (Array.isArray(arg[1].notes)) {
-      let theNotesString = ""
-      arg[1].notes.forEach(note => {
-        theNotesString = theNotesString + note + '\n'
-      });
-      editnotesInput.value = theNotesString
+      for (let index = 0; index < arg[1].notes.length; index++) {
+        const note = arg[1].notes[index];
+        let newNote = document.createElement('p')
+        newNote.innerHTML = note + ' <button type="button" id="note' + index + '" class="btn btn-danger"><i class="fa-solid fa-trash"></i></button>'
+        editnotesInput.appendChild(newNote)
+        document.getElementById('note' + index).addEventListener('click', function () {
+          ipcRenderer.send('trash-note', Array(memberEditing, index))
+          newNote.remove()
+        })
+      }
     } else {
-      editnotesInput.value = arg[1].notes
+      let newNote = document.createElement('p')
+      newNote.innerHTML = arg[1].notes
+      editnotesInput.appendChild(newNote)
     }
     if (arg[1].waiver_status) {
       editwaiverInput.checked = true;
