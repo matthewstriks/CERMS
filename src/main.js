@@ -4595,7 +4595,12 @@ ipcMain.on('trash-note', async (event, arg) => {
 })
 
 ipcMain.on('trash-member-file', async (event, arg) => {
-  theClient = event.sender;
+  theClient = event.sender;  
+  if (!canUser('permissionEditMemberFiles')) {
+    notificationSystem('warning', 'You do not have permisison to remove member files.')
+    return
+  }
+
   const docRef = doc(db, "members", arg[0]);
   await updateDoc(docRef, {
     files: arrayRemove(arg[1]),
