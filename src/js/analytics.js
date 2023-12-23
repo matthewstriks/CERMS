@@ -8,12 +8,6 @@ let tnomLbl = document.getElementById('tnomLbl')
 let productInventoryDocChart = document.getElementById('productInventoryChart')
 let productSalesDocChart = document.getElementById('productSalesChart')
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 if (analyticsTabs) {
   analyticsTabs.style.display = 'none';
 }

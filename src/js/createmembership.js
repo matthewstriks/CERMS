@@ -111,12 +111,6 @@ function scanIDFunction(){
   scanIDTxt.value = ""
 }
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 if (createMembershipForm) {
   ipcRenderer.send('product-membership-request')
 }

@@ -127,12 +127,6 @@ let theCustomerEMail;
 let recieptStyle;
 let theProductID;
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 if (clearBtn) {
   clearBtn.addEventListener('click', function(){
     productsSelected = Array()

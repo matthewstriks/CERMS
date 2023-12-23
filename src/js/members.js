@@ -144,12 +144,6 @@ function scanIDFunction() {
   scanIDTxt.value = ""
 }
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 if (document.getElementById('testTable')) {
   document.getElementById('testTable').style.display = 'none'
 }

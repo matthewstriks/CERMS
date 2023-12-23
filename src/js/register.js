@@ -42,12 +42,6 @@ let manageRegisters = document.getElementById('manageRegisters');
 
 let theRegInfo;
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 function editEndingTotal(){
   endingAmt.value = (Number(input100.value) * 100) + (Number(input50.value) * 50) + (Number(input20.value) * 20) + (Number(input10.value) * 10) + (Number(input5.value) * 5) + (Number(input1.value) * 1) + (Number(input25c.value) * .25) + (Number(input10c.value) * .10) + (Number(input5c.value) * .05) + (Number(input1c.value) * .01)   
   let endAmt = Number(endingAmt.value)

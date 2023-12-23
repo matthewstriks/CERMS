@@ -97,12 +97,6 @@ let productsData = Array()
 
 let enterPressed
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 if (productMembershipDiv) {
   productMembershipDiv.style.display = 'none'  
 }

@@ -70,12 +70,6 @@ if (changelogBtn) {
   })
 }
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 if (connectQuickBooksBtn) {
   let connectBtnClicked = false
   connectQuickBooksDiv.style.display = 'none'

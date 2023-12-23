@@ -1,6 +1,7 @@
 const { ipcRenderer } = require('electron')
 let errorMsg = document.getElementById('errorMsg');
 let logoutBtn = document.getElementById('logoutBtn');
+let quickSaleBtn = document.getElementById('quickSaleBtn')
 let darkModeToggle = document.getElementById('darkModeToggle');
 let darkMode = false
 
@@ -22,6 +23,12 @@ if (darkModeToggle) {
       document.querySelector('html').setAttribute('data-bs-theme', 'dark')      
       ipcRenderer.send('change-dark-mode', darkMode)
     }
+  })
+}
+
+if (quickSaleBtn) {
+  quickSaleBtn.addEventListener('click', function () {
+    ipcRenderer.send('quick-sale')
   })
 }
 

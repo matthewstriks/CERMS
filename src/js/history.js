@@ -143,12 +143,6 @@ function orderSearchFunct() {
   }
 }
 
-if (document.getElementById('quickSaleBtn')) {
-  document.getElementById('quickSaleBtn').addEventListener('click', function () {
-    ipcRenderer.send('quick-sale')
-  })
-}
-
 ipcRenderer.on('history-order-request-return', (event, arg) => {
   var row = membershipOrderTable.insertRow(1);
   row.id = 'row' + arg[0];
