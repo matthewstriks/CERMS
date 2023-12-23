@@ -264,7 +264,6 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 }
 
 async function memberDNA(memberInfo){
-  console.log(memberInfo[1]);
   if (!canUser('permissionEditDNAAdd')) {
     notificationSystem('warning', 'You do not have permisison to add someone to the DNA list.')
     return
@@ -380,7 +379,6 @@ async function memberUNTag(memberInfo){
 }
 
 async function renewActivity(memberInfo){
-  console.log(memberInfo);
   notificationSystem('warning', 'Renewing time...')
   let theUserID = getUID();
   let theCurrentTime = memberInfo[1][4];
@@ -2527,15 +2525,15 @@ async function editProduct(productInfo){
   let theRentalLength = false
   if (productInfo[12]) {
     let theMultiple
-    if (productInfo[13] == 'hour') {
+    if (productInfo[14] == 'hour') {
       theMultiple = 3600
-    } else if (productInfo[13] == 'day') {
+    } else if (productInfo[14] == 'day') {
       theMultiple = 86400
-    } else if (productInfo[13] == 'week') {
+    } else if (productInfo[14] == 'week') {
       theMultiple = 604800
-    } else if (productInfo[13] == 'month') {
+    } else if (productInfo[14] == 'month') {
       theMultiple = 2.628e+6
-    } else if (productInfo[13] == 'year') {
+    } else if (productInfo[14] == 'year') {
       theMultiple = 3.154e+7
     }
     theMembershipLength = productInfo[12] * theMultiple
