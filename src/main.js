@@ -4,7 +4,7 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const xl = require('excel4node');
-const { firebaseConfig } = require('./assets/firebase-config.js');
+const { firebaseConfig, quickbooksConfig } = require('./assets/firebase-config.js');
 const { initializeApp } = require("firebase/app");
 const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword } = require("firebase/auth");
 const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment, arrayRemove } = require("firebase/firestore");
@@ -29,6 +29,8 @@ const OAuthClient = require('intuit-oauth');
 function initializeAppFunct(){
   firebaseApp = initializeApp(firebaseConfig);
 }
+
+const oauthClient = new OAuthClient(quickbooksConfig);
 
 const startInitApp = initializeAppFunct();
 const db = getFirestore(firebaseApp);
@@ -70,6 +72,7 @@ let startGatherAllDiscountsA = false
 let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
 let darkMode = false
+let quickbooksIsConnected = false
 
 let pendingOrders = Array()
 let pendingOrderID;
@@ -141,6 +144,10 @@ async function getEMailByID(theUserID){
   }
 
   return userData.email;
+}
+
+function isQuickbooksConnected(){
+  return oauthClient.isAccessTokenValid()
 }
 
 function getDisplayName(){
@@ -4348,13 +4355,6 @@ ipcMain.on('reciept-choice-close', (event, arg) => {
   recieptWin.close()
 })
 
-const oauthClient = new OAuthClient({
-  clientId: 'ABJqZxMnj4SwV0T1cu7GPf2WOzGjcjQW44wzKG8OtlVJnxg1Bs',
-  clientSecret: 'uAre4dCXtd2Fwbt6CR93XGI3WceTUWZSYoye9tEH',
-  environment: 'sandbox',
-  redirectUri: 'http://clubentertainmentrms.com/resources/quickbooks/',
-});
-
 function quickBooksConnect() {
   // AuthorizationUri
   const authUri = oauthClient.authorizeUri({
@@ -4384,6 +4384,7 @@ async function quickBooksLogin(parseRedirect) {
     authToken = systemData.quickBooksToken
   }
   if (isValidUrl(parseRedirect)) {
+    notificationSystem('warning', 'Connecting to Quickbooks...')
     oauthClient.createToken(parseRedirect)
       .then(async function (authResponse) {
         authToken = authResponse.getJson()
@@ -4397,30 +4398,39 @@ async function quickBooksLogin(parseRedirect) {
   }
 
   oauthClient.setToken(authToken);
-  if (oauthClient.isAccessTokenValid()) {
-    const docRef = doc(db, "system", getSystemAccess());
-    await updateDoc(docRef, {
-      access: getSystemAccess(),
-      quickBooksToken: authToken
-    }).catch((error) => {
-      console.log(error);
-      if (error.code == "permission-denied") {
-        notificationSystem('danger', 'Access code NOT valid!')
-        updateDoc(doc(db, "users", getUID()), {
-          access: "",
-        });
+  setTimeout(async () => {
+    if (oauthClient.isAccessTokenValid()) {      
+      quickbooksIsConnected = true
+      console.log('Quickbooks has been connected.')
+      if (parseRedirect) {
+        notificationSystem('success', 'Quickbooks has been connected!')        
       }
-    });
-    return true
-  } else {
-    console.log('Something went wrong - Quickbooks is not connected.');
-    return false
-  }
+      const docRef = doc(db, "system", getSystemAccess());
+      await updateDoc(docRef, {
+        access: getSystemAccess(),
+        quickBooksToken: authToken
+      }).catch((error) => {
+        console.log(error);
+        if (error.code == "permission-denied") {
+          notificationSystem('danger', 'Access code NOT valid!')
+          updateDoc(doc(db, "users", getUID()), {
+            access: "",
+          });
+        }
+      });
+      return true
+    } else {
+      quickbooksIsConnected = false
+      console.log('Quickbooks is not connected.');
+      return false
+    }    
+  }, 1000);
 }
 
 function quickbooksGetAllProducts(){
   console.log('HERE: ');
   console.log(oauthClient.isAccessTokenValid());
+  console.log(oauthClient.getToken().access_token);
   oauthClient
     .makeApiCall({
       url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/4620816365354134710/query',
@@ -4592,6 +4602,11 @@ ipcMain.on('trash-note', async (event, arg) => {
   }
 })
 
+ipcMain.on('quickbooks-status', (event, arg) => {
+  theClient = event.sender;  
+  theClient.send('quickbooks-status-return', quickbooksIsConnected)
+})
+
 ipcMain.on('trash-member-file', async (event, arg) => {
   theClient = event.sender;  
   if (!canUser('permissionEditMemberFiles')) {
@@ -4614,6 +4629,4 @@ ipcMain.on('trash-member-file', async (event, arg) => {
     console.log(error);
     notificationSystem('danger', 'Something went wrong.')
   });
-
-
 })
