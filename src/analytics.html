@@ -1,224 +1,191 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
-      integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-    <!-- fontawesome -->
-    <script src="https://kit.fontawesome.com/d57fcc156f.js" crossorigin="anonymous"></script>
+<head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>CERMS - Analytics</title>
-  </head>
-  <body>
-    <br>
-    <div class="container">
-      <h1>Analytics</h1>
-      <p>View analytics on memberships and activity.</p>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <!-- fontawesome -->
+  <script src="https://kit.fontawesome.com/d57fcc156f.js" crossorigin="anonymous"></script>
+
+  <title>CERMS - Analytics 2</title>
+</head>
+
+<body>
+  <br>
+  <div class="container">
+    <h1>Analytics 2</h1>
+    <p>View analytics on memberships and activity.</p>
+  </div>
+  <div class="container">
+    <ul class="nav justify-content-end">
+      <li class="nav-item">
+        <div class="dropdown">
+          <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1"
+            data-bs-toggle="dropdown" aria-expanded="false">
+            Options
+          </button>
+          <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+            <div class="container">
+              <div class="btn-group-vertical">
+                <a class="btn btn-primary" href="account.html" role="button">Account</a>
+                <a class="btn btn-primary" href="products.html" role="button">Products</a>
+                <a class="btn btn-primary" href="support.html" role="button">Support</a>
+                <a class="btn btn-primary" href="#" id="darkModeToggle" role="button"><i
+                    class="fa-solid fa-moon"></i></a>
+              </div>
+              <hr>
+              <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
+            </div>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </div>
+  <hr>
+  <div class="container">
+    <div class="" role="alert" id="errorMsg">
     </div>
-    <div class="container">
-      <ul class="nav justify-content-end">
-        <li class="nav-item">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
-              Options
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-              <div class="container">
-                <div class="btn-group-vertical">
-                  <a class="btn btn-primary" href="account.html" role="button">Account</a>
-                  <a class="btn btn-primary" href="products.html" role="button">Products</a>
-                  <a class="btn btn-primary" href="support.html" role="button">Support</a>
-                  <a class="btn btn-primary" href="#" id="darkModeToggle" role="button"><i class="fa-solid fa-moon"></i></a>
+  </div>
+  <div class="container">
+    <a class="btn btn-primary" href="home.html" role="button">Home</a>
+    <a class="btn btn-primary" href="members.html" role="button">Members</a>
+    <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
+    <a class="btn btn-primary" href="register.html" role="button">Register</a>
+    <a class="btn btn-primary" href="history.html" role="button">History</a>
+    <a class="btn btn-secondary" disabled href="analytics.html" role="button">Analytics</a>
+  </div>
+  <br>
+
+  <div class="container" id="configureDiv">
+    <p>Start Date & Time</p>
+    <input id='startTime' type="datetime-local" class="form-control">
+    <p>End Date & Time</p>
+    <input id='endTime' type="datetime-local" class="form-control">
+    <br>
+    <button type="button" id="runAnalytics" class="btn btn-success">Run Analytics</button>
+  </div>
+  <br>
+  <div id="analyticsTabs" class="container">
+    <div class="accordion" id="accordionExample">
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+            Members Analytics
+          </button>
+        </h2>
+        <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+          <div class="accordion-body">
+            <div class="row">
+              <div class="col">
+                <div class="card" style="width: 18rem;">
+                  <canvas id="memberTimeChart" style="max-width: 1000px;"></canvas>
+                  <div class="card-body">
+                    <h5 class="card-title">Membership Signups</h5>
+                    <p class="card-text">View membership signups per time of day
+                    </p>
+                  </div>
                 </div>
-                <hr>
-                <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
               </div>
-            </ul>
-          </div>
-        </li>
-      </ul>
-    </div>
-    <hr>
-    <div class="container">
-      <div class="" role="alert" id="errorMsg">
-      </div>
-    </div>
-    <div class="container">
-      <a class="btn btn-primary" href="home.html" role="button">Home</a>
-      <a class="btn btn-primary" href="members.html" role="button">Members</a>
-      <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
-      <a class="btn btn-primary" href="register.html" role="button">Register</a>
-      <a class="btn btn-primary" href="history.html" role="button">History</a>
-      <a class="btn btn-secondary" disabled href="analytics.html" role="button">Analytics</a>
-    </div>
-    <br>
-
-    <div class="container">
-      <p>Start Date & Time</p>
-      <input id='startTime' type="datetime-local" class="form-control">
-      <p>End Date & Time</p>
-      <input id='endTime' type="datetime-local" class="form-control">
-      <br>
-      <button type="button" id="runAnalytics" class="btn btn-success">Run Analytics</button>
-    </div>
-    <br>
-    <div id="analyticsTabs" class="container">
-      <div class="container">
-        <h3>Membership Analytics</h3>
-        <div class="accordion" id="accordionExample">
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="headingOne">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne"
-                aria-expanded="false" aria-controls="collapseOne">
-                Number of singups per month
-              </button>
-            </h2>
-            <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne"
-              data-bs-parent="#accordionExample">
-              <div class="accordion-body">
-                <canvas id="membersPerMonthChart" width="400" height="150"></canvas>
-              </div>
-            </div>
-          </div>
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="headingTwo">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo"
-                aria-expanded="false" aria-controls="collapseTwo">
-                Membership Types
-              </button>
-            </h2>
-            <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo"
-              data-bs-parent="#accordionExample">
-              <div class="accordion-body">
-                <canvas id="membershipTypesChart" width="400" height="400"></canvas>
-              </div>
-            </div>
-          </div>
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="headingThree">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree"
-                aria-expanded="false" aria-controls="collapseThree">
-                Time of signups
-              </button>
-            </h2>
-            <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree"
-              data-bs-parent="#accordionExample">
-              <div class="accordion-body">
-                <ul class="nav nav-tabs" id="myTab" role="tablist">
-                  <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane"
-                      type="button" role="tab" aria-controls="home-tab-pane" aria-selected="true">All-time</button>
-                  </li>
-                  <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane"
-                      type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="false">Today</button>
-                  </li>
-                  <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact-tab-pane"
-                      type="button" role="tab" aria-controls="contact-tab-pane" aria-selected="false">This week</button>
-                  </li>
-                  <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="disabled-tab" data-bs-toggle="tab" data-bs-target="#disabled-tab-pane"
-                      type="button" role="tab" aria-controls="disabled-tab-pane" aria-selected="false">This month</button>
-                  </li>
-                </ul>
-                <div class="tab-content" id="myTabContent">
-                  <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab"
-                    tabindex="0">
-                    <canvas id="checkInTimeChart" width="800" height="400"></canvas>
-                  </div>
-                  <div class="tab-pane fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
-                    <canvas id="checkInTimeChartToday" width="800" height="400"></canvas>
-                  </div>
-                  <div class="tab-pane fade" id="contact-tab-pane" role="tabpanel" aria-labelledby="contact-tab" tabindex="0">
-                    <canvas id="checkInTimeChartWeek" width="800" height="400"></canvas>
-                  </div>
-                  <div class="tab-pane fade" id="disabled-tab-pane" role="tabpanel" aria-labelledby="disabled-tab" tabindex="0">
-                    <canvas id="checkInTimeChartMonth" width="800" height="400"></canvas>
+              <div class="col">
+                <div class="card" style="width: 18rem;">
+                  <canvas id="memberTypeChart" style="max-width: 1000px;"></canvas>
+                  <div class="card-body">
+                    <h5 class="card-title">Membership Types</h5>
+                    <p class="card-text">View membership types
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="headingFour">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour"
-                aria-expanded="false" aria-controls="collapseThree">
-                Totals
-              </button>
-            </h2>
-            <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour"
-              data-bs-parent="#accordionExample">
-              <div class="accordion-body">
-                <p id="tnomLbl"><b>Total number of members: </b></p>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+            Activity Analytics
+          </button>
+        </h2>
+        <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+          <div class="accordion-body">
+            <div class="row">
+              <div class="col">
+                <div class="card" style="width: 18rem;">
+                  <canvas id="activityTimeChart" style="max-width: 1000px;"></canvas>
+                  <div class="card-body">
+                    <h5 class="card-title">Activity Time</h5>
+                    <p class="card-text">View activity per time of day
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="col">
+                <div class="card" style="width: 18rem;">
+                  <canvas id="activityTypeChart" style="max-width: 1000px;"></canvas>
+                  <div class="card-body">
+                    <h5 class="card-title">Activity Types</h5>
+                    <p class="card-text">View activity types
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <br>
-      <div class="container">
-        <h3>Products Analytics</h3>
-        <div class="accordion" id="accordionExample2">
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="headingOne2">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne2"
-                aria-expanded="false" aria-controls="collapseOne2">
-                Products Inventory
-              </button>
-            </h2>
-            <div id="collapseOne2" class="accordion-collapse collapse" aria-labelledby="headingOne2"
-              data-bs-parent="#accordionExample2">
-              <div class="accordion-body">
-                <canvas id="productInventoryChart" width="400" height="400"></canvas>
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+            Order Analytics
+          </button>
+        </h2>
+        <div id="collapseThree" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+          <div class="accordion-body">
+            <div class="row">
+              <div class="col">
+                <div class="card" style="width: 18rem;">
+                  <canvas id="orderTimeChart" style="max-width: 1000px;"></canvas>
+                  <div class="card-body">
+                    <h5 class="card-title">Order Times</h5>
+                    <p class="card-text">View orders per time of day
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="headingTwo2">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo2"
-                aria-expanded="false" aria-controls="collapseTwo2">
-                Product Sales
-              </button>
-            </h2>
-            <div id="collapseTwo2" class="accordion-collapse collapse" aria-labelledby="headingTwo2"
-              data-bs-parent="#accordionExample2">
-              <div class="accordion-body">
-                <canvas id="productSalesChart" width="400" height="400"></canvas>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <br>
-      <div class="container">
-        <h3>Order Analytics</h3>
-        <div class="accordion" id="accordionExample3">
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="headingOne3">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne3"
-                aria-expanded="false" aria-controls="collapseOne3">
-                Order Times
-              </button>
-            </h2>
-            <div id="collapseOne3" class="accordion-collapse collapse" aria-labelledby="headingOne3"
-              data-bs-parent="#accordionExample3">
-              <div class="accordion-body">
-                <canvas id="orderTimesChart" width="400" height="400"></canvas>
+              <div class="col">
+                <div class="card" style="width: 18rem;">
+                  <canvas id="orderTypeChart" style="max-width: 1000px;"></canvas>
+                  <div class="card-body">
+                    <h5 class="card-title">Products</h5>
+                    <p class="card-text">View most sold products
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <!-- Bootstrap Bundle with Popper -->
-    <script src="./js/core.js"></script>
-    <script src="./js/analytics.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-  </body>
+
+
+
+
+  </div>
+  <!-- Bootstrap Bundle with Popper -->
+  <script src="./js/core.js"></script>
+  <script src="./js/analytics.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+    crossorigin="anonymous"></script>
+</body>
+
 </html>

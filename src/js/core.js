@@ -53,7 +53,6 @@ ipcRenderer.on('notification-system', (event, arg) => {
   errorMsg.appendChild(theDiv)
   setTimeout(() => {
     theDiv.remove()
-    console.log(errorMsg.innerHTML);
     if (!errorMsg.innerHTML.includes('div') && document.getElementById('cermsLogo')) {
       document.getElementById('cermsLogo').style.display = ''      
     }

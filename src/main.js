@@ -2931,7 +2931,7 @@ async function startGatherAllActivity(){
     return
   }
   startGatherAllActivityA = true;
-  const q = query(collection(db, "activity"), where("active", "==", true), where('access', '==', getSystemAccess()));
+  const q = query(collection(db, "activity"), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -3181,7 +3181,9 @@ async function startGatherAllOrders(){
 
 async function displayAllActivity(){
   activitysData.forEach((activity) => {
-    theClient.send('activity-request-return', Array(activity[0], activity[1], activity[2], activity[3]))
+    if (activity[1].active) {
+      theClient.send('activity-request-return', Array(activity[0], activity[1], activity[2], activity[3]))      
+    }
   })
 }
 
@@ -3493,7 +3495,13 @@ async function getUserData(){
 }
 
 async function runAnalytics(timeStart, timeEnd){
+  if (!canUser('permissionEditAnalytics')) {
+    notificationSystem('warning', 'You do not have permisison to run analytics.')
+    return
+  }  
   notificationSystem('warning', 'Running analytics...')
+  await startGatherAllOrders();
+  let membersDataSend = Array()
   let activitysDataSend = Array()
   let ordersDataSend = Array()
 
@@ -3502,6 +3510,11 @@ async function runAnalytics(timeStart, timeEnd){
     let theTimeStartSec = Math.floor(theTimeStartDate / 1000)
     let theTimeEndDate = new Date(timeEnd);
     let theTimeEndSec = Math.floor(theTimeEndDate / 1000)
+    membersData.forEach(member => {
+      if (member[1].creation_time.seconds > theTimeStartSec && member[1].creation_time.seconds < theTimeEndSec) {
+        membersDataSend.push(member)
+      }
+    })
     activitysData.forEach(activity => {
       if (activity[1].timeIn.seconds > theTimeStartSec && activity[1].timeIn.seconds < theTimeEndSec){
         activitysDataSend.push(activity)
@@ -3513,16 +3526,18 @@ async function runAnalytics(timeStart, timeEnd){
       }
     });
     setTimeout(() => {
-      theClient.send('analytics-return', Array(membersData, activitysDataSend, productsData, ordersDataSend));      
+      theClient.send('analytics-return', Array(membersDataSend, activitysDataSend, productsData, ordersDataSend));      
       setTimeout(() => {
         notificationSystem('success', 'Analytics gathered!')
       }, 5000);
     }, 3000);
   }else{
-    theClient.send('analytics-return', Array(membersData, activitysData, productsData, ordersData));    
     setTimeout(() => {
-      notificationSystem('success', 'Analytics gathered!')
-    }, 5000);
+      theClient.send('analytics-return', Array(membersData, activitysData, productsData, ordersData));          
+      setTimeout(() => {
+        notificationSystem('success', 'Analytics gathered!')
+      }, 5000);
+    }, 3000);
   }
 }
 
@@ -3822,7 +3837,8 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditTagAdd: arg[14],
     permissionEditTagRemove: arg[15],
     permissionEditMemberNotes: arg[16],
-    permissionEditMemberFiles: arg[17]
+    permissionEditMemberFiles: arg[17],
+    permissionEditAnalytics: arg[18]
   });
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')

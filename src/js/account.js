@@ -55,6 +55,7 @@ let permissionEditTagAdd = document.getElementById('permissionEditTagAdd')
 let permissionEditTagRemove = document.getElementById('permissionEditTagRemove')
 let permissionEditMemberNotes = document.getElementById('permissionEditMemberNotes')
 let permissionEditMemberFiles = document.getElementById('permissionEditMemberFiles')
+let permissionEditAnalytics = document.getElementById('permissionEditAnalytics')
 
 let usersArray = Array();
 
@@ -180,7 +181,7 @@ function formWasSubmitted(){
 
 function formWasSubmitted2(){
   //RANK
-  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked))
+  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionEditAnalytics.checked))
 }
 
 ipcRenderer.send('request-account')
@@ -269,6 +270,7 @@ if (employeeInput) {
         permissionEditTagRemove.checked = value[1].permissionEditTagRemove
         permissionEditMemberNotes.checked = value[1].permissionEditMemberNotes
         permissionEditMemberFiles.checked = value[1].permissionEditMemberFiles
+        permissionEditAnalytics.checked = value[1].permissionEditAnalytics
       }else if (!employeeInput.value) {
         changeDisplayNameInput.value = ""
         changeRankInput.value = ""
@@ -287,6 +289,7 @@ if (employeeInput) {
         permissionEditTagRemove.checked = false
         permissionEditMemberNotes.checked = false
         permissionEditMemberFiles.checked = false
+        permissionEditAnalytics.checked = false
       }{
 
       }
