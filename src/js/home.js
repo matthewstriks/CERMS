@@ -30,10 +30,6 @@ let editRentalInfoType = document.getElementById('editRentalInfoType');
 let editRentalInfoNum = document.getElementById('editRentalInfoNum');
 let editRentalInfoNotes = document.getElementById('editRentalInfoNotes');
 
-let intervalId;
-let intervalId1;
-let intervalId2;
-let timerArrays = Array();
 let addLockerRoomMemberID;
 let currentlyRenewing;
 let currentlyCheckingOut;
@@ -49,6 +45,39 @@ let theCheckoutMsg = "Member has all belongings"
 function openMembership(){
   let memID = document.getElementById('lastCreatedID').innerHTML
   ipcRenderer.send('open-membership', memID)
+}
+
+function updateTime(){
+  setTimeout(() => {
+    for (let index = 0; index < document.getElementsByTagName('tr').length; index++) {
+      const theTable = document.getElementsByTagName('tr')[index];
+      if (theTable.id && (theTable.id != 'testTable')) {
+        let timerRow = document.getElementById('timeCell'+theTable.getAttribute('theid'))
+        let expireTime = timerRow.getAttribute('expireTime')
+
+        let currSeconds = Math.floor(Date.now() / 1000);
+        let secondsInbetween = expireTime - currSeconds;
+        if (secondsInbetween <= 0) {
+          let secondsInbetween = currSeconds - expireTime;
+          printSeconds = new Date(secondsInbetween * 1000).toISOString().substr(11, 8) + ' (Expired)';
+        } else {
+          printSeconds = new Date(secondsInbetween * 1000).toISOString().substr(11, 8);
+        }
+        timerRow.innerHTML = printSeconds
+        if (secondsInbetween > 300) {
+          theTable.classList.remove('table-warning')
+          theTable.classList.remove('table-danger')
+        }
+        if (secondsInbetween <= 300) {
+          theTable.classList.add('table-warning')
+        }
+        if (secondsInbetween <= 0) {
+          theTable.classList.add('table-danger')
+        }
+      }
+    }
+    updateTime()
+  }, 1000);
 }
 
 if (editRentalInfoType) {
@@ -166,6 +195,7 @@ ipcRenderer.on('activity-request-return-remove', (event, arg) => {
 
 ipcRenderer.on('activity-request-return-update', (event, arg) => {
   let row = document.getElementById('row'+arg[0]);
+  row.setAttribute('theID', arg[0])
   let theTable = document.getElementById('activityTable');
   if (!arg[1].active || arg[1].goingInactive) {
     theTable.deleteRow(row.rowIndex);
@@ -191,6 +221,7 @@ ipcRenderer.on('activity-request-return-update', (event, arg) => {
 
   let currSeconds = Math.floor(Date.now() / 1000);
   let secondsInbetween = arg[1].lockerRoomStatus[5] - currSeconds;
+  cell5.setAttribute('expireTime', arg[1].lockerRoomStatus[5])
   if (secondsInbetween <= 0) {
     let secondsInbetween = currSeconds - arg[1].lockerRoomStatus[5];
     printSeconds = new Date(secondsInbetween * 1000).toISOString().substr(11, 8) + ' (Expired)';
@@ -208,31 +239,6 @@ ipcRenderer.on('activity-request-return-update', (event, arg) => {
   if (secondsInbetween <= 0) {
     row.classList.add('table-danger')
   }
-
-  timerArrays.forEach((item, i) => {
-    if (item[0] == arg[0]) {
-      window.clearInterval(item[1])
-    }
-  });
-
-  intervalId2 = window.setInterval(function(){
-    let currSeconds = Math.floor(Date.now() / 1000);
-    let secondsInbetween = arg[1].lockerRoomStatus[5] - currSeconds;
-    if (secondsInbetween <= 0) {
-      let secondsInbetween = currSeconds - arg[1].lockerRoomStatus[5];
-      printSeconds = "Expired: " + new Date(secondsInbetween * 1000).toISOString().substr(11, 8);
-    }else{
-      printSeconds = new Date(secondsInbetween * 1000).toISOString().substr(11, 8);
-    }
-    cell5.innerHTML = printSeconds
-    if (secondsInbetween <= 300) {
-      row.classList.add('table-warning')
-    }
-    if (secondsInbetween <= 0) {
-      row.classList.add('table-danger')
-    }
-  }, 1000);
-  timerArrays.push(Array(arg[0], intervalId2))
 
   document.getElementById('renew'+arg[0]).addEventListener('click', function(){
     document.getElementById('renew'+arg[0]).addEventListener('click', function(){
@@ -310,7 +316,6 @@ ipcRenderer.on('activity-request-return-update', (event, arg) => {
 })
 
 ipcRenderer.on('home-checkoutmsg-return', (event, arg) => {
-  console.log(arg);
   if (arg) {
     theCheckoutMsg = arg
     confirmCheckoutLbl.innerHTML = arg
@@ -324,6 +329,7 @@ ipcRenderer.on('activity-request-return', (event, arg) => {
   currCheckedIn = currCheckedIn + 1
   var row = activityTable.insertRow(1);
   row.id = 'row'+arg[0];
+  row.setAttribute('theID', arg[0])
   var cell1 = row.insertCell(0);
   cell1.id = 'lockerRoomNumCell'+arg[0];
   var cell2 = row.insertCell(1);
@@ -350,6 +356,7 @@ ipcRenderer.on('activity-request-return', (event, arg) => {
 
     let currSeconds = Math.floor(Date.now() / 1000);
     let secondsInbetween = arg[1].lockerRoomStatus[5] - currSeconds;
+    cell5.setAttribute('expireTime', arg[1].lockerRoomStatus[5])
     if (secondsInbetween <= 0) {
       let secondsInbetween = currSeconds - arg[1].lockerRoomStatus[5];
       printSeconds = new Date(secondsInbetween * 1000).toISOString().substr(11, 8) + ' (Expired)';
@@ -363,25 +370,6 @@ ipcRenderer.on('activity-request-return', (event, arg) => {
     if (secondsInbetween <= 0) {
       row.classList.add('table-danger')
     }
-
-    intervalId1 = window.setInterval(function(){
-      let currSeconds = Math.floor(Date.now() / 1000);
-      let secondsInbetween = arg[1].lockerRoomStatus[5] - currSeconds;
-      if (secondsInbetween <= 0) {
-        let secondsInbetween = currSeconds - arg[1].lockerRoomStatus[5];
-        printSeconds = new Date(secondsInbetween * 1000).toISOString().substr(11, 8) + ' (Expired)';
-      }else{
-        printSeconds = new Date(secondsInbetween * 1000).toISOString().substr(11, 8);
-      }
-      cell5.innerHTML = printSeconds
-      if (secondsInbetween <= 300) {
-        row.classList.add('table-warning')
-      }
-      if (secondsInbetween <= 0) {
-        row.classList.add('table-danger')
-      }
-    }, 1000);
-    timerArrays.push(Array(arg[0], intervalId1))
 
     cell6.innerHTML = "<button id='renew"+arg[0]+"' type='button' data-bs-toggle='modal' data-bs-target='#myModal4' class='btn btn-success'>Renew</button> <button data-bs-toggle='modal' data-bs-target='#myModal3' id='checkout"+arg[0]+"' type='button' class='btn btn-danger'>Check Out</button>  <button data-bs-toggle='modal' data-bs-target='#myModal2' id='viewinfo"+arg[0]+"' type='button' class='btn btn-primary'>View info</button>"
     cell7.innerHTML = "<button id='waitlistbtn"+arg[0]+"' type='button' class='btn btn-warning'><i class='fa-solid fa-clock'></i></button> <button id='outbtn"+arg[0]+"' type='button' class='btn btn-danger'><i class='fa-solid fa-person-walking-arrow-right'></i></button> <button id='inbtn"+arg[0]+"' type='button' class='btn btn-success'><i class='fa-solid fa-person-booth'></i></button>"
@@ -498,3 +486,4 @@ ipcRenderer.on('rentals-request-return', (event, arg) => {
   opt.innerHTML = arg;
   editRentalInfoType.appendChild(opt);
 })
+updateTime()
