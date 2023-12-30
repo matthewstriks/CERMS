@@ -3800,6 +3800,7 @@ ipcMain.on('request-account', (event, arg) => {
   let displayName = getDisplayName();
   let rank = getRank();
   theClient.send('recieve-account', Array(displayName, rank, systemData, oauthClient.isAccessTokenValid()))
+  theClient.send('recieve-account2', Array(userData, systemData, oauthClient.isAccessTokenValid()))
 })
 
 ipcMain.on('account-create', (event, arg) => {
