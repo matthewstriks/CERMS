@@ -1,45 +1,69 @@
-let systemName = document.getElementById('systemName');
-let displayName = document.getElementById('displayName');
-let rankInfo = document.getElementById('rankInfo');
-let updateBtn = document.getElementById('updateBtn');
-let changelogBtn = document.getElementById('changelogBtn');
-let changePasswordBtn = document.getElementById('changePasswordBtn');
-let editAccountBtnSubmitPassReset = document.getElementById('editAccountBtnSubmitPassReset');
-let editAccountBtnDeleteUser = document.getElementById('editAccountBtnDeleteUser');
-
-let createAccountForm = document.getElementById('createAccountForm');
-let newAccountBtn = document.getElementById('newAccountBtn');
-let newAccountDiv = document.getElementById('newAccountDiv');
-let emailInput = document.getElementById('emailInput')
-let displayNameInput = document.getElementById('displayNameInput')
-let rankInput = document.getElementById('rankInput')
-let saveDir = document.getElementById('saveDir')
-let importMembershipsBtn = document.getElementById('importMembershipsBtn')
-let editSaveDir = document.getElementById('editSaveDir')
-let editModalDirs = document.getElementById('editModalDirs')
-let invWarnEMail = document.getElementById('invWarnEMail')
-let editInvWarnEMail = document.getElementById('editInvWarnEMail')
-let editCheckoutMsg = document.getElementById('editCheckoutMsg')
-let checkoutMsg = document.getElementById('checkoutMsg')
-let editShiftTimes = document.getElementById('editShiftTimes')
-let editShiftTimesA = document.getElementById('editShiftTimesA')
-let editShiftTimesB = document.getElementById('editShiftTimesB')
-let editShiftTimesC = document.getElementById('editShiftTimesC')
-let connectQuickBooksBtn = document.getElementById('connectQuickBooksBtn')
-let connectQuickBooksDiv = document.getElementById('connectQuickBooksDiv')
-let connectQuickBooksInput = document.getElementById('connectQuickBooksInput')
-let quickBooksTestBtn = document.getElementById('quickBooksTestBtn')
-let editRecieptTxt = document.getElementById('editRecieptTxt')
-let editRegisterRecieptTxt = document.getElementById('editRegisterRecieptTxt')
-let editRecieptTxtBtn = document.getElementById('editRecieptTxtBtn')
-let editRegisterRecieptTxtBtn = document.getElementById('editRegisterRecieptTxtBtn')
-
+// User Settings
+let displayDiv = document.getElementById('displayDiv')
+let editDiv = document.getElementById('editDiv')
+let displayName = document.getElementById('displayName')
+let displayNameEdit = document.getElementById('displayNameEdit')
+let roleTxt = document.getElementById('roleTxt')
+let emailTxt = document.getElementById('emailTxt')
+let editEmail = document.getElementById('editEmail')
+let editPassword = document.getElementById('editPassword')
+let editPassword2 = document.getElementById('editPassword2')
 let editAccountBtn = document.getElementById('editAccountBtn')
-let editAccountForm = document.getElementById('editAccountForm')
+let saveAccountBtn = document.getElementById('saveAccountBtn')
+let cancelBtn = document.getElementById('cancelBtn')
+let verifyEMailDisplay = document.getElementById('verifyEMailDisplay')
+let verifyEMailBtn = document.getElementById('verifyEMailBtn')
+let darkModeToggle2 = document.getElementById('darkModeToggle2')
+let notidicationSecondsEdit = document.getElementById('notidicationSecondsEdit')
+
+// System Settings
+let updateBtn = document.getElementById('updateBtn')
+let changelogBtn = document.getElementById('changelogBtn')
+let businessSettingsDisplay = document.getElementById('businessSettingsDisplay')
+let businessName = document.getElementById('businessName')
+let businessAddress = document.getElementById('businessAddress')
+let businessAddress2 = document.getElementById('businessAddress2')
+let businessPNum = document.getElementById('businessPNum')
+let businessEMail = document.getElementById('businessEMail')
+let editBusinessSettingsBtn = document.getElementById('editBusinessSettingsBtn')
+let businessSettingsEdit = document.getElementById('businessSettingsEdit')
+let businessNameEdit = document.getElementById('businessNameEdit')
+let businessAddressEdit = document.getElementById('businessAddressEdit')
+let businessAddress2Edit = document.getElementById('businessAddress2Edit')
+let businessPNumEdit = document.getElementById('businessPNumEdit')
+let businessEMailEdit = document.getElementById('businessEMailEdit')
+let saveBusinessSettingsBtn = document.getElementById('saveBusinessSettingsBtn')
+let cancelBusinessSettingsBtn = document.getElementById('cancelBusinessSettingsBtn')
+let quickbooksStep2 = document.getElementById('quickbooksStep2')
+let quickbooksURL = document.getElementById('quickbooksURL')
+let finishQuickbooks = document.getElementById('finishQuickbooks')
+let quickbooksConnect = document.getElementById('quickbooksConnect')
+let quickbooksDisConnect = document.getElementById('quickbooksDisConnect')
+let importMembershipModeSwitch = document.getElementById('importMembershipModeSwitch')
+let saveDirTxt = document.getElementById('saveDirTxt')
+let editModalDirs = document.getElementById('editModalDirs')
+let editSaveDir = document.getElementById('editSaveDir')
+let invWarnEMailDiv = document.getElementById('invWarnEMailDiv')
+let invWarnEMail = document.getElementById('invWarnEMail')
+let invWarnEMailBtn = document.getElementById('invWarnEMailBtn')
+let checkoutMsgDiv = document.getElementById('checkoutMsgDiv')
+let checkoutMsg = document.getElementById('checkoutMsg')
+let checkoutMsgBtn = document.getElementById('checkoutMsgBtn')
+let bshiftTime = document.getElementById('bshiftTime')
+let cshiftTime = document.getElementById('cshiftTime')
+let ashiftTime = document.getElementById('ashiftTime')
+let shiftTimeDiv = document.getElementById('shiftTimeDiv')
+let shiftTimeBtn = document.getElementById('shiftTimeBtn')
+
+// Accounts
+let editingID;
+let creatingAccount;
 let editAccountDiv = document.getElementById('editAccountDiv')
-let employeeInput = document.getElementById('employeeInput')
-let changeDisplayNameInput = document.getElementById('changeDisplayNameInput')
-let changeRankInput = document.getElementById('changeRankInput')
+let editingDisplayName = document.getElementById('editingDisplayName')
+let editingEMail = document.getElementById('editingEMail')
+let editingRank = document.getElementById('editingRank')
+let editingAccessCodeDiv = document.getElementById('editingAccessCodeDiv')
+let editingAccessCode = document.getElementById('editingAccessCode')
 let permissionViewProductsPage = document.getElementById('permissionViewProductsPage')
 let permissionEditCategory = document.getElementById('permissionEditCategory')
 let permissionEditProducts = document.getElementById('permissionEditProducts')
@@ -56,272 +80,315 @@ let permissionEditTagRemove = document.getElementById('permissionEditTagRemove')
 let permissionEditMemberNotes = document.getElementById('permissionEditMemberNotes')
 let permissionEditMemberFiles = document.getElementById('permissionEditMemberFiles')
 let permissionEditAnalytics = document.getElementById('permissionEditAnalytics')
+let editAccountSave = document.getElementById('editAccountSave')
+let editAccountCancel = document.getElementById('editAccountCancel')
+let addAccountBtn = document.getElementById('addAccountBtn')
+let userAccounts = document.getElementById('userAccounts')
 
-let usersArray = Array();
+//let  = document.getElementById('')
 
-if (updateBtn) {
-  updateBtn.addEventListener('click', function(){
+
+// User Settings
+if (displayDiv) {
+    editDiv.style.display = 'none'
+}
+
+editAccountBtn.addEventListener('click', function(){
+    editDiv.style.display = ''
+    displayDiv.style.display = 'none'
+
+})
+
+saveAccountBtn.addEventListener('click', function(){
+    ipcRenderer.send("settings-update-Account", Array(displayNameEdit.value, editEmail.value, editPassword.value, editPassword2.value))
+})
+
+cancelBtn.addEventListener('click', function(){
+    editDiv.style.display = 'none'
+    displayDiv.style.display = ''
+})
+
+verifyEMailBtn.addEventListener('click', function(){
+    ipcRenderer.send('settings-verify-email')
+})
+
+darkModeToggle2.addEventListener('click', function(){
+    document.getElementById('darkModeToggle').click()
+})
+
+notidicationSecondsEdit.addEventListener('change', function(){
+    ipcRenderer.send('settings-update-notification-seconds', notidicationSecondsEdit.value)
+})
+
+// System Settings 
+
+updateBtn.addEventListener('click', function(){
     ipcRenderer.send('request-update')
-  })
-}
+})
 
-if (changelogBtn) {
-  changelogBtn.addEventListener('click', function(){
+changelogBtn.addEventListener('click', function(){
     ipcRenderer.send('request-changelog')
-  })
+})
+
+if (businessSettingsDisplay) {
+    businessSettingsEdit.style.display = 'none'
 }
 
-if (connectQuickBooksBtn) {
-  let connectBtnClicked = false
-  connectQuickBooksDiv.style.display = 'none'
-  connectQuickBooksBtn.addEventListener('click', function () {
-    if (connectBtnClicked) {
-      connectBtnClicked = false
-      connectQuickBooksDiv.style.display = 'none'
-      ipcRenderer.send('quickbooks-login', connectQuickBooksInput.value)
-    } else {
-      connectBtnClicked = true
-      connectQuickBooksDiv.style.display = ''
-      ipcRenderer.send('quickbooks-connect')
-    }
-  })
+editBusinessSettingsBtn.addEventListener('click', function(){
+    businessSettingsDisplay.style.display = 'none'
+    businessSettingsEdit.style.display = ''
+})
+
+saveBusinessSettingsBtn.addEventListener('click', function(){
+    ipcRenderer.send('settings-update-business-info', Array(businessNameEdit.value, businessAddressEdit.value, businessAddress2Edit.value, businessPNumEdit.value, businessEMailEdit.value))
+})
+
+cancelBusinessSettingsBtn.addEventListener('click', function(){
+    businessSettingsDisplay.style.display = ''
+    businessSettingsEdit.style.display = 'none'
+})
+
+if (quickbooksStep2) {
+    quickbooksStep2.style.display = 'none'
+    quickbooksDisConnect.style.display = 'none'
 }
 
-if (quickBooksTestBtn) {
-  quickBooksTestBtn.addEventListener('click', function () {
-    ipcRenderer.send('quickbooks-test')
-  })
-}
+quickbooksConnect.addEventListener('click', function() {
+    quickbooksConnect.style.display = 'none'
+    quickbooksStep2.style.display = ''
+    ipcRenderer.send('quickbooks-connect')
+})
 
-if (changePasswordBtn) {
-  changePasswordBtn.addEventListener('click', function(){
-    ipcRenderer.send('account-change-password')
-  })
-}
+finishQuickbooks.addEventListener('click', function(){
+    quickbooksConnect.style.display = ''
+    quickbooksStep2.style.display = 'none'
+    ipcRenderer.send('quickbooks-login', quickbooksURL.value)
+})
 
-if (editAccountBtnSubmitPassReset) {
-  editAccountBtnSubmitPassReset.style.display = 'none';
-  editAccountBtnSubmitPassReset.addEventListener('click', function(){
-    ipcRenderer.send('account-change-password', Array(employeeInput.value))
-  })
-}
+quickbooksDisConnect.addEventListener("click", function(){
+    ipcRenderer.send('settings-quickbooks-disconnect')
+})
 
-if (editAccountBtnDeleteUser) {
-  editAccountBtnDeleteUser.style.display = 'none';
-  editAccountBtnDeleteUser.addEventListener('click', function(){
-    ipcRenderer.send('account-delete-user', Array(employeeInput.value))
-  })
-}
+importMembershipModeSwitch.addEventListener('change', function(){
+    ipcRenderer.send('settings-import-membership-mode-toggle', importMembershipModeSwitch.checked)
+})
 
-if (importMembershipsBtn) {
-  ipcRenderer.send('import-memberships-mode-status')
-  importMembershipsBtn.addEventListener('click', function(){
-    ipcRenderer.send('import-memberships-mode-change')
-  })
-}
-
-if (editSaveDir) {
-  editSaveDir.addEventListener('click', function(){
+editSaveDir.addEventListener('click', function () {
     ipcRenderer.send('edit-save-dir')
-  })
+})
+
+if (invWarnEMailDiv) {
+    invWarnEMailDiv.style.display = 'none'
 }
 
-if (editInvWarnEMail) {
-  editInvWarnEMail.addEventListener('click', function(){
-    ipcRenderer.send('edit-invWarn', invWarnEMail.value)
-  })
+invWarnEMail.addEventListener('input', function(){
+    invWarnEMailDiv.style.display = ''
+})
+
+invWarnEMailBtn.addEventListener('click', function(){
+    ipcRenderer.send('settings-update-invwarnemail', invWarnEMail.value)
+})
+
+if (checkoutMsgDiv) {
+    checkoutMsgDiv.style.display = 'none'
 }
 
-if (editCheckoutMsg) {
-  editCheckoutMsg.addEventListener('click', function(){
-    ipcRenderer.send('edit-checkoutmsg', checkoutMsg.value)
-  })
+checkoutMsg.addEventListener('input', function(){
+    checkoutMsgDiv.style.display = ''
+})
+
+checkoutMsgBtn.addEventListener('click', function(){
+    ipcRenderer.send('settings-update-checkoutmsg', checkoutMsg.value)
+})
+
+if (shiftTimeDiv) {
+    shiftTimeDiv.style.display = 'none'
 }
 
-if (editShiftTimes) {
-  editShiftTimes.addEventListener('click', function(){
-    ipcRenderer.send('edit-shifttimes', Array(editShiftTimesA.value, editShiftTimesB.value, editShiftTimesC.value))
-  })
-}
+bshiftTime.addEventListener('input', function(){
+    shiftTimeDiv.style.display = ''
+})
 
-if (editRecieptTxtBtn) {
-  editRecieptTxtBtn.addEventListener('click', function(){
-    ipcRenderer.send('edit-reciept', editRecieptTxt.value)
-  })
-}
+cshiftTime.addEventListener('input', function(){
+    shiftTimeDiv.style.display = ''
+})
 
-if (editRegisterRecieptTxtBtn) {
-  editRegisterRecieptTxtBtn.addEventListener('click', function(){
-    ipcRenderer.send('edit-register-reciept', editRegisterRecieptTxt.value)
-  })
-}
+ashiftTime.addEventListener('input', function(){
+    shiftTimeDiv.style.display = ''
+})
 
-if (newAccountBtn) {
-  newAccountBtn.style.display = "none";
-  newAccountDiv.style.display = "none";
-  newAccountBtn.addEventListener('click', function(){
-    newAccountDiv.style.display = "block";
-    emailInput.focus();
-  })
-}
+shiftTimeBtn.addEventListener('click', function(){
+    ipcRenderer.send('settings-update-shifttimes', Array(ashiftTime.value, bshiftTime.value, cshiftTime.value))
+})
 
-if (editAccountBtn) {
-  editAccountBtn.style.display = "none";
-  editAccountDiv.style.display = "none";
-  editAccountBtn.addEventListener('click', function(){
-    editAccountDiv.style.display = "block";
+// Account
+
+if (userAccounts) {
     ipcRenderer.send('request-users')
-    employeeInput.focus();
-  })
+    editAccountDiv.style.display = 'none'
 }
 
-function formWasSubmitted(){
-  ipcRenderer.send('account-create', Array(emailInput.value, displayNameInput.value, rankInput.value))
-}
+editAccountSave.addEventListener('click', function(){
+    editAccountDiv.style.display = 'none'
+    if (creatingAccount) {
+        creatingAccount = false
+        editingAccessCodeDiv.style.display = ''
+        editingAccessCode.style.display = ''
+        ipcRenderer.send('account-create', Array(editingEMail.value, editingDisplayName.value, editingRank.value))
+    } else {
+        ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionEditAnalytics.checked))    
+    }
+})
 
-function formWasSubmitted2(){
-  //RANK
-  ipcRenderer.send('account-edit', Array(employeeInput.value, changeDisplayNameInput.value, changeRankInput.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionEditAnalytics.checked))
-}
+editAccountCancel.addEventListener('click', function(){
+    editAccountDiv.style.display = 'none'
+    if (creatingAccount) {
+        creatingAccount = false
+        editingAccessCodeDiv.style.display = ''
+        editingAccessCode.style.display = ''
+    }
+})
+
+editingAccessCodeDiv.addEventListener('click', function () {
+    editingAccessCode.disabled = false
+})
+
+addAccountBtn.addEventListener('click', function(){
+    creatingAccount = true
+    editAccountDiv.style.display = ''
+    editingAccessCodeDiv.innerHTML = '<b>NOTE: Permisisons will not save! You must go back and edit the user that is created. You can ignore the below section and move to save/close buttons</b>'
+    editingAccessCode.style.display = 'none'
+})
 
 ipcRenderer.send('request-account')
-ipcRenderer.on('recieve-account', (event, arg) => {
-  if (arg[3]) {
-    connectQuickBooksBtn.disabled = true
-    connectQuickBooksBtn.innerHTML = 'Connected!'
-  } else {
-    connectQuickBooksBtn.innerHTML = 'Connect'
-    connectQuickBooksBtn.disabled = false
-  }
 
-  invWarnEMail.value = arg[2].invWarnEMail
-  checkoutMsg.value = arg[2].checkoutMsg
-  editShiftTimesA.value = arg[2].shiftTimeA
-  editShiftTimesB.value = arg[2].shiftTimeB
-  editShiftTimesC.value = arg[2].shiftTimeC
-  systemName.innerHTML = arg[2].businessName;
-  displayName.innerHTML = 'Display Name: ' + arg[0];
-  if (arg[1] == 1) {
-    rankInfo.innerHTML = 'Rank: Manager';
-    newAccountBtn.style.display = "block";
-    editAccountBtn.style.display = "block";
-  }else if (arg[1] == 0) {
-    rankInfo.innerHTML = 'Rank: Employee';
-  }else {
-    rankInfo.innerHTML = 'Rank: Unknown';
-  }
-  editRecieptTxt.value = arg[2].reciept
-  editRegisterRecieptTxt.value = arg[2].registerReciept
+ipcRenderer.on('recieve-account2', (event, arg) => {
+    console.log(arg);
+    displayName.innerHTML = arg[0].displayName
+    displayNameEdit.value = arg[0].displayName
+    if (arg[0].rank == '1') {
+        roleTxt.innerHTML = "Manager"        
+    } else {
+        roleTxt.innerHTML = "Employee"        
+    }
+    emailTxt.innerHTML = arg[0].email
+    editEmail.value = arg[0].email
+    if (arg[4]) {
+        verifyEMailDisplay.style.display = 'none'
+    }
 
-  if (!arg[2] || !Array.isArray(arg[2])) {
-    saveDir.innerHTML = 'Report save directory: ' + arg[2].fileSaveSystemDir
-  } else {
-    arg[2].fileSaveSystem.forEach(theDir => {
-      var opt = document.createElement('li');
-      var opt2 = document.createElement('br')
-      opt.setAttribute("theDir", theDir)
-      opt.innerHTML = '<button class="btn btn-danger">' + theDir + '</button>';
-      opt.addEventListener('click', function () {
-        ipcRenderer.send('remove-dir', opt.getAttribute('theDir'))
-        opt.style.display = 'none'
-        opt2.style.display = 'none'
-      })
-      editModalDirs.appendChild(opt);
-      editModalDirs.appendChild(opt2);
-    });
-  }
+    if (document.querySelector('html').getAttribute('data-bs-theme') == 'dark') {
+        darkModeToggle2.checked = true
+    }
+    notidicationSecondsEdit.value = arg[0].notificationSecs || ''
+
+    businessName.innerHTML = arg[1].businessName || ""
+    businessAddress.innerHTML = arg[1].businessAddress || ""
+    businessAddress2.innerHTML = arg[1].businessAddress2 || ""
+    businessPNum.innerHTML = arg[1].businessPNum || ""
+    businessEMail.innerHTML = arg[1].businessEMail || ""
+
+    businessNameEdit.value = arg[1].businessName || ""
+    businessAddressEdit.value = arg[1].businessAddress || ""
+    businessAddress2Edit.value = arg[1].businessAddress2 || ""
+    businessPNumEdit.value = arg[1].businessPNum || ""
+    businessEMailEdit.value = arg[1].businessEMail || ""
+
+    if (arg[2]) {
+       quickbooksConnect.disabled = true 
+       quickbooksConnect.innerHTML = "Quickbooks Connected" 
+       quickbooksConnect.className = 'btn btn-success'
+        quickbooksDisConnect.style.display = ''
+    }
+
+    importMembershipModeSwitch.checked = arg[3]
+
+    saveDirTxt.innerHTML = arg[1].fileSaveSystemDir    
+
+    if (arg[1].fileSaveSystem || Array.isArray(arg[1].fileSaveSystem)) {
+        arg[1].fileSaveSystem.forEach(theDir => {
+            var opt = document.createElement('li');
+            var opt2 = document.createElement('br')
+            opt.setAttribute("theDir", theDir)
+            opt.innerHTML = '<button class="btn btn-danger">' + theDir + '</button>';
+            opt.addEventListener('click', function () {
+                ipcRenderer.send('remove-dir', opt.getAttribute('theDir'))
+                opt.style.display = 'none'
+                opt2.style.display = 'none'
+            })
+            editModalDirs.appendChild(opt);
+            editModalDirs.appendChild(opt2);
+        });
+    }
+
+    invWarnEMail.value = arg[1].invWarnEMail || ""
+    if (invWarnEMailDiv) {
+        invWarnEMailDiv.style.display = 'none'        
+    }
+    checkoutMsg.value = arg[1].checkoutMsg || ""
+    if (checkoutMsgDiv) {
+        checkoutMsgDiv.style.display = 'none'
+    }
+    ashiftTime.value = arg[1].shiftTimeA || ""
+    bshiftTime.value = arg[1].shiftTimeB || ""
+    cshiftTime.value = arg[1].shiftTimeC || ""
+    if (shiftTimeDiv) {
+        shiftTimeDiv.style.display = 'none'
+    }
 })
 
 ipcRenderer.on('recieve-users', (event, arg) => {
-  usersArray.push(arg)
-  var nOpt = document.createElement('option');
-  nOpt.value = arg[0];
-  nOpt.innerHTML = arg[1].displayName;
-  employeeInput.appendChild(nOpt);
- })
+    console.log(arg);
+    var row = userAccounts.insertRow(1);
+    row.id = 'row' + arg[0];
+    row.setAttribute('theID', arg[0])
+    var cell1 = row.insertCell(0);
+    cell1.id = 'nameCell' + arg[0];
+    var cell2 = row.insertCell(1);
+    cell2.id = 'rankCell' + arg[0];
+    var cell3 = row.insertCell(2);
+    cell3.id = 'actionCell' + arg[0];
 
+//    cell1.outerHTML = "<th scope='row' id='lockerRoomNumCell" + arg[0] + "'>" + parseInt(arg[1].lockerRoomStatus[1]) + "</th>"
+    cell1.innerHTML = arg[1].displayName;
+    if (Number(arg[1].rank == 0)) {
+        cell2.innerHTML = "Employee";
+    } else {
+        cell2.innerHTML = "Manager";
+    }
 
-if (employeeInput) {
-  employeeInput.addEventListener('change', function(){
-    //RANK
-    usersArray.forEach(function (value, i) {
-      if (employeeInput.value) {
-        editAccountBtnSubmitPassReset.style.display = '';
-        editAccountBtnDeleteUser.style.display = '';
-      }else{
-        editAccountBtnSubmitPassReset.style.display = 'none';
-        editAccountBtnDeleteUser.style.display = 'none';
-      }
-      if (employeeInput.value == value[0]) {
-        changeDisplayNameInput.value = value[1].displayName
-        changeRankInput.value = value[1].rank
-        permissionViewProductsPage.checked = value[1].permissionViewProductsPage
-        permissionEditCategory.checked = value[1].permissionEditCategory
-        permissionEditProducts.checked = value[1].permissionEditProducts
-        permissionEditDiscounts.checked = value[1].permissionEditDiscounts
-        permissionWaiveProducts.checked = value[1].permissionWaiveProducts
-        permissionEditCoreProducts.checked = value[1].permissionEditCoreProducts
-        permissionEditSystemSettings.checked = value[1].permissionEditSystemSettings
-        permissionEditRegisters.checked = value[1].permissionEditRegisters
-        permissionImportMemberMode.checked = value[1].permissionImportMemberMode
-        permissionEditDNAAdd.checked = value[1].permissionEditDNAAdd
-        permissionEditDNARemove.checked = value[1].permissionEditDNARemove
-        permissionEditTagAdd.checked = value[1].permissionEditTagAdd
-        permissionEditTagRemove.checked = value[1].permissionEditTagRemove
-        permissionEditMemberNotes.checked = value[1].permissionEditMemberNotes
-        permissionEditMemberFiles.checked = value[1].permissionEditMemberFiles
-        permissionEditAnalytics.checked = value[1].permissionEditAnalytics
-      }else if (!employeeInput.value) {
-        changeDisplayNameInput.value = ""
-        changeRankInput.value = ""
-        permissionViewProductsPage.checked = false
-        permissionEditCategory.checked = false
-        permissionEditProducts.checked = false
-        permissionEditDiscounts.checked = false
-        permissionWaiveProducts.checked = false
-        permissionEditCoreProducts.checked = false
-        permissionEditSystemSettings.checked = false
-        permissionEditRegisters.checked = false
-        permissionImportMemberMode.checked = false
-        permissionEditDNAAdd.checked = false
-        permissionEditDNARemove.checked = false
-        permissionEditTagAdd.checked = false
-        permissionEditTagRemove.checked = false
-        permissionEditMemberNotes.checked = false
-        permissionEditMemberFiles.checked = false
-        permissionEditAnalytics.checked = false
-      }{
+    cell3.innerHTML = "<button class='btn btn-warning' type='button' id='edit" + arg[0] + "'>Edit</button> <button class='btn btn-danger' type='button' id='delete" + arg[0] + "'>Delete</button> <button class='btn btn-primary' type='button' id='resetpass" + arg[0] + "'>Reset Password</button>"
 
-      }
-    });
-  })
-}
+    document.getElementById('edit'+arg[0]).addEventListener('click', function(){
+        editingID = arg[0]
+        editAccountDiv.style.display = ''
+        editingDisplayName.value = arg[1].displayName
+        editingEMail.value = arg[1].email
+        editingRank.value = arg[1].rank
+        editingAccessCode.value = arg[1].access
+        permissionViewProductsPage.checked = arg[1].permissionViewProductsPage
+        permissionEditCategory.checked = arg[1].permissionEditCategory
+        permissionEditProducts.checked = arg[1].permissionEditProducts
+        permissionEditDiscounts.checked = arg[1].permissionEditDiscounts
+        permissionWaiveProducts.checked = arg[1].permissionWaiveProducts
+        permissionEditCoreProducts.checked = arg[1].permissionEditCoreProducts
+        permissionEditSystemSettings.checked = arg[1].permissionEditSystemSettings
+        permissionEditRegisters.checked = arg[1].permissionEditRegisters
+        permissionImportMemberMode.checked = arg[1].permissionImportMemberMode
+        permissionEditDNAAdd.checked = arg[1].permissionEditDNAAdd
+        permissionEditDNARemove.checked = arg[1].permissionEditDNARemove
+        permissionEditTagAdd.checked = arg[1].permissionEditTagAdd
+        permissionEditTagRemove.checked = arg[1].permissionEditTagRemove
+        permissionEditMemberNotes.checked = arg[1].permissionEditMemberNotes
+        permissionEditMemberFiles.checked = arg[1].permissionEditMemberFiles
+        permissionEditAnalytics.checked = arg[1].permissionEditAnalytics
+    })
 
-ipcRenderer.on('quickbooks-test-test', (event, arg) => {
+    document.getElementById('delete'+arg[0]).addEventListener('click', function(){
+        ipcRenderer.send('account-delete-user', Array(arg[0]))
+    })
 
-})
-
-ipcRenderer.on('account-edit-success', (event, arg) => {
-  var i, L = employeeInput.options.length - 1;
-  for(i = L; i >= 0; i--) {
-     employeeInput.remove(i);
-  }
-  var nOpt = document.createElement('option');
-  nOpt.value = "";
-  nOpt.innerHTML = "---";
-  employeeInput.appendChild(nOpt);
-  changeDisplayNameInput.value = "";
-  changeRankInput.value = "";
-  editAccountForm.reset()
-  editAccountDiv.style.display = "none";
-})
-
-ipcRenderer.on('import-memberships-mode-status-return', (event, arg) => {
-  if (arg) {
-    importMembershipsBtn.className = 'btn btn-danger'
-    importMembershipsBtn.innerHTML = 'Disable'
-  } else {
-    importMembershipsBtn.className = 'btn btn-success'
-    importMembershipsBtn.innerHTML = 'Enable'
-  }
+    document.getElementById('resetpass'+arg[0]).addEventListener('click', function(){
+        ipcRenderer.send('account-change-password', Array(arg[0]))
+    })
 })

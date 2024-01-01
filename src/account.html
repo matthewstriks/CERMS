@@ -1,319 +1,469 @@
 <!doctype html>
 <html lang="en">
-  <head>
+
+<head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
-      integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <!-- fontawesome -->
     <script src="https://kit.fontawesome.com/d57fcc156f.js" crossorigin="anonymous"></script>
 
     <title>CERMS - Account</title>
-  </head>
-  <body>
+</head>
+
+<body>
     <br>
     <div class="container">
-      <h1 >Account</h1>
-      <p>Edit/View account information</p>
+        <h1>Account</h1>
+        <p>Edit/View account information</p>
     </div>
     <div class="container">
-      <ul class="nav justify-content-end">
-        <li class="nav-item">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
-              Options
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-              <div class="container">
-                <div class="btn-group-vertical">
-                  <a class="btn btn-primary" href="settings.html" role="button">Account</a>
-                  <a class="btn btn-primary" href="products.html" role="button">Products</a>
-                  <a class="btn btn-primary" href="support.html" role="button">Support</a>
-                  <a class="btn btn-primary" href="#" id="darkModeToggle" role="button"><i class="fa-solid fa-moon"></i></a>
+        <ul class="nav justify-content-end">
+            <li class="nav-item">
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        Options
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+                        <div class="container">
+                            <div class="btn-group-vertical">
+                                <a class="btn btn-primary" href="account.html" role="button">Account</a>
+                                <a class="btn btn-primary" href="products.html" role="button">Products</a>
+                                <a class="btn btn-primary" href="support.html" role="button">Support</a>
+                                <a class="btn btn-primary" href="#" id="darkModeToggle" role="button"><i
+                                        class="fa-solid fa-moon"></i></a>
+                            </div>
+                            <hr>
+                            <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
+                        </div>
+                    </ul>
                 </div>
-                <hr>
-                <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
-              </div>
-            </ul>
-          </div>
-        </li>
-      </ul>
+            </li>
+        </ul>
     </div>
     <hr>
     <div class="container">
-      <div class="" role="alert" id="errorMsg">
-      </div>
+        <div class="" role="alert" id="errorMsg">
+        </div>
     </div>
     <div class="container">
-      <a class="btn btn-primary" href="home.html" role="button">Home</a>
-      <a class="btn btn-primary" href="members.html" role="button">Members</a>
-      <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
-      <a class="btn btn-primary" href="register.html" role="button">Register</a>
-      <a class="btn btn-primary" href="history.html" role="button">History</a>
-      <a class="btn btn-primary" href="analytics.html" role="button">Analytics</a>
+        <a class="btn btn-primary" href="home.html" role="button">Home</a>
+        <a class="btn btn-primary" href="members.html" role="button">Members</a>
+        <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
+        <a class="btn btn-primary" href="register.html" role="button">Register</a>
+        <a class="btn btn-primary" href="history.html" role="button">History</a>
+        <a class="btn btn-primary" href="analytics.html" role="button">Analytics</a>
     </div>
     <br>
 
     <!-- Modal -->
-    <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Edit save directories</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <p>Directories on file:</p>
-            <p>Click to delete</p>
-            <ul id="editModalDirs">
-            </ul>
-          </div>
-          <div class="modal-footer">
-            <button type="button" data-bs-dismiss="modal" class="btn btn-success" id="editSaveDir">Add Directory</button>
-            <button type="button" data-bs-dismiss="modal" class="btn btn-secondary">Close</button>
-          </div>
+    <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
+        data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit save directories</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Directories on file:</p>
+                    <p>Click to delete</p>
+                    <ul id="editModalDirs">
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" data-bs-dismiss="modal" class="btn btn-success" id="editSaveDir">Add
+                        Directory</button>
+                    <button type="button" data-bs-dismiss="modal" class="btn btn-secondary">Close</button>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
 
     <div class="container">
-      <h1 id="systemName">System Name: </h1>
-      <h1 id="displayName">Display Name: </h1>
-      <h1 id="rankInfo">Rank: </h1>
-      <br>
-      <button id="updateBtn" class="btn btn-primary">Check for update</button>      <button id="changelogBtn" class="btn btn-warning">View Changelog</button>
-      <br>
-      <hr>
-      <p id="saveDir">Report save directory: </p>
-      <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#myModal">Edit Save Dir</button>
-      <hr>
-      <p id="saveDir">Import Memberships Mode</p>
-      <button class="btn btn-warning" id="importMembershipsBtn" type="button">Enable</button>
-      <hr>
-      <p>Where to send the inventory warning emails</p>
-      <input class="form-control" type="text" id="invWarnEMail"></input>
-      <br>
-      <button id="editInvWarnEMail" class="btn btn-warning">Edit InvWarn EMail</button>
-      <hr>
-      <p>What should the checkout message say?</p>
-      <input class="form-control" type="text" id="checkoutMsg"></input>
-      <br>
-      <button id="editCheckoutMsg" class="btn btn-warning">Edit Checkout Message</button>
-      <hr>
-      <p>Shift Times (Ex. '7am - 3pm')</p>
-      <label for="editShiftTimesB">Day Shift</label>
-      <input type="text" class="form-control" id="editShiftTimesB" placeholder="Day Shift">
-      <br>
-      <label for="editShiftTimesC">Evening Shift</label>
-      <input type="text" class="form-control" id="editShiftTimesC" placeholder="Evening Shift">
-      <br>
-      <label for="editShiftTimesA">Night Shift</label>
-      <input type="text" class="form-control" id="editShiftTimesA" placeholder="Night Shift">
-      <br>
-      <button class="btn btn-warning" id="editShiftTimes">Edit Shift Times</button>
-      <hr>
-      <p>Connect to Quickbooks</p>
-      <button class="btn btn-warning" id="connectQuickBooksBtn">Connect</button>
-      <div class="container" id="connectQuickBooksDiv">
-        <br>
-        <p>Enter URL here then press connect again.</p>
-        <br>
-        <input id='connectQuickBooksInput' type="text" class='form-control' placeholder="URL">
-      </div>
-      <hr>
-      <p>Test Function</p>
-      <button class="btn btn-warning" id="quickBooksTestBtn">Test</button>
-      <hr>
-      <p>Reciept</p>
-      <textarea id="editRecieptTxt" cols="100" rows="10"></textarea>
-      <br>
-      <button id="editRecieptTxtBtn" class="btn btn-warning">Edit Reciept</button>
-      <hr>
-      <p>Register Reciept</p>
-      <textarea id="editRegisterRecieptTxt" cols="100" rows="10"></textarea>
-      <br>
-      <button id="editRegisterRecieptTxtBtn" class="btn btn-warning">Edit Register Reciept</button>
-      <hr>
-      <br>
-      <br>
-      <button type="button" id="changePasswordBtn" class="btn btn-primary">Change password</button>
-      <br>
-      <br>
-      <button type="button" id="newAccountBtn" class="btn btn-success">Create new account</button>
-      <br>
-      <button type="button" id="editAccountBtn" class="btn btn-warning">Edit account</button>
-      <br>
-      <br>
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane" type="button"
+                    role="tab" aria-controls="home-tab-pane" aria-selected="true">User Settings</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane" type="button"
+                    role="tab" aria-controls="profile-tab-pane" aria-selected="false">System Settings</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact-tab-pane" type="button"
+                    role="tab" aria-controls="contact-tab-pane" aria-selected="false">Accounts</button>
+            </li>
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab" tabindex="0">
+                <br>
+                <div id="displayDiv">
+                    <h3 id="displayName">Display Name</h3>
+                    <h3 id="roleTxt">Role</h3>
+                    <h3 id="emailTxt">EMail</h3>
+                    <h3>Click 'Edit Account' to change password.</h3>
+                    <br>
+                    <button id="editAccountBtn" type="button" class="btn btn-warning"><i class="fa-solid fa-pen-to-square"></i> Edit Account</button>
+                </div>
+                <div id="editDiv">
+                    <input id="displayNameEdit" type="text" class="form-control" placeholder="Display Name">
+                    <br>
+                    <input id="editEmail" type="email" class="form-control" placeholder="EMail">
+                    <br>
+                    <p>Change Password</p>
+                    <input id="editPassword" type="password" class="form-control" placeholder="Password">
+                    <br>
+                    <input id="editPassword2" type="password" class="form-control" placeholder="Re-type Password">
+                    <br>
+                    <br>
+                    <button id="saveAccountBtn" type="button" class="btn btn-success"> Save</button>
+                    <button id="cancelBtn" type="button" class="btn btn-danger">Close</button>
+                </div>
+                <div id="verifyEMailDisplay">
+                    <br>
+                    <button class="btn btn-primary" type="button" id="verifyEMailBtn">Verify EMail</button>
+                </div>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <label class="form-check-label" for="darkModeToggle2">Dark Mode</label>
+                            </div>
+                            <div class="col-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle2">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <p>How long should notifications last? (in seconds)</p>
+                            </div>
+                            <div class="col-4">
+                                <input id="notidicationSecondsEdit" type="number" class="form-control" placeholder="Seconds for notifications to last">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <br>
+                <br>
+            </div>
+            <div class="tab-pane fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+                <br>
+                <button type="button" id="updateBtn" class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Check for update</button>
+                <button type="button" id="changelogBtn" class="btn btn-warning"><i class="fa-solid fa-list"></i> Changelog</button>
+                <hr>
+                <div class="card">
+                    <div class="card-body">
+                        <h3>Business Settings</h3>
+                        <hr>
+                        <div id="businessSettingsDisplay">
+                            <b id="businessName">Business Name</b>
+                            <br>
+                            <b id="businessAddress">Business Address</b>
+                            <br>
+                            <b id="businessAddress2">Business City State, Zip</b>
+                            <br>
+                            <b id="businessPNum">Business Phone Number</b>
+                            <br>
+                            <b id="businessEMail">Business EMail</b>
+                            <br>
+                            <br>
+                            <button id="editBusinessSettingsBtn" type="button" class="btn btn-warning"><i class="fa-solid fa-pen-to-square"></i> Edit Business Settings</button>
+                        </div>
+                        <div id="businessSettingsEdit">
+                            <input id="businessNameEdit" type="text" class="form-control" placeholder="Business Name">
+                            <br>
+                            <input id="businessAddressEdit" type="text" class="form-control" placeholder="Address">
+                            <br>
+                            <input id="businessAddress2Edit" type="text" class="form-control" placeholder="City State, ZIP">
+                            <br>
+                            <input id="businessPNumEdit" type="tel" class="form-control" placeholder="Phone Number">
+                            <br>
+                            <input id="businessEMailEdit" type="email" class="form-control" placeholder="EMail">
+                            <br>
+
+                            <button id="saveBusinessSettingsBtn" type="button" class="btn btn-success">Save</button>
+                            <button id="cancelBusinessSettingsBtn" type="button" class="btn btn-danger">Close</button>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div id="quickbooksStep2">
+                            <input id="quickbooksURL" type="text" class="form-control" placeholder="URL from CERMS Website"></input>
+                            <br>
+                            <button id="finishQuickbooks" type="button" class="btn btn-success">Finish Connecting</button>
+                        </div>
+                        <button class="btn btn-warning" id="quickbooksConnect" type="button">Connect to Quickbooks</button>
+                        <button class="btn btn-danger" id="quickbooksDisConnect" type="button">Disconnect Quickbooks</button>
+                    </div>
+                    <div class="card-footer">
+                        Click the button to sign in to your Quickbooks Online account. You will then be redirected to the CERMS website. Copy the URL of the CERMS website back here and click connect again.
+                    </div>
+                </div>                
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <label class="form-check-label" for="importMembershipModeSwitch">Import Membership Mode</label>                                
+                            </div>
+                            <div class="col-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="importMembershipModeSwitch">
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        Allows you to create memberships bypassing the order page and imputting the membership creation date/time and the membership ID number.
+                    </div>
+                </div>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        Save directory
+                        <div class="row">
+                            <div class="col-8">
+                                <p id="saveDirTxt"></p>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-warning" id="editSaveDirBtn" data-bs-toggle="modal" data-bs-target="#myModal">Edit Save Dir</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        File locations where the register reports will save.
+                    </div>
+                </div>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <p>Who should get inventory warning emails?</p>
+                            </div>
+                            <div class="col-4">
+                                <input id="invWarnEMail" type="email" class="form-control"
+                                    placeholder="EMail">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer" id="invWarnEMailDiv">
+                        <button class="btn btn-success" type="button" id="invWarnEMailBtn">Save</button>
+                    </div>
+                </div>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <p>What should the checkout message say?</p>
+                            </div>
+                            <div class="col-4">
+                                <input id="checkoutMsg" type="text" class="form-control"
+                                    placeholder="Checkout Message">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer" id="checkoutMsgDiv">
+                        <button class="btn btn-success" type="button" id="checkoutMsgBtn">Save</button>
+                    </div>
+                </div>
+                <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <p>Shift Times (Ex. '7am - 3pm')</p>
+                                <p>Day Shift</p>
+                                <input type="text" class="form-control" placeholder="Day Shift" id="bshiftTime"></input>
+                                <br>
+                                <p>Evening Shift</p>
+                                <input type="text" class="form-control" placeholder="Evening Shift" id="cshiftTime"></input>
+                                <br>
+                                <p>Night Shift</p>
+                                <input type="text" class="form-control" placeholder="Night Shift" id="ashiftTime"></input>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer" id="shiftTimeDiv">
+                        <button class="btn btn-success" type="button" id="shiftTimeBtn">Save</button>
+                    </div>
+                </div>
+                <br>
+                <br>
+                <br>
+            </div>
+            <div class="tab-pane fade" id="contact-tab-pane" role="tabpanel" aria-labelledby="contact-tab" tabindex="0">
+                <br>
+                <div id="editAccountDiv">
+                    <h3>Edit Account</h3>
+                    <br>
+                    <input class="form-control" type="text" id="editingDisplayName" placeholder="Display Name"></input>
+                    <br>
+                    <input class="form-control" type="email" id="editingEMail" placeholder="EMail"></input>
+                    <br>
+                    <select class="form-select" id="editingRank">
+                        <option value="">---</option>
+                        <option value="0">Employee</option>
+                        <option value="1">Manager</option>
+                    </select>
+                    <br>
+                    <p id="editingAccessCodeDiv">Access Code <b>DO NOT TOUCH UNLESS YOU KNOW WHAT YOU ARE DOING</b> click here to change access code</p>
+                    <input disabled class="form-control" type="text" id="editingAccessCode" placeholder="Access Code"></input>
+
+
+                    <br>
+                    <b>Permissions</b>
+                    <br>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionViewProductsPage">
+                        <label class="form-check-label" for="permissionViewProductsPage">
+                            View Products Page
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditCategory">
+                        <label class="form-check-label" for="permissionEditCategory">
+                            Edit Categories
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditProducts">
+                        <label class="form-check-label" for="permissionEditProducts">
+                            Edit Products
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditCoreProducts">
+                        <label class="form-check-label" for="permissionEditCoreProducts">
+                            Edit Core Products
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditDiscounts">
+                        <label class="form-check-label" for="permissionEditDiscounts">
+                            Edit Discounts/Codes
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionWaiveProducts">
+                        <label class="form-check-label" for="permissionWaiveProducts">
+                            Waive Products
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditSystemSettings">
+                        <label class="form-check-label" for="permissionEditSystemSettings">
+                            Edit System Settings
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditRegisters">
+                        <label class="form-check-label" for="permissionEditRegisters">
+                            Edit Registers
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionImportMemberMode">
+                        <label class="form-check-label" for="permissionImportMemberMode">
+                            Import Membership Mode (bypass order screen to create member)
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditDNAAdd">
+                        <label class="form-check-label" for="permissionEditDNA">
+                            Add DNA (Add members to DNA)
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditDNARemove">
+                        <label class="form-check-label" for="permissionEditDNA">
+                            Remove DNA (Remove members from DNA)
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditTagAdd">
+                        <label class="form-check-label" for="permissionEditTag">
+                            Add Tag (Add members to Tag list)
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditTagRemove">
+                        <label class="form-check-label" for="permissionEditTag">
+                            Remove Tag (Remove members from Tag list)
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditMemberNotes">
+                        <label class="form-check-label" for="permissionEditMemberNotes">
+                            Remove Member Notes
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditMemberFiles">
+                        <label class="form-check-label" for="permissionEditMemberFiles">
+                            Manage Member Files
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditAnalytics">
+                        <label class="form-check-label" for="permissionEditAnalytics">
+                            Run Analytics
+                        </label>
+                    </div>
+                    <br>
+                    <button class="btn btn-success" type="button" id="editAccountSave">Save</button> <button class="btn btn-danger" type="button" id="editAccountCancel">Close</button>
+                    <br>
+                    <hr>
+                    <br>
+                </div>
+                <button class="btn btn-success" type="button" id="addAccountBtn">Add Account</button>
+                <br>
+                <br>
+                <table id="userAccounts" class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Rank</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <div id="newAccountDiv" class="container">
-      <br>
-      <h3>Create New Account</h3>
-      <form onsubmit="formWasSubmitted(); return false;" id="createAccountForm">
-        <div class="form-group">
-          <label for="emailInput">Email address</label>
-          <input required type="email" class="form-control" id="emailInput" aria-describedby="emailHelp">
-          <small id="emailHelp" class="form-text text-muted">Enter employees email.</small>
-        </div>
-        <div class="form-group">
-          <label for="displayNameInput">Display Name</label>
-          <input required type="text" class="form-control" id="displayNameInput">
-        </div>
-        <div class="form-group">
-          <label for="rankInput">Employee Rank</label>
-          <select required class="form-control" id="rankInput">
-            <option value="" selected>---</option>
-            <option value="0">Employee</option>
-            <option value="1">Manager</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <button type="submit" id="newAccountBtnSubmit" class="form-control btn btn-success">Create User</button>
-        </div>
-      </form>
-    </div>
-
-    <div id="editAccountDiv" class="container">
-      <br>
-      <h3>Edit Account</h3>
-      <form onsubmit="formWasSubmitted2(); return false;" id="editAccountForm">
-        <div class="form-group">
-          <label for="employeeInput">Select an employee</label>
-          <select required class="form-control" id="employeeInput">
-            <option value="" selected>---</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="changeDisplayNameInput">Change Display Name</label>
-          <input required type="text" class="form-control" id="changeDisplayNameInput">
-        </div>
-        <div class="form-group">
-          <label for="changeRankInput">Change Employee Rank</label>
-          <select required class="form-control" id="changeRankInput">
-            <option value="" selected>---</option>
-            <option value="0">Employee</option>
-            <option value="1">Manager</option>
-          </select>
-        </div>
-        Permissions
-        <br>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionViewProductsPage">
-          <label class="form-check-label" for="permissionViewProductsPage">
-            View Products Page
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditCategory">
-          <label class="form-check-label" for="permissionEditCategory">
-            Edit Categories
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditProducts">
-          <label class="form-check-label" for="permissionEditProducts">
-            Edit Products
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditCoreProducts">
-          <label class="form-check-label" for="permissionEditCoreProducts">
-            Edit Core Products
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditDiscounts">
-          <label class="form-check-label" for="permissionEditDiscounts">
-            Edit Discounts/Codes
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionWaiveProducts">
-          <label class="form-check-label" for="permissionWaiveProducts">
-            Waive Products
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditSystemSettings">
-          <label class="form-check-label" for="permissionEditSystemSettings">
-            Edit System Settings
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditRegisters">
-          <label class="form-check-label" for="permissionEditRegisters">
-            Edit Registers
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionImportMemberMode">
-          <label class="form-check-label" for="permissionImportMemberMode">
-            Import Membership Mode (bypass order screen to create member)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditDNAAdd">
-          <label class="form-check-label" for="permissionEditDNA">
-            Add DNA (Add members to DNA)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditDNARemove">
-          <label class="form-check-label" for="permissionEditDNA">
-            Remove DNA (Remove members from DNA)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditTagAdd">
-          <label class="form-check-label" for="permissionEditTag">
-            Add Tag (Add members to Tag list)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditTagRemove">
-          <label class="form-check-label" for="permissionEditTag">
-            Remove Tag (Remove members from Tag list)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditMemberNotes">
-          <label class="form-check-label" for="permissionEditMemberNotes">
-            Remove Member Notes
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditMemberFiles">
-          <label class="form-check-label" for="permissionEditMemberFiles">
-            Manage Member Files
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="permissionEditAnalytics">
-          <label class="form-check-label" for="permissionEditAnalytics">
-            Run Analytics
-          </label>
-        </div>
-        <br>
-        <div class="form-group">
-          <button type="submit" id="editAccountBtnSubmit" class="form-control btn btn-success">Edit User</button>
-          <br>
-          <br>
-          <button type="button" id="editAccountBtnSubmitPassReset" class="form-control btn btn-warning">Reset users password</button>
-          <br>
-          <br>
-          <button type="button" id="editAccountBtnDeleteUser" class="form-control btn btn-danger">Delete user</button>
-        </div>
-      </form>
-    </div>
 
     <!-- Bootstrap Bundle with Popper -->
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous"></script>
     <script src="./js/core.js"></script>
     <script src="./js/account.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-  </body>
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+</body>
+
 </html>
