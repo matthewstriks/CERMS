@@ -6,7 +6,7 @@ const fs = require('fs');
 const xl = require('excel4node');
 const { firebaseConfig, quickbooksConfig } = require('./assets/firebase-config.js');
 const { initializeApp } = require("firebase/app");
-const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword } = require("firebase/auth");
+const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, updateEmail, sendEmailVerification } = require("firebase/auth");
 const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment, arrayRemove } = require("firebase/firestore");
 const { getStorage, ref, getDownloadURL, deleteObject } = require("firebase/storage");
 const { log } = require('console');
@@ -167,7 +167,11 @@ function getUID(){
 }
 
 function notificationSystem(notificationType, notificationMsg){
-  theClient.send('notification-system', Array(notificationType, notificationMsg))
+  let theNotSecs = 5
+  if (userData && userData.notificationSecs) {
+    theNotSecs = userData.notificationSecs
+  }
+  theClient.send('notification-system', Array(notificationType, notificationMsg, theNotSecs))
 }
 
 async function getMemberInfo(memberID){
@@ -3187,6 +3191,13 @@ async function displayAllActivity(){
   })
 }
 
+function verifyUserEMail(){
+  if (!user.emailVerified) {
+    sendEmailVerification(auth.currentUser)
+    notificationSystem('primary', 'A verification EMail has been sent. Please check your inbox and spam folder to verify.')
+  }
+}
+
 async function attemptLogin(details){
   notificationSystem('warning', 'Logging in...')
   loginCreds = details;
@@ -3800,7 +3811,7 @@ ipcMain.on('request-account', (event, arg) => {
   let displayName = getDisplayName();
   let rank = getRank();
   theClient.send('recieve-account', Array(displayName, rank, systemData, oauthClient.isAccessTokenValid()))
-  theClient.send('recieve-account2', Array(userData, systemData, oauthClient.isAccessTokenValid()))
+  theClient.send('recieve-account2', Array(userData, systemData, oauthClient.isAccessTokenValid(), importMembershipsMode, user.emailVerified))
 })
 
 ipcMain.on('account-create', (event, arg) => {
@@ -3818,50 +3829,42 @@ ipcMain.on('account-edit', async (event, arg) => {
   theClient = event.sender;
   let theRank = await getRank()
   if (theRank != "1") {
+    notificationSystem('warning', 'You do not have permisison to do this.')
     return
   }
   const docRef = doc(db, "users", arg[0]);
   updateDoc(docRef, {
     displayName: arg[1],
     rank: arg[2],
-    permissionViewProductsPage: arg[3],
-    permissionEditCategory: arg[4],
-    permissionEditProducts: arg[5],
-    permissionEditDiscounts: arg[6],
-    permissionWaiveProducts: arg[7],
-    permissionEditCoreProducts: arg[8],
-    permissionEditSystemSettings: arg[9],
-    permissionEditRegisters: arg[10],
-    permissionImportMemberMode: arg[11],
-    permissionEditDNAAdd: arg[12],
-    permissionEditDNARemove: arg[13],
-    permissionEditTagAdd: arg[14],
-    permissionEditTagRemove: arg[15],
-    permissionEditMemberNotes: arg[16],
-    permissionEditMemberFiles: arg[17],
-    permissionEditAnalytics: arg[18]
+    access: arg[3],
+    permissionViewProductsPage: arg[4],
+    permissionEditCategory: arg[5],
+    permissionEditProducts: arg[6],
+    permissionEditDiscounts: arg[7],
+    permissionWaiveProducts: arg[8],
+    permissionEditCoreProducts: arg[9],
+    permissionEditSystemSettings: arg[10],
+    permissionEditRegisters: arg[11],
+    permissionImportMemberMode: arg[12],
+    permissionEditDNAAdd: arg[13],
+    permissionEditDNARemove: arg[14],
+    permissionEditTagAdd: arg[15],
+    permissionEditTagRemove: arg[16],
+    permissionEditMemberNotes: arg[17],
+    permissionEditMemberFiles: arg[18],
+    permissionEditAnalytics: arg[19]
   });
+
+  if (arg[0] == getUID()) {
+    getUserData()
+  }
+
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')
 })
 
 ipcMain.on('import-memberships-mode-status', (event, arg) => {
   theClient = event.sender;
-  theClient.send('import-memberships-mode-status-return', importMembershipsMode)
-})
-
-ipcMain.on('import-memberships-mode-change', async (event, arg) => {
-  theClient = event.sender;
-  let isAllowed = await canUser('permissionImportMemberMode')
-  if (!isAllowed) {
-    notificationSystem('danger', 'You do not have permission to do this.')
-    return
-  }
-  if (importMembershipsMode) {
-    importMembershipsMode = false
-  } else {
-    importMembershipsMode = true
-  }
   theClient.send('import-memberships-mode-status-return', importMembershipsMode)
 })
 
@@ -3881,9 +3884,10 @@ ipcMain.on('account-delete-user', async (event, arg) => {
   if (theRank == "1") {
     await deleteDoc(doc(db, "users", arg[0]));
   } else {
-    console.log('No permissions!');
+    notificationSystem('warning', 'You do not have permission to do this.')
+    return
   }
-  createMail("matthew@striks.com", "!!DELETE ACCOUNT!!", "You can delete the account with UID " + arg[0], "You can delete the account with UID " + arg[0] + " Click <a href='https://console.firebase.google.com/u/0/project/club-pittsburgh-entry-6be3b/authentication/users'>here</a>!")
+  createMail("matthew@striks.com", "!!DELETE ACCOUNT!!", "You can delete the account with UID " + arg[0], "You can delete the account with UID " + arg[0] + " Click <a href='https://console.firebase.google.com/u/0/project/cerms-7af24/authentication/users'>here</a>!")
   notificationSystem('warning', 'Account deleted!')
   theClient.send('account-edit-success')
 })
@@ -4202,47 +4206,6 @@ ipcMain.on('edit-save-dir', (event, arg) => {
   let userAllowed = canUser("permissionEditSystemSettings");
   if (userAllowed) {
     updateFileDir()    
-  }
-})
-
-ipcMain.on('edit-invWarn', async (event, arg) => {
-  theClient = event.sender;
-  let userAllowed = canUser("permissionEditSystemSettings");
-  if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
-      invWarnEMail: arg
-    });
-    await getSystemData()
-    goHome()      
-  }
-})
-
-ipcMain.on('edit-checkoutmsg', async (event, arg) => {
-  theClient = event.sender;
-  let userAllowed = canUser("permissionEditSystemSettings");
-  if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
-      checkoutMsg: arg
-    });
-    await getSystemData()
-    goHome()      
-  }
-})
-
-ipcMain.on('edit-shifttimes', async (event, arg) => {
-  theClient = event.sender;
-  let userAllowed = canUser("permissionEditSystemSettings");
-  if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
-      shiftTimeA: arg[0],
-      shiftTimeB: arg[1],
-      shiftTimeC: arg[2]
-    });
-    await getSystemData()
-    goHome()      
   }
 })
 
@@ -4646,4 +4609,145 @@ ipcMain.on('trash-member-file', async (event, arg) => {
     console.log(error);
     notificationSystem('danger', 'Something went wrong.')
   });
+})
+
+ipcMain.on('settings-update-Account', async (event, arg) => {
+  theClient = event.sender
+
+  let currName = await getDisplayName()
+  if (currName != arg[0]) {
+    const docRef = doc(db, "users", getUID());
+    updateDoc(docRef, {
+      displayName: arg[0]
+    })    
+    notificationSystem('success', 'Display Name has been updated!')
+  }
+
+  let currEMail = await getEMail()
+  if (currEMail != arg[1]) {
+    updateEmail(auth.currentUser, arg[1]).then(() => {
+      const docRef = doc(db, "users", getUID());
+      updateDoc(docRef, {
+        email: arg[1]
+      })    
+      notificationSystem('success', 'EMail has been updated!')
+    }).catch((error) => {
+      console.log(error);
+      notificationSystem('danger', error.message)
+    });    
+  }
+
+  if ((arg[2] && arg[3]) && (arg[2] == arg[3])){
+    updatePassword(user, arg[3]).then(() => {
+      notificationSystem('success', 'Password has been updated!')
+    }).catch((error) => {
+      console.log(error)
+      notificationSystem('danger', error.message)
+    });
+  } else if (arg[2] && arg[3]) {
+    notificationSystem('warning', 'Passwords did not match.')
+  }
+  getUserData()
+})
+
+ipcMain.on('settings-verify-email', (event, arg) => {
+  theClient = event.sender
+  verifyUserEMail()
+})
+
+ipcMain.on('settings-update-business-info', async (event, arg) => {
+  theClient = event.sender
+  const docRef = doc(db, "system", getSystemAccess());
+  updateDoc(docRef, {
+    businessName: arg[0],
+    businessAddress: arg[1],
+    businessAddress2: arg[2],
+    businessPNum: arg[3],
+    businessEMail: arg[4]
+  })
+  getSystemData()
+  notificationSystem('success', 'Business Info has been updated!')
+})
+
+ipcMain.on('settings-quickbooks-disconnect', async (event, arg) => {
+  theClient = event.sender
+
+  const docRef = doc(db, "system", getSystemAccess());
+  await updateDoc(docRef, {
+    quickBooksToken: ""
+  })
+  notificationSystem('success', "Quickbooks has been disconnected. Close the application and re-open to fully disconnect.")
+  getSystemData()
+})
+
+ipcMain.on('settings-import-membership-mode-toggle', async (event, arg) => {
+  theClient = event.sender;
+  let isAllowed = await canUser('permissionImportMemberMode')
+  if (!isAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+  if (importMembershipsMode) {
+    importMembershipsMode = false
+  } else {
+    importMembershipsMode = true
+  }
+  theClient.send('import-memberships-mode-status-return', importMembershipsMode)
+  getSystemData()
+})
+
+ipcMain.on('settings-update-notification-seconds', async (event, arg) => {
+  theClient = event.sender;
+  const docRef = doc(db, "users", getUID());
+  updateDoc(docRef, {
+    notificationSecs: Number(arg)
+  })    
+  getUserData()
+})
+
+ipcMain.on('settings-update-invwarnemail', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+
+  const docRef = doc(db, "system", userData.access);
+  await updateDoc(docRef, {
+    invWarnEMail: arg
+  });
+  await getSystemData()
+})
+
+ipcMain.on('settings-update-checkoutmsg', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+
+  const docRef = doc(db, "system", userData.access);
+  await updateDoc(docRef, {
+    checkoutMsg: arg
+  });
+  await getSystemData()
+})
+
+ipcMain.on('settings-update-shifttimes', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+
+  const docRef = doc(db, "system", userData.access);
+  await updateDoc(docRef, {
+    shiftTimeA: arg[0],
+    shiftTimeB: arg[1],
+    shiftTimeC: arg[2]
+  });
+  await getSystemData()
 })

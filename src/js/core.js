@@ -43,6 +43,10 @@ ipcRenderer.on('recieve-dark-mode', (event, arg) => {
 })
 
 ipcRenderer.on('notification-system', (event, arg) => {
+  let timeToDelay = 5
+  if (arg[2]) {
+    timeToDelay = arg[2] * 1000
+  }
   if (document.getElementById('cermsLogo')) {
     document.getElementById('cermsLogo').style.display = 'none'
   }
@@ -56,5 +60,5 @@ ipcRenderer.on('notification-system', (event, arg) => {
     if (!errorMsg.innerHTML.includes('div') && document.getElementById('cermsLogo')) {
       document.getElementById('cermsLogo').style.display = ''      
     }
-  }, 5000);
+  }, timeToDelay);
 }) 
