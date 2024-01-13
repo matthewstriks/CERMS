@@ -4006,6 +4006,11 @@ ipcMain.on('rank-request', async (event, arg) => {
   theClient.send('rank-request-return', theRank)
 })
 
+ipcMain.on('mandDNANotes-request', async (event, arg) => {
+  theClient = event.sender;
+  theClient.send('mandDNANotes-return', systemData.mandatoryDNANotes)
+})
+
 ipcMain.on('activity-edit', (event, arg) => {
   theClient = event.sender;
   editActivity(arg)
@@ -4747,6 +4752,21 @@ ipcMain.on('settings-include-expire-time-renew-toggle', async (event, arg) => {
   const docRef = doc(db, "system", userData.access);
   await updateDoc(docRef, {
     includeExpireTimeRenew: arg
+  });
+  await getSystemData()
+})
+
+ipcMain.on('settings-mandatory-DNANotes-toggle', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+
+  const docRef = doc(db, "system", userData.access);
+  await updateDoc(docRef, {
+    mandatoryDNANotes: arg
   });
   await getSystemData()
 })

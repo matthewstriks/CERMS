@@ -55,6 +55,7 @@ let ashiftTime = document.getElementById('ashiftTime')
 let shiftTimeDiv = document.getElementById('shiftTimeDiv')
 let shiftTimeBtn = document.getElementById('shiftTimeBtn')
 let includeExpireTimeRenewSwitch = document.getElementById('includeExpireTimeRenewSwitch')
+let mandatoryDNANotesSwitch = document.getElementById('mandatoryDNANotesSwitch')
 
 // Accounts
 let editingID;
@@ -176,6 +177,10 @@ importMembershipModeSwitch.addEventListener('change', function(){
 
 includeExpireTimeRenewSwitch.addEventListener('change', function(){
     ipcRenderer.send('settings-include-expire-time-renew-toggle', includeExpireTimeRenewSwitch.checked)
+})
+
+mandatoryDNANotesSwitch.addEventListener('change', function(){
+    ipcRenderer.send('settings-mandatory-DNANotes-toggle', mandatoryDNANotesSwitch.checked)
 })
 
 editSaveDir.addEventListener('click', function () {
@@ -338,6 +343,7 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
     bshiftTime.value = arg[1].shiftTimeB || ""
     cshiftTime.value = arg[1].shiftTimeC || ""
     includeExpireTimeRenewSwitch.checked = arg[1].includeExpireTimeRenew || false
+    mandatoryDNANotesSwitch.checked = arg[1].mandatoryDNANotes || false
     if (shiftTimeDiv) {
         shiftTimeDiv.style.display = 'none'
     }

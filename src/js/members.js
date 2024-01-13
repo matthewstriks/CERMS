@@ -1,5 +1,6 @@
 var Tablesort = require('tablesort');
 let productsData = Array()
+let mandDNANotes = false
 let viewDNABtn = document.getElementById('viewDNABtn');
 let unViewDNABtn = document.getElementById('unViewDNABtn');
 let membershipSearch = document.getElementById('membershipSearch');
@@ -35,6 +36,7 @@ let memberCreateOrder = document.getElementById('memberCreateOrder');
 let scanIDBtn = document.getElementById('scanIDBtn');
 let scanIDTxt = document.getElementById('scanIDTxt');
 let uploadFileBtn = document.getElementById('uploadFileBtn');
+let DNANeedNote = document.getElementById('DNANeedNote');
 let scannerOn = false
 
 // History
@@ -153,6 +155,7 @@ if (membershipTable) {
   ipcRenderer.send('rank-request')
   ipcRenderer.send('rentals-request')
   ipcRenderer.send('product-membership-request')
+  ipcRenderer.send('mandDNANotes-request')
   new Tablesort(membershipTable);
 }
 
@@ -306,16 +309,29 @@ if(completeCheckIn){
 }
 
 if(editmemberInfoDNABtn){
+  DNANeedNote.style.display = 'none'
   editmemberInfoDNABtn.addEventListener('click', function(){
+    if (mandDNANotes && editnotesInputNew.value == '') {
+      DNANeedNote.style.display = ''
+      return
+    }
     ipcRenderer.send('member-dna', Array(memberEditing, editnotesInputNew.value))
+    DNANeedNote.style.display = 'none'
     editnotesInputNew.value = ""
+    document.getElementById("editmemberInfoClose").click()
   })
 }
 
 if(editmemberInfoDNABtn2){
   editmemberInfoDNABtn2.addEventListener('click', function(){
+    if (mandDNANotes && editnotesInputNew.value == '') {
+      DNANeedNote.style.display = ''
+      return
+    }
     ipcRenderer.send('member-undna', Array(memberEditing, editnotesInputNew.value))
+    DNANeedNote.style.display = 'none'
     editnotesInputNew.value = ""
+    document.getElementById("editmemberInfoClose").click()
   })
 }
 
@@ -491,6 +507,10 @@ function topFunction() {
   document.body.scrollTop = 0; // For Safari
   document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
 }
+
+ipcRenderer.on('mandDNANotes-return', (event, arg) => {
+  mandDNANotes = arg
+})
 
 ipcRenderer.on('rentals-request-return', (event, arg) => {
   var opt = document.createElement('option');
