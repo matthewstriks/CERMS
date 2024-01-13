@@ -593,9 +593,13 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
 //    return
   }
 
-  pendingOrderType = orderType
-  pendingOrderInfo = thePendingOrder
-  pendingOrders.unshift(Array(memberInfo, orderType, thePendingOrder))
+  if (!orderSuspended) {
+    pendingOrders = Array()
+  }
+
+  let pendingOrderType = orderType
+  let pendingOrderInfo = thePendingOrder
+  pendingOrders.unshift(Array(memberInfo, pendingOrderType, pendingOrderInfo))
 
   let theMembersData
   if (memberInfo[0]) {
