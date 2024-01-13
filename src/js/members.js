@@ -757,6 +757,7 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     editmembershipInput.value = arg[1].membership_type;
     editidnumInput.value = arg[1].idnum;
     editidnumStateInput.value = arg[1].idstate;
+    editnotesInput.innerHTML = ""
     if (Array.isArray(arg[1].notes)) {
       for (let index = 0; index < arg[1].notes.length; index++) {
         const note = arg[1].notes[index];
@@ -779,6 +780,7 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       editwaiverInput.checked = false;
     }
 
+    editFileList.innerHTML = ""
     if (arg[1].files) {
       for (let index = 0; index < arg[1].files.length; index++) {
         let fileURL = arg[1].files[index];
@@ -999,6 +1001,7 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
     editmembershipInput.value = arg[1].membership_type;
     editidnumInput.value = arg[1].idnum;
     editidnumStateInput.value = arg[1].idstate;
+    editnotesInput.innerHTML = ""
     if (Array.isArray(arg[1].notes)) {
       let theNotesString = ""
       arg[1].notes.forEach(note => {
