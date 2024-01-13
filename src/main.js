@@ -16,6 +16,8 @@ const os = require('os');
 const { getSystemMemoryInfo } = require('process');
 const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
+//const QuickBooks = require('node-quickbooks')
+
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
   .then((url) => {
@@ -394,6 +396,7 @@ async function renewActivity(memberInfo){
   let theUserID = getUID();
   let theCurrentTime = memberInfo[1][4];
   let theCurrentTimeExp = memberInfo[1][5];
+  console.log('Here: ' + theCurrentTime);
   let theTimeToAdd = 6 * 3600
 
   productsData.forEach(product => {
@@ -417,7 +420,14 @@ async function renewActivity(memberInfo){
   theMembershipLength = proMembershipLength * theMultiple
   */
 
-  let theTimeExpire = theCurrentTimeExp + theTimeToAdd;
+  if (systemData.includeExpireTimeRenew) {
+    theTimeExpire = theCurrentTimeExp + theTimeToAdd;    
+  } else {
+    let timestamp = Date.now();
+    timestampInSeconds = timestamp / 1000;
+    theTimeExpire = timestampInSeconds + theTimeToAdd;    
+  }
+
   const docRef = doc(db, "activity", memberInfo[0]);
   await updateDoc(docRef, {
     lockerRoomStatus: Array(
@@ -3485,9 +3495,8 @@ async function updateOrderCustomerID(orderID, theCustomerID){
 }
 
 function userLogout(){
-  user = null;
-  userData = null;
-  loadAuth();
+  app.relaunch({ args: process.argv.slice(1).concat(['--relaunch']) })
+  app.exit(0)
 }
 
 async function getUserData(){
@@ -4398,13 +4407,35 @@ async function quickBooksLogin(parseRedirect) {
           });
         }
       });
+      /*
+      console.log('running');
+      let theAuthToken = oauthClient.token.getToken();
+      var qbo = new QuickBooks(quickbooksConfig.clientId,
+        quickbooksConfig.clientSecret,
+        theAuthToken,
+        theAuthToken,
+        false,
+        true, // don't use the sandbox (i.e. for testing)
+        true); // turn debugging on
+
+
+      qbo.updateCustomer({
+        Id: '42',
+        SyncToken: '1',
+        sparse: true,
+        PrimaryEmailAddr: { Address: 'customer@example.com' }
+      }, function (err, customer) {
+        if (err) console.log(err)
+        else console.log(customer)
+      })
+      */
       return true
     } else {
       quickbooksIsConnected = false
       console.log('Quickbooks is not connected.');
       return false
     }    
-  }, 1000);
+  }, 1000);  
 }
 
 function quickbooksGetAllProducts(){
@@ -4694,6 +4725,21 @@ ipcMain.on('settings-import-membership-mode-toggle', async (event, arg) => {
   }
   theClient.send('import-memberships-mode-status-return', importMembershipsMode)
   getSystemData()
+})
+
+ipcMain.on('settings-include-expire-time-renew-toggle', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+
+  const docRef = doc(db, "system", userData.access);
+  await updateDoc(docRef, {
+    includeExpireTimeRenew: arg
+  });
+  await getSystemData()
 })
 
 ipcMain.on('settings-update-notification-seconds', async (event, arg) => {

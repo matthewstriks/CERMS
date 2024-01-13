@@ -88,20 +88,20 @@
     <div class="container">
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane" type="button"
-                    role="tab" aria-controls="home-tab-pane" aria-selected="true">User Settings</button>
+                <button class="nav-link active" id="user-tab" data-bs-toggle="tab" data-bs-target="#user-tab-pane" type="button"
+                    role="tab" aria-controls="user-tab-pane" aria-selected="true">User Settings</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane" type="button"
-                    role="tab" aria-controls="profile-tab-pane" aria-selected="false">System Settings</button>
+                <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system-tab-pane" type="button"
+                    role="tab" aria-controls="system-tab-pane" aria-selected="false">System Settings</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact-tab-pane" type="button"
-                    role="tab" aria-controls="contact-tab-pane" aria-selected="false">Accounts</button>
+                <button class="nav-link" id="accounts-tab" data-bs-toggle="tab" data-bs-target="#accounts-tab-pane" type="button"
+                    role="tab" aria-controls="accounts-tab-pane" aria-selected="false">Accounts</button>
             </li>
         </ul>
         <div class="tab-content" id="myTabContent">
-            <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab" tabindex="0">
+            <div class="tab-pane fade show active" id="user-tab-pane" role="tabpanel" aria-labelledby="user-tab" tabindex="0">
                 <br>
                 <div id="displayDiv">
                     <h3 id="displayName">Display Name</h3>
@@ -161,7 +161,7 @@
                 <br>
                 <br>
             </div>
-            <div class="tab-pane fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+            <div class="tab-pane fade" id="system-tab-pane" role="tabpanel" aria-labelledby="system-tab" tabindex="0">
                 <br>
                 <button type="button" id="updateBtn" class="btn btn-primary"><i class="fa-solid fa-arrow-up"></i> Check for update</button>
                 <button type="button" id="changelogBtn" class="btn btn-warning"><i class="fa-solid fa-list"></i> Changelog</button>
@@ -307,10 +307,28 @@
                     </div>
                 </div>
                 <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <label class="form-check-label" for="includeExpireTimeRenewSwitch">Include expired time in renew</label>
+                            </div>
+                            <div class="col-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="includeExpireTimeRenewSwitch">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        If enabled, when a members rental expires and they renew, it will <i>ADD</i> the rental time to however much time is has been expired. For example, if a rental is one hour and someone's rental is expired by 30 minutes, when they renew it will be 30 minutes left. If this is <i>NOT</i> selected, it will add the one hour no matter what.
+                    </div>
+                </div>
+                <br>
                 <br>
                 <br>
             </div>
-            <div class="tab-pane fade" id="contact-tab-pane" role="tabpanel" aria-labelledby="contact-tab" tabindex="0">
+            <div class="tab-pane fade" id="accounts-tab-pane" role="tabpanel" aria-labelledby="accounts-tab" tabindex="0">
                 <br>
                 <div id="editAccountDiv">
                     <h3>Edit Account</h3>
