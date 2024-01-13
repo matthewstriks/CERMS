@@ -182,19 +182,13 @@ async function getMemberInfo(memberID){
   }
 
   const docRef = doc(db, "members", memberID);
-  await getDoc(docRef).then(docSnap => {
-    if (docSnap.exists()) {
-      return docSnap.data()
-    } else {
-      return false
-    }
-  }).catch((error) => {
-    console.log(error);
-    const errorCode = error.code;
-    const errorMessage = error.message;
-    console.log(errorMessage + "(" + errorCode + ")");
-    return false
-  });
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    return docSnap.data();
+  } else {
+    return false;
+  }
 }
 
 async function getMemberEMail(memberID){
