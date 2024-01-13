@@ -321,13 +321,13 @@ if(editmemberInfoDNABtn2){
 
 if(editmemberInfoTagBtn){
   editmemberInfoTagBtn.addEventListener('click', function(){
-    ipcRenderer.send('member-tag', memberEditing)
+    ipcRenderer.send('member-tag', Array(memberEditing, editnotesInputNew.value))
   })
 }
 
 if(editmemberInfoTagBtn2){
   editmemberInfoTagBtn2.addEventListener('click', function(){
-    ipcRenderer.send('member-untag', memberEditing)
+    ipcRenderer.send('member-untag', Array(memberEditing, editnotesInputNew.value))
   })
 }
 
@@ -1003,13 +1003,20 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
     editidnumStateInput.value = arg[1].idstate;
     editnotesInput.innerHTML = ""
     if (Array.isArray(arg[1].notes)) {
-      let theNotesString = ""
-      arg[1].notes.forEach(note => {
-        theNotesString = theNotesString + note + '\n'
-      });
-      editnotesInput.value = theNotesString
+      for (let index = 0; index < arg[1].notes.length; index++) {
+        const note = arg[1].notes[index];
+        let newNote = document.createElement('p')
+        newNote.innerHTML = note + ' <button type="button" id="note' + index + '" class="btn btn-danger"><i class="fa-solid fa-trash"></i></button>'
+        editnotesInput.appendChild(newNote)
+        document.getElementById('note' + index).addEventListener('click', function () {
+          ipcRenderer.send('trash-note', Array(memberEditing, index))
+          newNote.remove()
+        })
+      }
     } else {
-      editnotesInput.value = arg[1].notes
+      let newNote = document.createElement('p')
+      newNote.innerHTML = arg[1].notes
+      editnotesInput.appendChild(newNote)
     }
     if (arg[1].waiver_status) {
       editwaiverInput.checked = true;
@@ -1017,6 +1024,7 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
       editwaiverInput.checked = false;
     }
 
+    editFileList.innerHTML = ""
     if (arg[1].files) {
       for (let index = 0; index < arg[1].files.length; index++) {
         let fileURL = arg[1].files[index];

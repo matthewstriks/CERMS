@@ -180,14 +180,21 @@ async function getMemberInfo(memberID){
   if ((memberID == -1) || (Array.isArray(memberID))) {
     return false
   }
-  const docRef = doc(db, "members", memberID);
-  const docSnap = await getDoc(docRef);
 
-  if (docSnap.exists()) {
-    return docSnap.data();
-  } else {
-    return false;
-  }
+  const docRef = doc(db, "members", memberID);
+  await getDoc(docRef).then(docSnap => {
+    if (docSnap.exists()) {
+      return docSnap.data()
+    } else {
+      return false
+    }
+  }).catch((error) => {
+    console.log(error);
+    const errorCode = error.code;
+    const errorMessage = error.message;
+    console.log(errorMessage + "(" + errorCode + ")");
+    return false
+  });
 }
 
 async function getMemberEMail(memberID){
@@ -354,7 +361,7 @@ async function memberTag(memberInfo){
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo);
+  const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     tag: true,
     notes: arrayUnion(stringStarter + stringEnd),
@@ -382,8 +389,7 @@ async function memberUNTag(memberInfo){
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-
-  const docRef = doc(db, "members", memberInfo);
+  const docRef = doc(db, "members", memberInfo[0]);
   await updateDoc(docRef, {
     tag: false,
     notes: arrayUnion(stringStarter + stringEnd),
@@ -396,7 +402,6 @@ async function renewActivity(memberInfo){
   let theUserID = getUID();
   let theCurrentTime = memberInfo[1][4];
   let theCurrentTimeExp = memberInfo[1][5];
-  console.log('Here: ' + theCurrentTime);
   let theTimeToAdd = 6 * 3600
 
   productsData.forEach(product => {
@@ -2411,7 +2416,13 @@ async function updateMemberNotes(memberID){
   if (!Array.isArray(currNotes)) {
     await updateDoc(docRef, {
       notes: Array('(old system): ' + currNotes),
-    })
+    }).catch((error) => {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      console.log(error);
+      notificationSystem('danger', errorMessage + ' (' + errorCode + ') [updateMemberNotes]')
+    });
+
     return true
   }else{
     return true
