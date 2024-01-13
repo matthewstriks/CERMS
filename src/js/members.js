@@ -558,6 +558,10 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   var cell5 = row.insertCell(4);
   cell5.id = 'buttoncell'+arg[0];
 
+  let expireDateUnknown = false
+  if (!arg[1].id_expiration) {
+    expireDateUnknown = true
+  }
   var a2 = new Date(arg[1].id_expiration * 1000);
   var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var year2 = a2.getFullYear();
@@ -572,6 +576,9 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   var min2 = a2.getMinutes();
   var sec2 = a2.getSeconds();
   var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2 + ' ' + hour2 + ':' + min2 + ':' + sec2 + ' ' + ampm;
+  if (expireDateUnknown) {
+    time2 = 'Unknown'    
+  }
 
   row.setAttribute('memberid', arg[0]);
   cell1.innerHTML = arg[1].name;
@@ -803,6 +810,10 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
 })
 
 ipcRenderer.on('membership-request-return-update', (event, arg) => {
+  let expireDateUnknown = false
+  if (!arg[1].id_expiration) {
+    expireDateUnknown = true
+  }
   var a2 = new Date(arg[1].id_expiration * 1000);
   var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var year2 = a2.getFullYear();
@@ -817,6 +828,9 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
   var min2 = a2.getMinutes();
   var sec2 = a2.getSeconds();
   var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2 + ' ' + hour2 + ':' + min2 + ':' + sec2 + ' ' + ampm2;
+  if (expireDateUnknown) {
+    time2 = 'Unknown'
+  }
   document.getElementById('namecell' + arg[0]).innerHTML = arg[1].name;
   document.getElementById('dobcell' + arg[0]).innerHTML = arg[1].dob;
   document.getElementById('typecell' + arg[0]).innerHTML = arg[1].membership_type;
