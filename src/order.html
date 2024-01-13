@@ -175,17 +175,16 @@
         <div class="accordion" id="accordionExample">
           <div class="accordion-item">
             <h2 class="accordion-header" id="headingZero">
-              <button id="searchProducts" class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseZero"
-                aria-expanded="false" aria-controls="collapseZero">
-                Search
-              </button>
+              <br>
+              <div class="container">
+                  <input type="search" class="form-control" id="myInput" onkeyup="filterFunction()" placeholder="Search..."
+                    aria-label="Search">
+              </div>
             </h2>
-            <div id="collapseZero" class="accordion-collapse collapse" aria-labelledby="headingZero"
+            <div id="collapseZero" class="accordion-collapse" aria-labelledby="headingZero"
               data-bs-parent="#accordionExample">
               <div class="accordion-body">
                 <div id="myDropdown" class="dropdown-content">
-                  <input type="search" class="form-control" id="myInput" onkeyup="filterFunction()" placeholder="Search..."
-                    aria-label="Search">
                   <div class="container">
                     <ul class="list-group" id="productListSearch">
                     </ul>                
