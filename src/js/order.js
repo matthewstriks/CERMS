@@ -374,6 +374,7 @@ const formatter = new Intl.NumberFormat('en-US', {
 });
 
 function addProductCard(theProduct){  
+  checkoutBtn.disabled = false
   let currentProductCard = document.getElementById(theProduct[0] + 'newCard')
   let currentProductCardInfo = document.getElementById(theProduct[0] + 'cardHeader')
   if (currentProductCard) {
