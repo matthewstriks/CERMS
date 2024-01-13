@@ -567,15 +567,7 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   var year2 = a2.getFullYear();
   var month2 = months[a2.getMonth()];
   var date2 = a2.getDate();
-  let hour2 = a2.getHours();
-  let ampm = "AM"
-  if (hour2 > 12) {
-    ampm = "PM"
-    hour2 = hour2 - 12
-  }
-  var min2 = a2.getMinutes();
-  var sec2 = a2.getSeconds();
-  var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2 + ' ' + hour2 + ':' + min2 + ':' + sec2 + ' ' + ampm;
+  var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2;
   if (expireDateUnknown) {
     time2 = 'Unknown'    
   }
@@ -819,15 +811,7 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
   var year2 = a2.getFullYear();
   var month2 = months[a2.getMonth()];
   var date2 = a2.getDate();
-  let hour2 = a2.getHours();
-  let ampm2 = "AM"
-  if (hour2 > 12) {
-    ampm2 = "PM"
-    hour2 = hour2 - 12
-  }
-  var min2 = a2.getMinutes();
-  var sec2 = a2.getSeconds();
-  var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2 + ' ' + hour2 + ':' + min2 + ':' + sec2 + ' ' + ampm2;
+  var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2;
   if (expireDateUnknown) {
     time2 = 'Unknown'
   }
