@@ -71,6 +71,7 @@ let editFileList = document.getElementById('editFileList');
 let editFileList2 = document.getElementById('editFileList2');
 let editmemberInfoDeleteBtn = document.getElementById('editmemberInfoDeleteBtn');
 let editmemberInfoDeleteBtnCloseConfirm = document.getElementById('editmemberInfoDeleteBtnCloseConfirm');
+let editmemberInfoDeleteFileBtnCloseConfirm = document.getElementById('editmemberInfoDeleteFileBtnCloseConfirm');
 
 let myModal2 = document.getElementById('myModal2');
 
@@ -88,6 +89,9 @@ let inputStatus = false;
 let viwingMore = false;
 let rank;
 let isTagged = false
+let fileTrashing
+let fileTrashingList
+
 
 if (scanIDBtn) {
   scanIDTxt.style.display = 'none'
@@ -217,6 +221,13 @@ if(document.getElementById('myModal4')){
 if(document.getElementById('myModal5')){
   document.getElementById('myModal5').addEventListener('hidden.bs.modal', function () {
     viwingMore = false;
+  })
+}
+
+if (editmemberInfoDeleteFileBtnCloseConfirm) {
+  editmemberInfoDeleteFileBtnCloseConfirm.addEventListener('click', function(){
+    ipcRenderer.send('trash-member-file', fileTrashing)
+    fileTrashingList.remove()
   })
 }
 
@@ -828,14 +839,14 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
         let fileNameRaw = arg[1].filesNamesRaw[index] 
         let newLi = document.createElement('li')
         newLi.className = 'list-group-item'
-        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button> <button type='button' class='btn btn-danger' id='" + arg[0] + "fileTrash" + index + "'><i class='fa-solid fa-trash'></i></button>"
+        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button> <button data-bs-toggle='modal' data-bs-target='#myModal8' type='button' class='btn btn-danger' id='" + arg[0] + "fileTrash" + index + "'><i class='fa-solid fa-trash'></i></button>"
         editFileList.appendChild(newLi)
         document.getElementById(arg[0] + 'fileView' + index).addEventListener('click', function(){
           ipcRenderer.send('open-link', fileURL)
         })
         document.getElementById(arg[0] + 'fileTrash' + index).addEventListener('click', function(){
-          ipcRenderer.send('trash-member-file', Array(arg[0], fileURL, fileName, fileNameRaw))
-          newLi.remove()
+          fileTrashing = Array(arg[0], fileURL, fileName, fileNameRaw)
+          fileTrashingList = newLi
         })
       }
     }
@@ -1089,14 +1100,14 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
         let fileNameRaw = arg[1].filesNamesRaw[index]
         let newLi = document.createElement('li')
         newLi.className = 'list-group-item'
-        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button> <button type='button' class='btn btn-danger' id='" + arg[0] + "fileTrash" + index + "'><i class='fa-solid fa-trash'></i></button>"
+        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button> <button data-bs-toggle='modal' data-bs-target='#myModal8' type='button' class='btn btn-danger' id='" + arg[0] + "fileTrash" + index + "'><i class='fa-solid fa-trash'></i></button>"
         editFileList.appendChild(newLi)
         document.getElementById(arg[0] + 'fileView' + index).addEventListener('click', function () {
           ipcRenderer.send('open-link', fileURL)
         })
         document.getElementById(arg[0] + 'fileTrash' + index).addEventListener('click', function () {
-          ipcRenderer.send('trash-member-file', Array(arg[0], fileURL, fileName, fileNameRaw))
-          newLi.remove()
+          fileTrashing = Array(arg[0], fileURL, fileName, fileNameRaw)
+          fileTrashingList = newLi
         })
       }
     }
@@ -1218,18 +1229,12 @@ ipcRenderer.on('member-history-request-return', (event, arg) => {
 })
 
 ipcRenderer.on('rank-request-return', (event, arg) => {
-  rank = arg
-  if (rank == '1') {
-    editmemberInfoDeleteBtn.disabled = false
-    editmemberInfoDeleteBtn.style.display = ''
-    editmemberInfoDeleteBtn.addEventListener('click', function(){
-      editmemberInfoName.innerHTML = memberEditingName;
-    })
-    editmemberInfoDeleteBtnCloseConfirm.addEventListener('click', function(){
-      ipcRenderer.send('membership-delete', memberEditing)
-    })
-  }else {
-    editmemberInfoDeleteBtn.disabled = true
-    editmemberInfoDeleteBtn.style.display = 'none'
-  }
+  editmemberInfoDeleteBtn.disabled = false
+  editmemberInfoDeleteBtn.style.display = ''
+  editmemberInfoDeleteBtn.addEventListener('click', function () {
+    editmemberInfoName.innerHTML = memberEditingName;
+  })
+  editmemberInfoDeleteBtnCloseConfirm.addEventListener('click', function () {
+    ipcRenderer.send('membership-delete', memberEditing)
+  })
 })

@@ -437,6 +437,29 @@
       </div>
     </div>
 
+    <!-- Modal -->
+    <div class="modal fade" id="myModal8" tabindex="-1" aria-labelledby="memberInfoName" aria-hidden="true"
+      data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editmemberInfoName">Delete Member File</h5>
+            <button type="button" id="editmemberInfoDeleteBtnClose" class="btn-close" data-bs-toggle='modal'
+              data-bs-target='#myModal8' aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Are you sure you want to delete this member file? This can not be undone.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="editmemberInfoDeleteFileBtnCloseConfirm" class="btn btn-danger" data-bs-toggle='modal'
+              data-bs-target='#myModal8'>Confirm</button>
+            <button type="button" id="editmemberInfoDeleteBtnClose" class="btn btn-secondary" data-bs-toggle='modal'
+              data-bs-target='#myModal8'>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="container">
       <a class="btn btn-success" href="createmembership.html" role="button">Create Membership</a>
       <button id='viewDNABtn' class="btn btn-warning">View all DNA</button>

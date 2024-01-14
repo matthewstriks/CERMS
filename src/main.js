@@ -4653,6 +4653,9 @@ ipcMain.on('quickbooks-status', (event, arg) => {
 
 ipcMain.on('trash-member-file', async (event, arg) => {
   theClient = event.sender;  
+  console.log("Hey");
+  console.log(arg);
+  console.log('done');
   if (!canUser('permissionEditMemberFiles')) {
     notificationSystem('warning', 'You do not have permisison to remove member files.')
     return
