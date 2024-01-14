@@ -470,7 +470,7 @@ async function createCategory(catName, catDesc, catColor){
   goProducts()
 }
 
-async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proFavorite, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode, proRentalLength, proRentalLengthType){
+async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proFavorite, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode, proRentalLength, proRentalLengthType, proRestricted, proRestrictedUsers){
   notificationSystem('warning', 'Creating Product...')
   let userAllowed = canUser('permissionEditProducts')
   let userAllowedCore = canUser('permissionEditCoreProducts')
@@ -540,7 +540,9 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     rentalLengthRaw: proRentalLength,
     rentalLengthType: proRentalLengthType,
     barcode: proBarcode,
-    image: false
+    image: false,
+    restricted: proRestricted,
+    restrictedUsers: proRestrictedUsers
   });
   notificationSystem('success', 'Product Added!')
   goProducts()
@@ -1079,7 +1081,6 @@ async function deleteMember(memberInfo){
     docRef = query(collection(db, "activity"), where("memberID", "==", memberInfo), where('access', '==', getSystemAccess()));
     const docSnap = await getDocs(docRef);
     docSnap.forEach(async activity => {
-      console.log('Here: ' + activity.id);
       const activityRef = doc(db, 'activity', activity.id)
       await updateDoc(activityRef, {
         removed: true
@@ -2614,7 +2615,9 @@ async function editProduct(productInfo){
     rentalLengthRaw: productInfo[17],
     rentalLengthType: productInfo[18],
     inventoryPar: productInfo[15],
-    barcode: productInfo[16]
+    barcode: productInfo[16],
+    restricted: productInfo[19],
+    restrictedUsers: productInfo[20]
   });
   notificationSystem('success', 'Product Edited!')
 //  goProducts()
@@ -2898,9 +2901,27 @@ async function displayAllCategories(){
 async function displayAllProductsOrder(){
   theClient.send('return-category-order-all', Array(categoriesData))
   productsData.forEach((products) => {
-    theClient.send('return-products-order', Array(products[0], products[1]))
-    if (products[1].favorite) {
-      theClient.send('return-products-order', Array(products[0], products[1]))      
+    if (products[1].restricted) {
+      console.log(products[1]);
+      console.log('true');
+      let isAllowed = false
+      products[1].restrictedUsers.forEach(usersAllowed => {
+        if (usersAllowed == getUID()){
+          isAllowed = true
+        }
+      });
+      console.log('isAllowed ' + isAllowed);
+      if (isAllowed) {
+        theClient.send('return-products-order', Array(products[0], products[1]))
+        if (products[1].favorite) {
+          theClient.send('return-products-order', Array(products[0], products[1]))
+        }
+      }
+    }else{
+      theClient.send('return-products-order', Array(products[0], products[1]))
+      if (products[1].favorite) {
+        theClient.send('return-products-order', Array(products[0], products[1]))
+      }
     }
   })
   theClient.send('return-products-order-all', Array(productsData, discountsData))
@@ -4105,7 +4126,7 @@ ipcMain.on('remove-category', (event, arg) => {
 
 ipcMain.on('create-product', (event, arg) => {
   theClient = event.sender;
-  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15], arg[16], arg[17])
+  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15], arg[16], arg[17], arg[18], arg[19])
 })
 
 ipcMain.on('gather-products-order', (event, arg) => {
@@ -4653,9 +4674,6 @@ ipcMain.on('quickbooks-status', (event, arg) => {
 
 ipcMain.on('trash-member-file', async (event, arg) => {
   theClient = event.sender;  
-  console.log("Hey");
-  console.log(arg);
-  console.log('done');
   if (!canUser('permissionEditMemberFiles')) {
     notificationSystem('warning', 'You do not have permisison to remove member files.')
     return

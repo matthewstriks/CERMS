@@ -31,6 +31,8 @@ let productMembership = document.getElementById('productMembership')
 let productMembershipDiv = document.getElementById('productMembershipDiv')
 let productMembershipLength = document.getElementById('productMembershipLength')
 let productMembershipLengthType = document.getElementById('productMembershipLengthType')
+let productRestrict = document.getElementById('productRestrict')
+let productRestrictDiv = document.getElementById('productRestrictDiv')
 let productDesc = document.getElementById('productDesc')
 let productInventory = document.getElementById('productInventory')
 let productInventoryPar = document.getElementById('productInventoryPar')
@@ -55,6 +57,8 @@ let editProductMembership = document.getElementById('editProductMembership')
 let editProductMembershipDiv = document.getElementById('editProductMembershipDiv')
 let editProductMembershipLength = document.getElementById('editProductMembershipLength')
 let editProductMembershipLengthType = document.getElementById('editProductMembershipLengthType')
+let editProductRestrict = document.getElementById('editProductRestrict')
+let editProductRestrictDiv = document.getElementById('editProductRestrictDiv')
 let editProductDesc = document.getElementById('editProductDesc')
 let editProductInventory = document.getElementById('editProductInventory')
 let editProductInventoryPar = document.getElementById('editProductInventoryPar')
@@ -94,11 +98,18 @@ let productEditing;
 let discountEditing;
 
 let productsData = Array()
+let usersData = Array()
 
 let enterPressed
 
 if (productMembershipDiv) {
   productMembershipDiv.style.display = 'none'  
+}
+
+if (productRestrictDiv) {
+  productRestrictDiv.style.display = 'none'
+  editProductRestrictDiv.style.display = 'none'
+  ipcRenderer.send('request-users')
 }
 
 if (productRentalDiv) {
@@ -119,6 +130,26 @@ if (productMembership) {
       productMembershipDiv.style.display = ''            
     }else{
       productMembershipDiv.style.display = 'none'            
+    }
+  })
+}
+
+if (productRestrict) {
+  productRestrict.addEventListener('change', function(){
+    if (productRestrict.checked) {
+      productRestrictDiv.style.display = ''
+    }else{
+      productRestrictDiv.style.display = 'none'
+    }
+  })
+}
+
+if (editProductRestrict) {
+  editProductRestrict.addEventListener('change', function(){
+    if (editProductRestrict.checked) {
+      editProductRestrictDiv.style.display = ''
+    }else{
+      editProductRestrictDiv.style.display = 'none'
     }
   })
 }
@@ -229,11 +260,36 @@ function removeCategory(){
 }
 
 function addProduct(){
-  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productFavorite.checked, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value, productRentalLength.value, productRentalLengthType.value))
+  let usersChecked = Array()
+  if (productRestrict.checked) {
+    usersData.forEach(user => {
+      let isChecked = document.getElementById('userCheck' + user).checked
+      if (isChecked) {
+        usersChecked.push(user)
+      }
+    });    
+  }
+
+  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productFavorite.checked, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value, productRentalLength.value, productRentalLengthType.value, productRestrict.checked, usersChecked))
+  usersData.forEach(user => {
+    document.getElementById('userCheck' + user).checked = false
+  });
 }
 
 function editProduct(){
-  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductFavorite.checked, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value, editProductRentalLength.value, editProductRentalLengthType.value))
+  let usersChecked = Array()
+  if (editProductRestrict.checked) {
+    usersData.forEach(user => {
+      let isChecked = document.getElementById('editUserCheck' + user).checked
+      if (isChecked) {
+        usersChecked.push(user)
+      }
+    });
+  }
+  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductFavorite.checked, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value, editProductRentalLength.value, editProductRentalLengthType.value, editProductRestrict.checked, usersChecked))
+  usersData.forEach(user => {
+    document.getElementById('editUserCheck' + user).checked = false
+  });
 }
 
 function removeProduct(){
@@ -357,6 +413,10 @@ if (productTable) {
         cell6.innerHTML = "<button data-bs-toggle='modal' data-bs-target='#myModal5' id='edit" + arg[0] + "' type='button' class='btn btn-warning'>Edit Product</button> <button id='remove" + arg[0] + "' data-bs-toggle='modal' data-bs-target='#myModal6' type='button' class='btn btn-danger'>Remove Product</button>";
 
         document.getElementById("edit" + arg[0]).addEventListener('click', function () {
+          editProductRestrictDiv.style.display = 'none'
+          usersData.forEach(user => {
+            document.getElementById('editUserCheck' + user).checked = false
+          });
           productEditing = arg[0];
           editProductCategory.value = arg[1].cat
           editProductName.value = arg[1].name
@@ -373,6 +433,13 @@ if (productTable) {
           editProductMembershipLengthType.value = arg[1].membershipLengthType
           editProductRentalLength.value = arg[1].rentalLengthRaw
           editProductRentalLengthType.value = arg[1].rentalLengthType
+          editProductRestrict.checked = arg[1].restricted
+          if (arg[1].restricted) {
+            editProductRestrictDiv.style.display = ''
+            arg[1].restrictedUsers.forEach(user => {
+              document.getElementById('editUserCheck' + user).checked = true
+            });    
+          }
           editProductDesc.value = arg[1].desc
           editProductInventory.value = arg[1].inventory
           editProductInventoryPar.value = arg[1].inventoryPar
@@ -536,6 +603,10 @@ ipcRenderer.on('return-products-update', (event, arg) => {
   }
 
   document.getElementById("edit"+arg[0]).addEventListener('click', function(){
+    editProductRestrictDiv.style.display = 'none'
+    usersData.forEach(user => {
+      document.getElementById('editUserCheck' + user).checked = false
+    });
     productEditing = arg[0];
     editProductCategory.value = arg[1].cat
     editProductName.value = arg[1].name
@@ -548,6 +619,13 @@ ipcRenderer.on('return-products-update', (event, arg) => {
     editProductCore.checked = arg[1].core
     editProductRental.checked = arg[1].rental
     editProductMembership.checked = arg[1].membership
+    editProductRestrict.checked = arg[1].restricted
+    if (arg[1].restricted) {
+      editProductRestrictDiv.style.display = ''
+      arg[1].restrictedUsers.forEach(user => {
+        document.getElementById('editUserCheck' + user).checked = true
+      });
+    }
     editProductDesc.value = arg[1].desc
     editProductInventory.value = arg[1].inventory
     editProductInventoryPar.value = arg[1].inventoryPar
@@ -652,4 +730,54 @@ ipcRenderer.on('return-discounts-remove', (event, arg) => {
     return
   }
   document.getElementById('row'+arg[0]).remove();
+})
+
+ipcRenderer.on('recieve-users', (event, arg) => {
+  // productRestrictDiv
+  usersData.push(arg[0])
+
+  let userCheckDiv = document.createElement('div')
+  userCheckDiv.className = 'mb-3 form-check'
+  
+  let userCheck = document.createElement('input')
+  userCheck.className = 'form-check-input'
+  userCheck.id = 'userCheck' + arg[0]
+  userCheck.setAttribute('userID', arg[0])
+  userCheck.setAttribute('type', 'checkbox')
+
+  let userCheckLbl = document.createElement('label')
+  userCheckLbl.className = 'form-check-label'
+  userCheckLbl.setAttribute('for', 'userCheck' + arg[0])
+  userCheckLbl.innerHTML = arg[1].displayName
+  
+  userCheckDiv.appendChild(userCheck)
+  userCheckDiv.appendChild(userCheckLbl)
+
+  productRestrictDiv.appendChild(userCheckDiv)
+
+  let editUserCheckDiv = document.createElement('div')
+  editUserCheckDiv.className = 'mb-3 form-check'
+  
+  let editUserCheck = document.createElement('input')
+  editUserCheck.className = 'form-check-input'
+  editUserCheck.id = 'editUserCheck' + arg[0]
+  editUserCheck.setAttribute('userID', arg[0])
+  editUserCheck.setAttribute('type', 'checkbox')
+
+  let editUserCheckLbl = document.createElement('label')
+  editUserCheckLbl.className = 'form-check-label'
+  editUserCheckLbl.setAttribute('for', 'editUserCheck' + arg[0])
+  editUserCheckLbl.innerHTML = arg[1].displayName
+  
+  editUserCheckDiv.appendChild(editUserCheck)
+  editUserCheckDiv.appendChild(editUserCheckLbl)
+
+  editProductRestrictDiv.appendChild(editUserCheckDiv)
+
+  /*
+  <div class="mb-3 form-check">
+    <input type="checkbox" class="form-check-input" id="productCore">
+      <label checked class="form-check-label" for="productCore">Product is core</label>
+  </div>              
+  */
 })
