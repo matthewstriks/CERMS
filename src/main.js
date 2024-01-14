@@ -4269,6 +4269,12 @@ ipcMain.on('generate-report-now', (event, arg) => {
   startRegisterReport(false, false)
 })
 
+ipcMain.on('generate-final-report-now', (event, arg) => {
+  theClient = event.sender;
+  // HERE
+  startRegisterReport(false, true)
+})
+
 ipcMain.on('uploadProductImg', (event, arg) => {
   theClient2 = event.sender;
   let theConfig;

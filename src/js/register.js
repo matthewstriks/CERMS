@@ -2,6 +2,7 @@ let personalRegOpen = document.getElementById('personalRegOpen');
 let personalRegClose = document.getElementById('personalRegClose');
 let personalRegDrop = document.getElementById('personalRegDrop');
 let genReportBtn = document.getElementById('genReportBtn');
+let genFinalReportBtn = document.getElementById('genFinalReportBtn');
 let startingAmtContainer = document.getElementById('startingAmtContainer');
 let startingAmt = document.getElementById('startingAmt');
 let startingShift = document.getElementById('startingShift');
@@ -152,6 +153,12 @@ if (startingAmtContainer) {
 if (genReportBtn) {
   genReportBtn.addEventListener('click', function(){
     ipcRenderer.send('generate-report-now')
+  })
+}
+
+if (genFinalReportBtn) {
+  genFinalReportBtn.addEventListener('click', function(){
+    ipcRenderer.send('generate-final-report-now')
   })
 }
 
