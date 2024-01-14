@@ -68,6 +68,7 @@ let editnotesInput = document.getElementById('editnotesInput');
 let editnotesInputNew = document.getElementById('editnotesInputNew');
 let editwaiverInput = document.getElementById('editwaiverInput');
 let editFileList = document.getElementById('editFileList');
+let editFileList2 = document.getElementById('editFileList2');
 let editmemberInfoDeleteBtn = document.getElementById('editmemberInfoDeleteBtn');
 let editmemberInfoDeleteBtnCloseConfirm = document.getElementById('editmemberInfoDeleteBtnCloseConfirm');
 
@@ -240,6 +241,7 @@ if(myModal2){
     memberInfoCT.innerHTML = '';
     memberInfoWS.innerHTML = '';
     memberInfoNotes.value = '';
+    editFileList2.value = '';
   })
 }
 
@@ -257,6 +259,7 @@ if (memberInfoClose) {
     memberInfoCT.innerHTML = '';
     memberInfoWS.innerHTML = '';
     memberInfoNotes.value = '';
+    editFileList2.value = '';
   })
 }
 
@@ -729,6 +732,24 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     } else {
       memberInfoNotes.value = arg[1].notes
     }
+    editFileList2.innerHTML = ""
+    if (arg[1].files) {
+      for (let index = 0; index < arg[1].files.length; index++) {
+        let fileURL = arg[1].files[index];
+        let fileName = arg[1].filesNames[index]
+        let fileNameRaw = arg[1].filesNamesRaw[index]
+        let newLi = document.createElement('li')
+        newLi.className = 'list-group-item'
+        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button>"
+        editFileList2.appendChild(newLi)
+        document.getElementById(arg[0] + 'fileView' + index).addEventListener('click', function () {
+          ipcRenderer.send('open-link', fileURL)
+        })
+      }
+    }
+
+
+
   })
 
   document.getElementById("edit"+arg[0]).addEventListener('click', function(){
@@ -972,6 +993,24 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
     } else {
       memberInfoNotes.value = arg[1].notes
     }
+    editFileList2.innerHTML = ""
+    if (arg[1].files) {
+      for (let index = 0; index < arg[1].files.length; index++) {
+        let fileURL = arg[1].files[index];
+        let fileName = arg[1].filesNames[index]
+        let fileNameRaw = arg[1].filesNamesRaw[index]
+        let newLi = document.createElement('li')
+        newLi.className = 'list-group-item'
+        newLi.innerHTML = fileName + " <button type='button' class='btn btn-primary' id='" + arg[0] + "fileView" + index + "'><i class='fa-solid fa-eye'></i></button>"
+        editFileList2.appendChild(newLi)
+        document.getElementById(arg[0] + 'fileView' + index).addEventListener('click', function () {
+          ipcRenderer.send('open-link', fileURL)
+        })
+      }
+    }
+
+
+
   })
 
   document.getElementById("edit" + arg[0]).addEventListener('click', function () {
