@@ -1073,11 +1073,20 @@ async function addLockerRoom(lockerRoomInfo){
 }
 
 async function deleteMember(memberInfo){
-  let theRank = await getRank()
-  if (theRank == "1") {
+  let userAllowed = canUser("permissionDeleteMembers");
+  if (userAllowed) {
     await deleteDoc(doc(db, "members", memberInfo));
-  }else{
-    console.log('No permissions!');
+    docRef = query(collection(db, "activity"), where("memberID", "==", memberInfo), where('access', '==', getSystemAccess()));
+    const docSnap = await getDocs(docRef);
+    docSnap.forEach(async activity => {
+      console.log('Here: ' + activity.id);
+      const activityRef = doc(db, 'activity', activity.id)
+      await updateDoc(activityRef, {
+        removed: true
+      })
+    });
+  } else {
+    notificationSystem('danger', 'You do not have permisison for this.')    
   }
 }
 
@@ -2959,7 +2968,10 @@ async function startGatherAllActivity(){
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
         if (!activitys.includes(change.doc.id)) {
-          let theMemberInfo = await getMemberInfo(change.doc.data().memberID);
+          let theMemberInfo = false
+          if (!change.doc.data().removed) {
+            theMemberInfo = await getMemberInfo(change.doc.data().memberID);            
+          }
           activitys.push(change.doc.id);
           activitysData.push(Array(change.doc.id, change.doc.data(), theMemberInfo, change.doc.data().memberID));
           theClient.send('activity-request-return', Array(change.doc.id, change.doc.data(), theMemberInfo, change.doc.data().memberID))
@@ -3870,7 +3882,8 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditTagRemove: arg[16],
     permissionEditMemberNotes: arg[17],
     permissionEditMemberFiles: arg[18],
-    permissionEditAnalytics: arg[19]
+    permissionDeleteMembers: arg[19],
+    permissionEditAnalytics: arg[20]
   });
 
   if (arg[0] == getUID()) {

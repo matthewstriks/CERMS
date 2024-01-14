@@ -81,6 +81,7 @@ let permissionEditTagAdd = document.getElementById('permissionEditTagAdd')
 let permissionEditTagRemove = document.getElementById('permissionEditTagRemove')
 let permissionEditMemberNotes = document.getElementById('permissionEditMemberNotes')
 let permissionEditMemberFiles = document.getElementById('permissionEditMemberFiles')
+let permissionDeleteMembers = document.getElementById('permissionDeleteMembers')
 let permissionEditAnalytics = document.getElementById('permissionEditAnalytics')
 let editAccountSave = document.getElementById('editAccountSave')
 let editAccountCancel = document.getElementById('editAccountCancel')
@@ -246,7 +247,7 @@ editAccountSave.addEventListener('click', function(){
         editingAccessCode.style.display = ''
         ipcRenderer.send('account-create', Array(editingEMail.value, editingDisplayName.value, editingRank.value))
     } else {
-        ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionEditAnalytics.checked))    
+        ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionDeleteMembers.checked, permissionEditAnalytics.checked))    
     }
 })
 
@@ -393,6 +394,7 @@ ipcRenderer.on('recieve-users', (event, arg) => {
         permissionEditTagRemove.checked = arg[1].permissionEditTagRemove
         permissionEditMemberNotes.checked = arg[1].permissionEditMemberNotes
         permissionEditMemberFiles.checked = arg[1].permissionEditMemberFiles
+        permissionDeleteMembers.checked = arg[1].permissionDeleteMembers
         permissionEditAnalytics.checked = arg[1].permissionEditAnalytics
     })
 
