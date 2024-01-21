@@ -199,6 +199,11 @@ function formWasSubmitted(){
   ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value, membershipMemberNumber.value))
 }
 
+function openMembership() {
+  let memID = document.getElementById('lastCreatedID').innerHTML
+  ipcRenderer.send('open-membership', memID)
+}
+
 ipcRenderer.on('membership-pending', (event, arg) => {
   submitBtn.disabled = true;
 })

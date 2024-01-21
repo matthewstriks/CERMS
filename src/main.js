@@ -3799,8 +3799,26 @@ ipcMain.on('account-logout', (event, arg) => {
   userLogout();
 })
 
-ipcMain.on('membership-create', (event, arg) => {
+ipcMain.on('membership-create', async (event, arg) => {
   theClient = event.sender;
+  let alreadyExists = false
+  const q2 = query(collection(db, "members"), where("name", "==", arg[0] + " " + arg[1]), where("dob", "==", arg[2]), where('idnum', "==", arg[6]), where('access', '==', getSystemAccess()));
+  const querySnapshot2 = await getDocs(q2);
+  querySnapshot2.forEach(async (doc) => {
+    let theID = ""
+    if (doc.id) {
+      theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc.id + "</a>"
+    }
+    let theMsg = "This member already exists! ID: " + theID
+    notificationSystem('warning', theMsg)
+    alreadyExists = true
+    return false
+  });
+
+  if (alreadyExists) {
+    return false
+  }
+
   if (importMembershipsMode) {
     createMembership(arg)
   } else {
