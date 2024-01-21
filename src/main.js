@@ -2902,15 +2902,12 @@ async function displayAllProductsOrder(){
   theClient.send('return-category-order-all', Array(categoriesData))
   productsData.forEach((products) => {
     if (products[1].restricted) {
-      console.log(products[1]);
-      console.log('true');
       let isAllowed = false
       products[1].restrictedUsers.forEach(usersAllowed => {
         if (usersAllowed == getUID()){
           isAllowed = true
         }
       });
-      console.log('isAllowed ' + isAllowed);
       if (isAllowed) {
         theClient.send('return-products-order', Array(products[0], products[1]))
         if (products[1].favorite) {
