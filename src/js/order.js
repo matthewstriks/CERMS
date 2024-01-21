@@ -30,6 +30,8 @@ let addLockerRoomInput2 = document.getElementById('addLockerRoomInput2');
 let completeCheckIn = document.getElementById('completeCheckIn');
 let productListSearch = document.getElementById('productListSearch');
 let searchProducts = document.getElementById('searchProducts');
+let completeTagCheck = document.getElementById('completeTagCheck');
+let completeTagNotes = document.getElementById('completeTagNotes');
 
 let accordionFavoriteheadingZero = document.getElementById('accordionFavoriteheadingZero');
 let favoriteProductCardRow = document.getElementById('favoriteProductCardRow');
@@ -835,6 +837,12 @@ ipcRenderer.on('send-customer-info', (event, arg) => {
     modal3Body.style.display = 'none'
     modal3Body2.style.display = ''  
     theCustomerID = 0
+  }
+
+  if (theCustomerInfo[1].tag) {
+    customerName.innerHTML = customerName.innerHTML + " <button class='btn btn-success' id='readNotesBtn' data-bs-toggle='modal' data-bs-target='#myModal4'>Read Notes</button>"
+    document.getElementById('readNotesBtn').click()
+    completeTagNotes.value = theCustomerInfo[1].notes
   }
 })
 
