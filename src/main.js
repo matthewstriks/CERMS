@@ -921,7 +921,9 @@ async function completeOrder(orderInfo){
   }
   let registerInfo = await getActiveRegister()
   let discountsInformation = orderInfo[2]
+  let isReturn = false
   if (orderInfo[2][0] == 'return') {
+    isReturn = true
     discountsInformation = 'return'
     let registerRef = doc(db, "registers", regStatusID)
     let theReturns = registerInfo.returns || Array()
@@ -957,7 +959,8 @@ async function completeOrder(orderInfo){
     paymentMethod: orderInfo[4],
     cashier: getUID(),
     timestamp: serverTimestamp(),
-    shift: theShift
+    shift: theShift,
+    return: isReturn
   });
 
   updateRegisterSub(registerInfo, orderInfo[4], orderInfo[3], false)
@@ -1567,6 +1570,9 @@ async function startRegisterReport(registerID, isFinal) {
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
     let orderInfo = doc.data()
+    if (orderInfo.return) {
+      return
+    }
     orderInfo.products.forEach((products, i) => {
       productsAndAmounts.forEach((productsAA, i2) => {
         if (productsAA[0] == products) {
@@ -3433,7 +3439,7 @@ async function startLoading(){
   await updateTLID();
   setTimeout(() => {
     notificationSystem('primary', 'The system will continue to gather data... This may take a couple minutes. If you see information missing, please wait for it to load.')
-  }, 5000);
+  }, 2000);
 }
 
 async function searchForMessage(){
