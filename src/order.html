@@ -11,6 +11,15 @@
     <!-- fontawesome -->
     <script src="https://kit.fontawesome.com/fd40e0ab04.js" crossorigin="anonymous"></script>
     <title>CERMS - Order</title>
+    <style>
+        div.scroll {
+          width: 500px;
+          height: 1000px;
+          overflow-x: hidden;
+          overflow-y: auto;
+          text-align: justify;
+        }
+      </style>
   </head>
   <body>
     <br>
@@ -193,7 +202,7 @@
     <br>
 
     <div class="d-flex bd-highlight">
-      <div class="p-2 flex-fill bd-highlight" id="orderPageDiv">
+      <div class="p-2 flex-fill bd-highlight scroll" id="orderPageDiv" tabindex="0">
         <div class="accordion" id="accordionExample">
           <div class="accordion-item">
             <h2 class="accordion-header" id="headingZero">
@@ -232,7 +241,7 @@
           </div>
         </div>
       </div>
-      <div class="p-2 flex-fill bd-highlight" id="orderPageDiv2">      
+      <div class="p-2 flex-fill bd-highlight" style="position: sticky; top: 300px;" id="orderPageDiv2">      
       
         <div id="orderCard" class="card">
           <div class="card-header">

@@ -3354,6 +3354,7 @@ async function startLoading(){
   totalLoadingProccesses = 11 // CHANGE ME
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading user data...'))
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading system modules... This may take a couple minutes.'))
   let theUserData = await getUserData();
   if (!theUserData) {
     return
@@ -3362,18 +3363,6 @@ async function startLoading(){
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading system data...'))
   await getSystemData();
-  loadingProgress = loadingProgress + 1
-
-  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading members...'))
-  await startGatherAllMembers();
-  loadingProgress = loadingProgress + 1
-
-  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading activity...'))
-  await startGatherAllActivity();
-  loadingProgress = loadingProgress + 1
-
-  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading orders...'))
-  await startGatherAllOrders();
   loadingProgress = loadingProgress + 1
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading register...'))
@@ -3396,6 +3385,18 @@ async function startLoading(){
   await startGatherAllUsers();
   loadingProgress = loadingProgress + 1
 
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading members...'))
+  await startGatherAllMembers();
+  loadingProgress = loadingProgress + 1
+
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading activity...'))
+  await startGatherAllActivity();
+  loadingProgress = loadingProgress + 1
+
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading orders...'))
+  await startGatherAllOrders();
+  loadingProgress = loadingProgress + 1
+
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
   await quickBooksLogin();
   loadingProgress = loadingProgress + 1
@@ -3408,6 +3409,9 @@ async function startLoading(){
 
   goHome(true);
   await updateTLID();
+  setTimeout(() => {
+    notificationSystem('primary', 'The system will continue to gather data... This may take a couple minutes. If you see information missing, please wait for it to load.')
+  }, 5000);
 }
 
 async function searchForMessage(){
