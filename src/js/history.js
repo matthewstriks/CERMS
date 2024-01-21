@@ -54,6 +54,13 @@ if(membershipSearch){
       var filter, tr, td, i, txtValue;
       filter = membershipSearch.value.toUpperCase();
       tr = membershipTable.getElementsByTagName("tr");
+      ipcRenderer.send('history-search', membershipSearch.value)
+      let theRows = 1;
+      var table = document.getElementById("membershipTable");
+      var rowCount = table.rows.length;
+      for (var i = theRows; i < rowCount; i++) {
+        table.deleteRow(theRows);
+      }
       for (i = 0; i < tr.length; i++) {
         if (membershipSearch.value == '') {
           enterPressed = false;

@@ -4065,6 +4065,62 @@ ipcMain.on('activity-edit', (event, arg) => {
   editActivity(arg)
 })
 
+ipcMain.on("history-search", async (event, arg) => {
+  theClient = event.sender;
+  let wasFound = false
+  if (arg != "") {
+    for (i = 0; i < activitysData.length; i++) {
+      let theActivityData = activitysData[i][1]
+      let theMemberData = activitysData[i][2]
+      let theName = theActivityData.lockerRoomStatus[2] + " " + theActivityData.lockerRoomStatus[1]
+      let brokenArg = arg.split(" ");
+
+      let a = new Date(theActivityData.timeIn.seconds * 1000);
+      let year = a.getFullYear();
+      let month = a.getMonth() + 1;
+      let date = a.getDate();
+      let theStartTime = month + '/' + date + '/' + year
+      if (theMemberData && ((theMemberData.fname + ' ' + theMemberData.lname).toUpperCase() == arg.toUpperCase())) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else if (theMemberData && (theMemberData.fname.toUpperCase() == arg.toUpperCase())) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else if (theMemberData && (theMemberData.lname.toUpperCase() == arg.toUpperCase())) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else if (theActivityData.memberID == arg) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else if (arg.toUpperCase() == theName.toUpperCase()) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else if (arg.toUpperCase() == theActivityData.lockerRoomStatus[2].toUpperCase()) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else if (arg.toUpperCase() == theActivityData.lockerRoomStatus[1].toUpperCase()) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else if (arg == theStartTime) {
+        wasFound = true
+        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+      } else {
+        brokenArg.forEach((item, itemi) => {
+          if (theName.includes(item) && !wasFound) {
+            wasFound = true
+            theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
+          }
+        });
+      }
+    }
+  } else {
+    displayAllHistory()
+  }
+  if (!wasFound && (arg != "")) {
+    notificationSystem('warning', 'No activity was found by the search "' + arg + '"')
+  }
+})
+
 ipcMain.on('searchForMember', (event, arg) => {
   theClient = event.sender;
   let wasFound = false
