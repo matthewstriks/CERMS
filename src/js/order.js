@@ -1,9 +1,12 @@
 let productSection = document.getElementById('productSection');
+let cardHeader = document.getElementById('cardHeader');
 let customerName = document.getElementById('customerName');
 let checkoutCustomerInfo = document.getElementById('checkoutCustomerInfo');
 let clearBtn = document.getElementById('clearBtn');
 let resumeBtn = document.getElementById('resumeBtn');
 let suspendBtn = document.getElementById('suspendBtn');
+let startReturnBtn = document.getElementById('startReturnBtn');
+let endReturnBtn = document.getElementById('endReturnBtn');
 let checkoutBtn = document.getElementById('checkoutBtn');
 let productCheckoutList = document.getElementById('productCheckoutList');
 let finishOrderBtn = document.getElementById('finishOrderBtn');
@@ -41,6 +44,8 @@ let ran = false
 let discountingOrder = false
 let theCustomerInfo;
 let favPros = Array()
+let isReturn = false
+
 
 if (searchProducts) {
   searchProducts.addEventListener('click', function(){
@@ -272,6 +277,26 @@ if (resumeBtn) {
   })
 }
 
+if (startReturnBtn) {
+  startReturnBtn.style.display = ''
+  endReturnBtn.style.display = 'none'
+  startReturnBtn.addEventListener('click', function(){
+    cardHeader.innerHTML = 'Order Card - <h3><b style="color: red">Return Mode Active</b></h3>'
+    isReturn = true
+    startReturnBtn.style.display = 'none'
+    endReturnBtn.style.display = ''
+  })
+}
+
+if (endReturnBtn) {
+  endReturnBtn.addEventListener('click', function(){
+    cardHeader.innerHTML = 'Order Card'
+    isReturn = false
+    startReturnBtn.style.display = ''
+    endReturnBtn.style.display = 'none'
+  })
+}
+
 if (checkoutBtn) {
   checkoutBtn.addEventListener('click', function(){
     productsSub = 0;
@@ -290,6 +315,8 @@ if (checkoutBtn) {
         if (discountItem[0] == discountInfo){
           theDiscountInfo = discountItem
           theDiscountInfoArray.push(Array(item, discountInfo))
+          console.log(theDiscountInfo);
+          console.log(theDiscountInfoArray);
         } 
       })
       for (var i2 = 0; i2 < currQuantity; i2++) {
@@ -301,6 +328,10 @@ if (checkoutBtn) {
               if (theDiscountInfo[1].dollar) {
                 theProductPrice = theProductPrice - theDiscountInfo[1].amount
                 newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (Discount ' + theDiscountInfo[1].code + ': ' + formatter.format(theDiscountInfo[1].amount) + ' OFF ' + formatter.format(item2[1].price) + ')'                
+                discountApplied = true
+              } else if (theDiscountInfo[0] == 'return'){
+                theProductPrice = -Math.abs(theProductPrice) 
+                newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (Return)'
                 discountApplied = true
               } else {
                 let thePer = (theDiscountInfo[1].amount / 100)
@@ -346,10 +377,12 @@ if (checkoutBtn) {
 
     productsTot = (productsSub + productsTax)
 
+    /*
     if (productsTot < 0) {
       productsTot = 0
     }    
-
+    */
+    console.log(productsTot);
     totalLeft.innerHTML = 'Total Left: ' + formatter.format(productsTot)
     updateOrderTotalPaid()
 
@@ -377,13 +410,17 @@ const formatter = new Intl.NumberFormat('en-US', {
 
 function addProductCard(theProduct){  
   checkoutBtn.disabled = false
+  let productPrice = theProduct[1].price
+  if (isReturn) {
+    productPrice = -Math.abs(productPrice)
+  }
   let currentProductCard = document.getElementById(theProduct[0] + 'newCard')
   let currentProductCardInfo = document.getElementById(theProduct[0] + 'cardHeader')
   if (currentProductCard) {
     let currQuantity = currentProductCard.getAttribute('quantity');
     currQuantity = Number(currQuantity) + 1
     currentProductCard.setAttribute('quantity', currQuantity)
-    currentProductCardInfo.innerHTML = theProduct[1].name + " - " + formatter.format(theProduct[1].price) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'    
+    currentProductCardInfo.innerHTML = theProduct[1].name + " - " + formatter.format(productPrice) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'    
 
     let plusBtn = document.getElementById(theProduct[0] + 'plus')
     if (plusBtn) {
@@ -408,7 +445,7 @@ function addProductCard(theProduct){
 
   let cardHeader = document.createElement('div')
   cardHeader.className = 'card-header'
-  cardHeader.innerHTML = theProduct[1].name + " - " + formatter.format(theProduct[1].price) + ' - x1 <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'    
+  cardHeader.innerHTML = theProduct[1].name + " - " + formatter.format(productPrice) + ' - x1 <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'    
   cardHeader.id = theProduct[0] + 'cardHeader'
 
   let cardBody = document.createElement('div')
@@ -469,6 +506,11 @@ function addProductCard(theProduct){
       ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct, addLockerRoomInput.value, addLockerRoomInput2.value))
     })
   }
+
+  if (isReturn) {
+    startProductDiscount("return", productDiscountWarning, productDiscount, productDiscountBtn, productWaiveBtn, removeProductDiscountBtn, currentProductCard)
+  }
+
 
   if(productDiscountBtn){
     productDiscountBtn.addEventListener('click', function(){
@@ -593,6 +635,17 @@ function startProductDiscount(discountCode, theDiscountWarning, theProductDiscou
       theProductWaiveBtn.style.display = 'none'
       discountFound = true
       discountsSelected = item
+    } else if ((item[0] == 'return') && (discountCode == 'return')) {
+      console.log('its a return');
+      theProductCard.setAttribute('discount', item[0])
+      theDiscountWarning.innerHTML = 'Return applied!'
+      theDiscountWarning.style = 'color:green'
+      theProductDiscount.disabled = true
+      theProductDiscountBtn.disabled = true
+      theProductDiscountBtn.style.display = 'none'
+      theProductWaiveBtn.style.display = 'none'
+      discountFound = true
+      discountsSelected = item
     }
   });
   if (!discountFound) {
@@ -644,6 +697,9 @@ ipcRenderer.send('gather-products-order')
 ipcRenderer.on('return-products-order-all', (event, arg) => {
   productsData = arg[0];
   discountsData = arg[1];
+  discountsData.push(Array("return", Array()))
+  console.log(discountsData);
+
 })
 
 ipcRenderer.on('return-category-order-all', (event, arg) => {

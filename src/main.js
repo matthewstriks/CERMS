@@ -737,38 +737,48 @@ async function registerReciept(registerID){
   let withInput10C
   let withInput5C
   let withInput1C
-
+  let theReturnsHTML = ""
   formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100)
+
+  registerInfo.returns.forEach(async products => {
+    let theInfo = await getProductInfo(products)
+    theReturnsHTML = theReturnsHTML + "<br>" + theInfo.name
+  });  
   
-
-  theHTML = systemData.registerReciept
-  withDate = theHTML.replace('TheDate', theStringTime)
-  withCashier = withDate.replace('TheCashier', theDisplayName)
-  withInput100 = withCashier.replace('Input100', registerInfo.input100)
-  withInput50 = withInput100.replace('Input50', registerInfo.input50)
-  withInput20 = withInput50.replace('Input20', registerInfo.input20)
-  withInput10 = withInput20.replace('Input10', registerInfo.input10)
-  withInput5 = withInput10.replace('Input5', registerInfo.input5)
-  withInput1 = withInput5.replace('Input1', registerInfo.input1)
-  withInput25C = withInput1.replace('Input25c', registerInfo.input25c)
-  withInput10C = withInput25C.replace('Input10c', registerInfo.input10c)
-  withInput5C = withInput10C.replace('Input05c', registerInfo.input5c)
-  withInput1C = withInput5C.replace('Input01c', registerInfo.input1c)
-  withTotal = withInput1C.replace('TheTotal', registerInfo.ending)
-  withStarting = withTotal.replace('TheExpTotal', registerInfo.starting)
-  withDiff = withStarting.replace('TheDifference', (formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100) - formatter.format(Math.round((Number(registerInfo.ending) + Number.EPSILON) * 100) / 100)))
-  withChargeTotal = withDiff.replace('TheTotalCharge', formatter.format(Math.round((Number(registerInfo.ccard) + Number.EPSILON) * 100) / 100))
-
-  fs.writeFile(p2, withChargeTotal, err => {
-    if (err) {
-      console.error(err);
+  setTimeout(async () => {
+    if (theReturnsHTML == "") {
+      theReturnsHTML = "None"
     }
-    createRecieptScreen(false)
-  });
+    theHTML = systemData.registerReciept
+    withDate = theHTML.replace('TheDate', theStringTime)
+    withCashier = withDate.replace('TheCashier', theDisplayName)
+    withInput100 = withCashier.replace('Input100', registerInfo.input100)
+    withInput50 = withInput100.replace('Input50', registerInfo.input50)
+    withInput20 = withInput50.replace('Input20', registerInfo.input20)
+    withInput10 = withInput20.replace('Input10', registerInfo.input10)
+    withInput5 = withInput10.replace('Input5', registerInfo.input5)
+    withInput1 = withInput5.replace('Input1', registerInfo.input1)
+    withInput25C = withInput1.replace('Input25c', registerInfo.input25c)
+    withInput10C = withInput25C.replace('Input10c', registerInfo.input10c)
+    withInput5C = withInput10C.replace('Input05c', registerInfo.input5c)
+    withInput1C = withInput5C.replace('Input01c', registerInfo.input1c)
+    withReturns = withInput1C.replace('TheReturns', theReturnsHTML)
+    withTotal = withReturns.replace('TheTotal', registerInfo.ending)
+    withStarting = withTotal.replace('TheExpTotal', registerInfo.starting)
+    withDiff = withStarting.replace('TheDifference', (formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100) - formatter.format(Math.round((Number(registerInfo.ending) + Number.EPSILON) * 100) / 100)))
+    withChargeTotal = withDiff.replace('TheTotalCharge', formatter.format(Math.round((Number(registerInfo.ccard) + Number.EPSILON) * 100) / 100))
 
-  await updateDoc(docRef, {
-    reciept: withChargeTotal
-  });
+    fs.writeFile(p2, withChargeTotal, err => {
+      if (err) {
+        console.error(err);
+      }
+      createRecieptScreen(false)
+    });
+
+    await updateDoc(docRef, {
+      reciept: withChargeTotal
+    });    
+  }, 1000);
 }
 
 async function recieptProcess(orderInfo, theOrderNumber){
@@ -902,12 +912,25 @@ async function completeOrder(orderInfo){
     theCustomerID = 0
   }
 
-  if (orderInfo[2] && (orderInfo[2][0] != 0)) {
+  if (orderInfo[2] && (orderInfo[2][0] != 0) && (orderInfo[2][0] != 'return')) {
     const discountRef = doc(db, "discounts", orderInfo[2][0]);
 
     await updateDoc(discountRef, {
       used: increment(1)
     });
+  }
+  let registerInfo = await getActiveRegister()
+  let discountsInformation = orderInfo[2]
+  if (orderInfo[2][0] == 'return') {
+    discountsInformation = 'return'
+    let registerRef = doc(db, "registers", regStatusID)
+    let theReturns = registerInfo.returns || Array()
+    orderInfo[1].forEach(products => {
+      theReturns.push(products)       
+    });
+    await updateDoc(registerRef, {
+      returns: theReturns
+    })
   }
 
   const toDate = new Date();
@@ -929,7 +952,7 @@ async function completeOrder(orderInfo){
     access: getSystemAccess(),
     customerID: theCustomerID,
     products: orderInfo[1],
-    discounts: orderInfo[2],
+    discounts: discountsInformation,
     total: orderInfo[3],
     paymentMethod: orderInfo[4],
     cashier: getUID(),
@@ -937,7 +960,6 @@ async function completeOrder(orderInfo){
     shift: theShift
   });
 
-  let registerInfo = await getActiveRegister()
   updateRegisterSub(registerInfo, orderInfo[4], orderInfo[3], false)
 
   pendingOrders.forEach(porder => {
@@ -1552,7 +1574,7 @@ async function startRegisterReport(registerID, isFinal) {
         }
       })
     })
-    if (orderInfo.discounts) {
+    if (Array.isArray(orderInfo.discounts)) {
       orderInfo.discounts.forEach((discount, i) => {
         discountsAndAmounts.forEach((discountAA, i2) => {
           if (discountAA[0] == discount) {
