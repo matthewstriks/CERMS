@@ -83,6 +83,13 @@ if (orderSearch){
       var filter, tr, td, i, txtValue;
       filter = orderSearch.value.toUpperCase();
       tr = membershipOrderTable.getElementsByTagName("tr");
+      ipcRenderer.send('order-search', orderSearch.value)
+      let theRows = 1;
+      var table = document.getElementById("membershipOrderTable");
+      var rowCount = table.rows.length;
+      for (var i = theRows; i < rowCount; i++) {
+        table.deleteRow(theRows);
+      }
       for (i = 0; i < tr.length; i++) {
         if (orderSearch.value == '') {
           enterPressed = false;

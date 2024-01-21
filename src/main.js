@@ -7,7 +7,7 @@ const xl = require('excel4node');
 const { firebaseConfig, quickbooksConfig } = require('./assets/firebase-config.js');
 const { initializeApp } = require("firebase/app");
 const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, updateEmail, sendEmailVerification } = require("firebase/auth");
-const { collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment, arrayRemove } = require("firebase/firestore");
+const { initializeFirestore, CACHE_SIZE_UNLIMITED, collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment, arrayRemove } = require("firebase/firestore");
 const { getStorage, ref, getDownloadURL, deleteObject } = require("firebase/storage");
 const { log } = require('console');
 const delay = require('delay');
@@ -35,6 +35,9 @@ function initializeAppFunct(){
 const oauthClient = new OAuthClient(quickbooksConfig);
 
 const startInitApp = initializeAppFunct();
+const firestoreDb = initializeFirestore(firebaseApp, {
+  cacheSizeBytes: CACHE_SIZE_UNLIMITED
+});
 const db = getFirestore(firebaseApp);
 const auth = getAuth();
 const storage = getStorage(); 
@@ -177,7 +180,7 @@ function notificationSystem(notificationType, notificationMsg){
 }
 
 async function getMemberInfo(memberID){
-  if ((memberID == -1) || (Array.isArray(memberID))) {
+  if ((memberID == -1) || (memberID == 0) || (Array.isArray(memberID))) {
     return false
   }
 
@@ -3348,7 +3351,7 @@ function createAccount(accountInfo){
 
 async function startLoading(){
   loadingProgress = 0;
-  totalLoadingProccesses = 10 // CHANGE ME
+  totalLoadingProccesses = 11 // CHANGE ME
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading user data...'))
   let theUserData = await getUserData();
@@ -3367,6 +3370,10 @@ async function startLoading(){
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading activity...'))
   await startGatherAllActivity();
+  loadingProgress = loadingProgress + 1
+
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading orders...'))
+  await startGatherAllOrders();
   loadingProgress = loadingProgress + 1
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading register...'))
@@ -3559,7 +3566,6 @@ async function runAnalytics(timeStart, timeEnd){
     return
   }  
   notificationSystem('warning', 'Running analytics...')
-  await startGatherAllOrders();
   let membersDataSend = Array()
   let activitysDataSend = Array()
   let ordersDataSend = Array()
@@ -4069,6 +4075,7 @@ ipcMain.on("history-search", async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
   if (arg != "") {
+    notificationSystem('warning', 'Searching... This may take a few seconds. You will be notified when the query is finished.')
     for (i = 0; i < activitysData.length; i++) {
       let theActivityData = activitysData[i][1]
       let theMemberData = activitysData[i][2]
@@ -4118,6 +4125,57 @@ ipcMain.on("history-search", async (event, arg) => {
   }
   if (!wasFound && (arg != "")) {
     notificationSystem('warning', 'No activity was found by the search "' + arg + '"')
+  } else {
+    notificationSystem('success', 'Results found!')
+  }
+})
+
+ipcMain.on("order-search", async (event, arg) => {
+  theClient = event.sender;
+  let wasFound = false
+  if (arg != "") {
+    notificationSystem('warning', 'Searching... This may take a few seconds. You will be notified when the query is finished.')
+    for (i = 0; i < ordersData.length; i++) {
+      let theOrderID = ordersData[i][0]
+      let theOrderData = ordersData[i][1]
+      let theOrderCustomerInfo = await getMemberInfo(theOrderData.customerID) || Array()        
+
+      let theCustomerFName = theOrderCustomerInfo.fname || ""
+      let theCustomerLName = theOrderCustomerInfo.lname || ""
+      let brokenArg = arg.split(" ");
+
+      let a = new Date(theOrderData.timestamp['seconds'] * 1000);
+      let year = a.getFullYear();
+      let month = a.getMonth() + 1;
+      let date = a.getDate();
+      let theStartTime = month + '/' + date + '/' + year
+      if (theOrderID.toUpperCase() == arg.toUpperCase()) {
+        wasFound = true
+        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+      } else if (arg == theStartTime) {
+        wasFound = true
+        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+      } else if (arg == theOrderData.total[2]) {
+        wasFound = true
+        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+      } else if (arg.toUpperCase() == theCustomerFName.toUpperCase()) {
+        wasFound = true
+        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+      } else if (arg.toUpperCase() == theCustomerLName.toUpperCase()) {
+        wasFound = true
+        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+      } else if (arg.toUpperCase() == (theCustomerFName.toUpperCase() + " " + theCustomerLName.toUpperCase())) {
+        wasFound = true
+        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+      }
+    }
+  } else {
+    displayAllOrders()
+  }
+  if (!wasFound && (arg != "")) {
+    notificationSystem('warning', 'No order was found by the search "' + arg + '"')
+  } else {
+    notificationSystem('success', 'Results found!')
   }
 })
 
@@ -4159,8 +4217,10 @@ ipcMain.on('searchForMember', (event, arg) => {
   } else{
     displayAllMembers()
   }
-  if (!wasFound) {
+  if (!wasFound && (arg != "")) {
     notificationSystem('warning', 'No member was found by the search "' + arg + '"')
+  } else {
+    notificationSystem('success', 'Results found!')
   }
 })
 
