@@ -777,44 +777,58 @@ async function registerReciept(registerID){
   let theReturnsHTML = ""
   formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100)
 
-  registerInfo.returns.forEach(async products => {
-    let theInfo = await getProductInfo(products)
-    theReturnsHTML = theReturnsHTML + "<br>" + theInfo.name
-  });  
+  if (registerInfo.returns) {
+    registerInfo.returns.forEach(async products => {
+      let theInfo = await getProductInfo(products)
+      theReturnsHTML = theReturnsHTML + "<br>" + theInfo.name
+    });      
+  }
   
-  setTimeout(async () => {
+  setTimeout(() => {
     if (theReturnsHTML == "") {
       theReturnsHTML = "None"
     }
-    theHTML = systemData.registerReciept
-    withDate = theHTML.replace('TheDate', theStringTime)
-    withCashier = withDate.replace('TheCashier', theDisplayName)
-    withInput100 = withCashier.replace('Input100', registerInfo.input100)
-    withInput50 = withInput100.replace('Input50', registerInfo.input50)
-    withInput20 = withInput50.replace('Input20', registerInfo.input20)
-    withInput10 = withInput20.replace('Input10', registerInfo.input10)
-    withInput5 = withInput10.replace('Input5', registerInfo.input5)
-    withInput1 = withInput5.replace('Input1', registerInfo.input1)
-    withInput25C = withInput1.replace('Input25c', registerInfo.input25c)
-    withInput10C = withInput25C.replace('Input10c', registerInfo.input10c)
-    withInput5C = withInput10C.replace('Input05c', registerInfo.input5c)
-    withInput1C = withInput5C.replace('Input01c', registerInfo.input1c)
-    withReturns = withInput1C.replace('TheReturns', theReturnsHTML)
-    withTotal = withReturns.replace('TheTotal', registerInfo.ending)
-    withStarting = withTotal.replace('TheExpTotal', registerInfo.starting)
-    withDiff = withStarting.replace('TheDifference', (formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100) - formatter.format(Math.round((Number(registerInfo.ending) + Number.EPSILON) * 100) / 100)))
-    withChargeTotal = withDiff.replace('TheTotalCharge', formatter.format(Math.round((Number(registerInfo.ccard) + Number.EPSILON) * 100) / 100))
+    let p = path.join(__dirname, '.', '/assets/register-reciept.html');
 
-    fs.writeFile(p2, withChargeTotal, err => {
+    fs.readFile(p, 'utf8', async (err, theHTML) => {
       if (err) {
         console.error(err);
+        return;
       }
-      createRecieptScreen(false)
-    });
+      withBName = theHTML.replace('businessName', systemData.businessName)
+      withBAdd = withBName.replace('businessAddress', systemData.businessAddress)
+      withBAdd2 = withBAdd.replace('businessAddress2', systemData.businessAddress2)
+      withBPN = withBAdd2.replace('businessPhone', systemData.businessPNum)
+      withBEM = withBPN.replace('businessEMail', systemData.businessEMail)
+      withDate = withBEM.replace('TheDate', theStringTime)
+      withCashier = withDate.replace('TheCashier', theDisplayName)
+      withInput100 = withCashier.replace('Input100', registerInfo.input100)
+      withInput50 = withInput100.replace('Input50', registerInfo.input50)
+      withInput20 = withInput50.replace('Input20', registerInfo.input20)
+      withInput10 = withInput20.replace('Input10', registerInfo.input10)
+      withInput5 = withInput10.replace('Input5', registerInfo.input5)
+      withInput1 = withInput5.replace('Input1', registerInfo.input1)
+      withInput25C = withInput1.replace('Input25c', registerInfo.input25c)
+      withInput10C = withInput25C.replace('Input10c', registerInfo.input10c)
+      withInput5C = withInput10C.replace('Input05c', registerInfo.input5c)
+      withInput1C = withInput5C.replace('Input01c', registerInfo.input1c)
+      withReturns = withInput1C.replace('TheReturns', theReturnsHTML)
+      withTotal = withReturns.replace('TheTotal', registerInfo.ending)
+      withStarting = withTotal.replace('TheExpTotal', registerInfo.starting)
+      withDiff = withStarting.replace('TheDifference', Math.round(((registerInfo.ending - registerInfo.starting) + Number.EPSILON) * 100) / 100)
+      withChargeTotal = withDiff.replace('TheTotalCharge', formatter.format(Math.round((Number(registerInfo.ccard) + Number.EPSILON) * 100) / 100))
 
-    await updateDoc(docRef, {
-      reciept: withChargeTotal
-    });    
+      fs.writeFile(p2, withChargeTotal, err => {
+        if (err) {
+          console.error(err);
+        }
+        createRecieptScreen(false)
+      });
+
+      await updateDoc(docRef, {
+        reciept: withChargeTotal
+      });    
+    })
   }, 1000);
 }
 
@@ -833,7 +847,6 @@ async function recieptProcess(orderInfo, theOrderNumber){
   let theCustomersEMail = await getMemberEMail(orderInfo[0])    
   let p2 = path.join(__dirname, '.', 'last-reciept.html');
 
-  let theHTML
   let withDate
   let withOrder
   let withSub
@@ -852,87 +865,102 @@ async function recieptProcess(orderInfo, theOrderNumber){
     }    
   }
 
-  theHTML = systemData.reciept
-  withDate = theHTML.replace('TheDate', theStringTime)
-  withOrder = withDate.replace('OrderNumber', theOrderNumber)
 
-  withSub = withOrder.replace('TheSubtotal', formatter.format(Math.round((Number(orderInfo[3][0]) + Number.EPSILON) * 100) / 100))
-  withTax = withSub.replace('TheTax', formatter.format(Math.round((Number(orderInfo[3][1]) + Number.EPSILON) * 100) / 100))
-  withTotal = withTax.replace('TheTotal', formatter.format(Math.round((Number(orderInfo[3][2]) + Number.EPSILON) * 100) / 100))
+  let p = path.join(__dirname, '.', '/assets/reciept.html');
 
-  withPayment = withTotal.replace('TheTotalPaymentMethod', '<b>Credit/Debit Card: </b>' + formatter.format(Math.round((Number(orderInfo[4][0]) + Number.EPSILON) * 100) / 100) + '<br><b>Gift Card: </b>' + formatter.format(Math.round((Number(orderInfo[4][1]) + Number.EPSILON) * 100) / 100) + '<br><b>Cash: </b>' + formatter.format(Math.round((Number(orderInfo[4][2]) + Number.EPSILON) * 100) / 100))
-
-  withCashier = withPayment.replace('TheCashier', theDisplayName)
-  withProductsTxt = ""
-
-  theDiscountsUsed = orderInfo[5]
-
-  if (theDiscountsUsed.length == 0) {
-    theDiscountsUsed.push(Array(0, 0))
-  }
-
-  orderInfo[1].forEach(async (productSel, i) => {
-    let theProductInfo = await getProductInfo(productSel)
-    withProductsTxt = withProductsTxt + '<tr><td>' + theProductInfo.name + '</td><td>1</td><td>x</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td></tr>'
-    if (orderInfo[1].length == (i + 1)) {
-      let withProducts = withCashier.replace('ProductsHere', withProductsTxt)
-
-      if (orderInfo[2]) {
-        if (orderInfo[2][1].dollar) {
-          withDiscountsTxt = withDiscountsTxt + '<tr><td>' + orderInfo[2][1].code + '</td><td>' + formatter.format(Math.round((Number(orderInfo[2][1].amount) + Number.EPSILON) * 100) / 100) + ' (entire order)</td><td>' + formatter.format(Math.round((Number(orderInfo[2][1].amount) + Number.EPSILON) * 100) / 100) + '</td></tr>'
-        } else {
-          let thePer = (orderInfo[2][1].amount / 100)
-          let theOff = Number(orderInfo[3][3]) * thePer
-          let theProductPrice = Number(orderInfo[3][3]) - theOff
-          let amountSaved = Number(orderInfo[3][3]) - theProductPrice
-          withDiscountsTxt = withDiscountsTxt + '<tr><td>' + orderInfo[2][1].code + '</td><td>' + orderInfo[2][1].amount + '% (entire order)</td><td>' + formatter.format(Math.round((Number(amountSaved) + Number.EPSILON) * 100) / 100) + '</td></tr>'
-        }
-      }
-      theDiscountsUsed.forEach(async (discountSel, i2) => {
-        if (discountSel[0] != 0) {
-          let theDiscountProductInfo = await getProductInfo(discountSel[0])
-          let theDiscountInfo = await getDiscountInfo(discountSel[1])
-          if (theDiscountInfo.dollar) {
-            withDiscountsTxt = withDiscountsTxt + '<tr><td>' + theDiscountInfo.code + '</td><td>' + formatter.format(Math.round((Number(theDiscountInfo.amount) + Number.EPSILON) * 100) / 100) + '</td><td>' + formatter.format(Math.round((Number(theDiscountInfo.amount) + Number.EPSILON) * 100) / 100) + '</td></tr>'
-          } else {
-            let thePer = (theDiscountInfo.amount / 100)
-            let theOff = theDiscountProductInfo.price * thePer
-            let theProductPrice = theDiscountProductInfo.price - theOff
-            let amountSaved = theDiscountProductInfo.price - theProductPrice
-            withDiscountsTxt = withDiscountsTxt + '<tr><td>' + theDiscountInfo.code + '</td><td>' + theDiscountInfo.amount + '%</td><td>' + formatter.format(Math.round((Number(amountSaved) + Number.EPSILON) * 100) / 100) + '</td></tr>'
-          }
-        }
-        if (orderInfo[5].length == (i2 + 1)) {
-          if (!withDiscountsTxt) {
-            withDiscountsTxt = ""
-          }
-          withDiscounts = withProducts.replace('TheDiscountsApplied', withDiscountsTxt)
-          const orderRef = doc(db, "orders", theOrderNumber);
-          await updateDoc(orderRef, {
-            reciept: withDiscounts
-          });
-          if (recieptStyle == 1) {
-            fs.writeFile(p2, withDiscounts, err => {
-              if (err) {
-                console.error(err);
-              }
-              createRecieptScreen(false)
-            });
-          } else if (recieptStyle == 2) {
-            createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
-          } else if (recieptStyle > 2) {
-            fs.writeFile(p2, withDiscounts, err => {
-              if (err) {
-                console.error(err);
-              }
-              createRecieptScreen(false)
-              createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
-            });
-          }
-        }
-      })
+  fs.readFile(p, 'utf8', (err, theHTML) => {
+    if (err) {
+      console.error(err);
+      return;
     }
+    withBName = theHTML.replace('businessName', systemData.businessName)
+    withBAdd = withBName.replace('businessAddress', systemData.businessAddress)
+    withBAdd2 = withBAdd.replace('businessAddress2', systemData.businessAddress2)
+    withBPN = withBAdd2.replace('businessPhone', systemData.businessPNum)
+    withBEM = withBPN.replace('businessEMail', systemData.businessEMail)
+
+    withDate = withBEM.replace('TheDate', theStringTime)
+    withOrder = withDate.replace('OrderNumber', theOrderNumber)
+
+    withSub = withOrder.replace('TheSubtotal', formatter.format(Math.round((Number(orderInfo[3][0]) + Number.EPSILON) * 100) / 100))
+    withTax = withSub.replace('TheTax', formatter.format(Math.round((Number(orderInfo[3][1]) + Number.EPSILON) * 100) / 100))
+    withTotal = withTax.replace('TheTotal', formatter.format(Math.round((Number(orderInfo[3][2]) + Number.EPSILON) * 100) / 100))
+
+    withPayment = withTotal.replace('TheTotalPaymentMethod', '<b>Credit/Debit Card: </b>' + formatter.format(Math.round((Number(orderInfo[4][0]) + Number.EPSILON) * 100) / 100) + '<br><b>Gift Card: </b>' + formatter.format(Math.round((Number(orderInfo[4][1]) + Number.EPSILON) * 100) / 100) + '<br><b>Cash: </b>' + formatter.format(Math.round((Number(orderInfo[4][2]) + Number.EPSILON) * 100) / 100))
+
+    withCashier = withPayment.replace('TheCashier', theDisplayName)
+    withProductsTxt = ""
+
+    theDiscountsUsed = orderInfo[5]
+
+    if (theDiscountsUsed.length == 0) {
+      theDiscountsUsed.push(Array(0, 0))
+    }
+
+    orderInfo[1].forEach(async (productSel, i) => {
+      let theProductInfo = await getProductInfo(productSel)
+      withProductsTxt = withProductsTxt + '<tr><td>' + theProductInfo.name + '</td><td>1</td><td>x</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td></tr>'
+      if (orderInfo[1].length == (i + 1)) {
+        let withProducts = withCashier.replace('ProductsHere', withProductsTxt)
+
+        if (orderInfo[2]) {
+          if (orderInfo[2][1].dollar) {
+            withDiscountsTxt = withDiscountsTxt + '<tr><td>' + orderInfo[2][1].code + '</td><td>' + formatter.format(Math.round((Number(orderInfo[2][1].amount) + Number.EPSILON) * 100) / 100) + ' (entire order)</td><td>' + formatter.format(Math.round((Number(orderInfo[2][1].amount) + Number.EPSILON) * 100) / 100) + '</td></tr>'
+          } else {
+            let thePer = (orderInfo[2][1].amount / 100)
+            let theOff = Number(orderInfo[3][3]) * thePer
+            let theProductPrice = Number(orderInfo[3][3]) - theOff
+            let amountSaved = Number(orderInfo[3][3]) - theProductPrice
+            withDiscountsTxt = withDiscountsTxt + '<tr><td>' + orderInfo[2][1].code + '</td><td>' + orderInfo[2][1].amount + '% (entire order)</td><td>' + formatter.format(Math.round((Number(amountSaved) + Number.EPSILON) * 100) / 100) + '</td></tr>'
+          }
+        }
+        theDiscountsUsed.forEach(async (discountSel, i2) => {
+          if (discountSel[0] != 0) {
+            let theDiscountProductInfo = await getProductInfo(discountSel[0])
+            let theDiscountInfo = await getDiscountInfo(discountSel[1])
+            if (theDiscountInfo.dollar) {
+              withDiscountsTxt = withDiscountsTxt + '<tr><td>' + theDiscountInfo.code + '</td><td>' + formatter.format(Math.round((Number(theDiscountInfo.amount) + Number.EPSILON) * 100) / 100) + '</td><td>' + formatter.format(Math.round((Number(theDiscountInfo.amount) + Number.EPSILON) * 100) / 100) + '</td></tr>'
+            } else {
+              let thePer = (theDiscountInfo.amount / 100)
+              let theOff = theDiscountProductInfo.price * thePer
+              let theProductPrice = theDiscountProductInfo.price - theOff
+              let amountSaved = theDiscountProductInfo.price - theProductPrice
+              withDiscountsTxt = withDiscountsTxt + '<tr><td>' + theDiscountInfo.code + '</td><td>' + theDiscountInfo.amount + '%</td><td>' + formatter.format(Math.round((Number(amountSaved) + Number.EPSILON) * 100) / 100) + '</td></tr>'
+            }
+          }
+          if (orderInfo[5].length == (i2 + 1)) {
+            if (!withDiscountsTxt) {
+              withDiscountsTxt = ""
+            }
+            withDiscounts = withProducts.replace('TheDiscountsApplied', withDiscountsTxt)
+            const orderRef = doc(db, "orders", theOrderNumber);
+            await updateDoc(orderRef, {
+              reciept: withDiscounts
+            });
+            if (recieptStyle == 1) {
+              fs.writeFile(p2, withDiscounts, err => {
+                if (err) {
+                  console.error(err);
+                }
+                createRecieptScreen(false)
+              });
+            } else if (recieptStyle == 2) {
+              createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
+            } else if (recieptStyle > 2) {
+              fs.writeFile(p2, withDiscounts, err => {
+                if (err) {
+                  console.error(err);
+                }
+                createRecieptScreen(false)
+                createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
+              });
+            }
+          }
+        })
+      }
+    });
   });
+
 }
 
 async function completeOrder(orderInfo){
