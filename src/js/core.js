@@ -32,6 +32,12 @@ if (quickSaleBtn) {
   })
 }
 
+if (errorMsg) {
+  setTimeout(() => {
+    ipcRenderer.send('gather-notifications')    
+  }, 1);
+}
+
 ipcRenderer.on('recieve-dark-mode', (event, arg) => {
   if (arg) {
     darkMode = true
@@ -43,10 +49,6 @@ ipcRenderer.on('recieve-dark-mode', (event, arg) => {
 })
 
 ipcRenderer.on('notification-system', (event, arg) => {
-  let timeToDelay = 5
-  if (arg[2]) {
-    timeToDelay = arg[2] * 1000
-  }
   if (document.getElementById('cermsLogo')) {
     document.getElementById('cermsLogo').style.display = 'none'
   }
@@ -54,11 +56,10 @@ ipcRenderer.on('notification-system', (event, arg) => {
   theDiv.className = 'alert alert-' + arg[0] + ' alert-dismissible'
   theDiv.innerHTML = arg[1] + ' <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
   theDiv.setAttribute('role', 'alert')
+  theDiv.setAttribute('notificationID', arg[3])
   errorMsg.appendChild(theDiv)
-  setTimeout(() => {
-    theDiv.remove()
-    if (!errorMsg.innerHTML.includes('div') && document.getElementById('cermsLogo')) {
-      document.getElementById('cermsLogo').style.display = ''      
-    }
-  }, timeToDelay);
 }) 
+
+ipcRenderer.on('notification-system-remove', (event, arg) => {
+  document.querySelector('[notificationID="' + arg + '"]').remove();
+})

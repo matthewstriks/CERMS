@@ -91,6 +91,8 @@ let regStatusID = false;
 
 let importMembershipsMode = false
 
+let notificationsData = Array()
+
 const formatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -172,11 +174,38 @@ function getUID(){
 }
 
 function notificationSystem(notificationType, notificationMsg){
-  let theNotSecs = 5
+  let theNotificationID = notificationsData.length + 1
+  let keepMsg = true
+  if (notificationMsg == 'Logging in...') {
+    keepMsg = false
+  }
+  let toAdd = Array(theNotificationID, notificationType, notificationMsg, keepMsg)
+  notificationsData.push(toAdd)
+  let theNotSecs = 10 * 1000
+  if (userData && userData.notificationSecs) {
+    theNotSecs = userData.notificationSecs * 1000
+  }  
+  theClient.send('notification-system', Array(notificationType, notificationMsg, theNotSecs, theNotificationID))
+  setTimeout(() => {
+    theClient.send('notification-system-remove', theNotificationID)
+    notificationsData.forEach(notification => {
+      if (notification[0] == theNotificationID) {
+        notification[3] = false
+      }
+    });
+  }, theNotSecs);
+}
+
+function getNotifications(){
+  let theNotSecs = 10
   if (userData && userData.notificationSecs) {
     theNotSecs = userData.notificationSecs
-  }
-  theClient.send('notification-system', Array(notificationType, notificationMsg, theNotSecs))
+  }  
+  notificationsData.forEach(notification => {
+    if (notification[3]) {
+      theClient.send('notification-system', Array(notification[1], notification[2], theNotSecs, notification[0]))
+    }    
+  });
 }
 
 async function getMemberInfo(memberID){
@@ -3437,8 +3466,8 @@ async function startLoading(){
 
   goHome(true);
   await updateTLID();
-  setTimeout(() => {
-    notificationSystem('primary', 'The system will continue to gather data... This may take a couple minutes. If you see information missing, please wait for it to load.')
+  setTimeout(() => { 
+    notificationSystem('primary', 'Welcome to CERMS! The system will continue to gather data. This may take a couple minutes. You may see less information when you first log in.')
   }, 2000);
 }
 
@@ -5028,4 +5057,9 @@ ipcMain.on('settings-update-shifttimes', async (event, arg) => {
     shiftTimeC: arg[2]
   });
   await getSystemData()
+})
+
+ipcMain.on('gather-notifications', async (event, arg) => {
+  theClient = event.sender;
+  getNotifications()
 })
