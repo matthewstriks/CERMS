@@ -208,6 +208,14 @@ function getNotifications(){
   });
 }
 
+function removeNotification(theNotificationID){
+  notificationsData.forEach(notification => {
+    if (notification[0] == theNotificationID) {
+      notification[3] = false
+    }
+  });
+}
+
 async function getMemberInfo(memberID){
   if ((memberID == -1) || (memberID == 0) || (Array.isArray(memberID))) {
     return false
@@ -5062,4 +5070,9 @@ ipcMain.on('settings-update-shifttimes', async (event, arg) => {
 ipcMain.on('gather-notifications', async (event, arg) => {
   theClient = event.sender;
   getNotifications()
+})
+
+ipcMain.on('notification-system-remove-id', async (event, arg) => {
+  theClient = event.sender;
+  removeNotification(arg)
 })

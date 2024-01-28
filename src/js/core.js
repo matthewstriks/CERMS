@@ -54,10 +54,14 @@ ipcRenderer.on('notification-system', (event, arg) => {
   }
   let theDiv = document.createElement('div')
   theDiv.className = 'alert alert-' + arg[0] + ' alert-dismissible'
-  theDiv.innerHTML = arg[1] + ' <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
+  theDiv.innerHTML = arg[1] + ' <button id="closeNotification' + arg[3] + '" notificationIDBtn=' + arg[3] + ' type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
   theDiv.setAttribute('role', 'alert')
   theDiv.setAttribute('notificationID', arg[3])
   errorMsg.appendChild(theDiv)
+
+  document.getElementById('closeNotification' + arg[3]).addEventListener('click', function(){
+    ipcRenderer.send('notification-system-remove-id', arg[3])
+  })
 }) 
 
 ipcRenderer.on('notification-system-remove', (event, arg) => {
