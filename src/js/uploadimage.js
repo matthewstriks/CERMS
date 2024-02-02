@@ -2,11 +2,6 @@ ipcRenderer.send('uploadProductImg')
 
 let theProductID;
 let firebaseConfig
-let errorMsg = document.getElementById('errorMsg');
-ipcRenderer.on('notification-system', (event, arg) => {
-    errorMsg.className = 'alert alert-' + arg[0]
-    errorMsg.innerHTML = arg[1]
-}) 
 
 var files = [];
 document.getElementById("files").addEventListener("change", function (e) {
