@@ -57,7 +57,32 @@
     <br>
 
     <div class="container">
-      <h2>To file a bug report, feature request, or a fix, click <a href="" id="githubLink">here</a></h2>
+      <button class="btn btn-info" id="sbmtTicket">Create support ticket (bugs, errors, feature requests)</button>
+      <button class="btn btn-danger" id="sbmtTicket2">Cancel Ticket</button>
+      <br>
+      <div class="container" id="supportTicketDiv">
+        <br>
+        <hr style="color: red;">
+        <p style="color: red;">NOTE: </p> <p>Once you click submit, you will be brought to the Support Ticket website. You must review all inputed fields and click submit or your ticket will not be received. You will also have the ability to upload files or attachments.</p>
+        <hr style="color: red;">
+        <div class="mb-3">
+          <label for="ticketType" class="form-label">Support Ticket Type</label>
+          <select class="form-control" id="ticketType">
+            <option value="">---</option>
+            <option value="1">General</option>
+            <option value="2">Bug Report</option>
+            <option value="3">Error Report</option>
+            <option value="4">Feature Request</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <input type="text" class="form-control" id="ticketSubject" placeholder="Subject">
+        </div>
+        <div class="mb-3">
+          <textarea id="ticketMessage" class="form-control" rows="10" placeholder="Message"></textarea>
+        </div>
+        <button type="button" id="ticketSubmitBtn" class="btn btn-primary">Submit</button>
+      </div>
       <hr>
       <h3>How to's</h3>
       <p>Below is a manual for CERMS. It should be used as a guide to learn how to use the system</p>

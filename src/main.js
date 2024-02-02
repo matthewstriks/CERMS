@@ -5109,3 +5109,18 @@ ipcMain.on('notification-system-remove-id', async (event, arg) => {
   theClient = event.sender;
   removeNotification(arg)
 })
+
+ipcMain.on('submit-support-ticket', async (event, arg) => {
+  theClient = event.sender;
+
+//  encodeURIComponent
+
+  let theURL = 'https://clubentertainmentrms.com/support/index.php?a=add'
+
+  theURL = theURL + '&name=' + encodeURIComponent(getDisplayName())
+  theURL = theURL + '&email=' + encodeURIComponent(getEMail())
+  theURL = theURL + '&catid=' + encodeURIComponent(arg[0])
+  theURL = theURL + '&subject=' + encodeURIComponent(arg[1])
+  theURL = theURL + '&message=' + encodeURIComponent(arg[2])
+  shell.openExternal(theURL)
+})
