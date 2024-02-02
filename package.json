@@ -27,6 +27,7 @@
     "@electron/remote": "^2.0.8",
     "address": "^2.0.1",
     "chart.js": "^3.8.0",
+    "date-fns": "^3.3.1",
     "delay": "^5.0.0",
     "electron-squirrel-startup": "^1.0.0",
     "electron-updater": "^6.1.4",

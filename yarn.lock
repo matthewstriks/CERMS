@@ -3,9 +3,9 @@
 
 
 "@babel/runtime@^7.21.0":
-  "integrity" "sha512-w06OXVOFso7LcbzMiDGt+3X7Rh7Ho8MmgPoWU3rarH+8upf+wSU/grlGbWzQyr3DkdN6ZeuMFjpdwW0Q+HxobA=="
-  "resolved" "https://registry.npmjs.org/@babel/runtime/-/runtime-7.23.7.tgz"
-  "version" "7.23.7"
+  "integrity" "sha512-0CX6F+BI2s9dkUqr08KFrAIZgNFj75rdBU/DjCyYLIaV/quFjkk6T+EJ2LkZHyZTbEV4L5p97mNkUsHl2wLFAw=="
+  "resolved" "https://registry.npmjs.org/@babel/runtime/-/runtime-7.23.9.tgz"
+  "version" "7.23.9"
   dependencies:
     "regenerator-runtime" "^0.14.0"
 
@@ -1945,6 +1945,11 @@
   "version" "2.30.0"
   dependencies:
     "@babel/runtime" "^7.21.0"
+
+"date-fns@^3.3.1":
+  "integrity" "sha512-y8e109LYGgoQDveiEBD3DYXKba1jWf5BA8YU1FL5Tvm0BTdEfy54WLCwnuYWZNnzzvALy/QQ4Hov+Q9RVRv+Zw=="
+  "resolved" "https://registry.npmjs.org/date-fns/-/date-fns-3.3.1.tgz"
+  "version" "3.3.1"
 
 "debug@^2.2.0":
   "integrity" "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA=="

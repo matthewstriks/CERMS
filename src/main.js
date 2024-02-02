@@ -16,6 +16,7 @@ const os = require('os');
 const { getSystemMemoryInfo } = require('process');
 const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
+const { compareAsc, format } = require("date-fns");
 //const QuickBooks = require('node-quickbooks')
 
 /*
@@ -4285,6 +4286,10 @@ ipcMain.on('searchForMember', (event, arg) => {
       let theID = Number(membersData[i][1].idnum)
       let theMemID = Number(membersData[i][1].id_number)
       let theDOB = membersData[i][1].dob
+      let stringDate = false
+      if (arg.includes('/') || arg.includes('-')) {
+        stringDate = format(new Date(arg), "yyyy-MM-dd");        
+      }
       let theMembership = membersData[i][1].membership_type.toUpperCase()
       let brokenArg = arg.split(" ");
       if (theName.includes(arg)) {
@@ -4296,7 +4301,7 @@ ipcMain.on('searchForMember', (event, arg) => {
       } else if (theMemID == Number(arg)) {
         wasFound = true
         theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (theDOB == arg) {
+      } else if (stringDate && (theDOB == stringDate)) {
         wasFound = true
         theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
       } else if (theMembership.includes(arg)) {
