@@ -248,6 +248,7 @@ editAccountSave.addEventListener('click', function(){
         ipcRenderer.send('account-create', Array(editingEMail.value, editingDisplayName.value, editingRank.value))
     } else {
         ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionDeleteMembers.checked, permissionEditAnalytics.checked))    
+        document.getElementById('row' + editingID).remove()
     }
 })
 
@@ -352,6 +353,10 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
 
 ipcRenderer.on('recieve-users', (event, arg) => {
     console.log(arg);
+    if (document.getElementById('row' + arg[0])) {
+        return
+    }
+
     var row = userAccounts.insertRow(1);
     row.id = 'row' + arg[0];
     row.setAttribute('theID', arg[0])

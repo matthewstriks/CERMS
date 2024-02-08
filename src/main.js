@@ -4030,6 +4030,8 @@ ipcMain.on('account-edit', async (event, arg) => {
     getUserData()
   }
 
+  gatherAllUsers()
+
   theClient.send('account-edit-success')
   notificationSystem('success', 'Account edited!')
 })
