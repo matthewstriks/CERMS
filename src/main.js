@@ -746,7 +746,7 @@ async function viewOrderReciept(theOrderNumber){
   }
 }
 
-async function registerReciept(registerID){
+async function registerReciept(registerID, logoutTF){
   let theTimestamp = new Date(Math.floor(Date.now()))
   let theMonth = theTimestamp.getMonth() + 1
   let theDate = theTimestamp.getDate()
@@ -823,7 +823,7 @@ async function registerReciept(registerID){
         if (err) {
           console.error(err);
         }
-        createRecieptScreen(false)
+        createRecieptScreen(false, logoutTF)
       });
 
       await updateDoc(docRef, {
@@ -1345,19 +1345,13 @@ async function endRegister(registerInfo, logoutTF){
     input1c: registerInfo[10],
     active: false
   });
-  registerReciept(regStatusID)
+  registerReciept(regStatusID, logoutTF)
   startRegisterReport(regStatusID, false)
   regStatus = false
   regStatusID = false
   regStatusShift = false
-  if (!logoutTF) {
-    goRegister()
-    registerStatus()
-  }else{
-    setTimeout(() => {
-      userLogout()
-    }, 2000);    
-  }
+  goRegister()
+  registerStatus()
 }
 
 async function updateRegisterSub(registerInfo, amount, total, drop) {
@@ -2305,7 +2299,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(moneyStyle)
 
   summaryWB.cell(13, 5)
-    .number(detailCashB) // Detail Cash (7a-3p)
+    .number(Number(detailCashB)) // Detail Cash (7a-3p)
     .style(moneyStyle)
 
   detailNetB = (detailCCardB + detailGCardB + detailCashB)
@@ -3782,7 +3776,7 @@ function emailReciept(theEMail){
     createMail(theEMail, 'Reciept!', data, data)              
   })
 }
-const createRecieptScreen = (shouldChoice) => {
+const createRecieptScreen = (shouldChoice, logoutTF) => {
   const recieptWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -3819,8 +3813,14 @@ const createRecieptScreen = (shouldChoice) => {
       if (!success) {
         console.log(errorType)
         recieptWin.close()
+        if (logoutTF) {
+          userLogout()
+        }
       } else {
         recieptWin.close()
+        if (logoutTF) {
+          userLogout()
+        }
       }
     })
   }
