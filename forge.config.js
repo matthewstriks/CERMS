@@ -1,6 +1,6 @@
 module.exports = {
   packagerConfig: {
-    icon: "./src/assets/cerms-icon",
+    icon: "src/assets/cerms-icon",
     asar: true,
   },
   rebuildConfig: {},

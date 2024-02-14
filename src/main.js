@@ -3857,7 +3857,7 @@ autoUpdater.on('checking-for-update', () => {
 });
 
 autoUpdater.on('update-available', () => {
-  notificationSystem('warning', 'A new update is available. Downloading now... (' + app.getVersion() + ')')
+  notificationSystem('warning', 'A new update is available. Downloading now...')
   theClient.send('update_available');
 });
 
