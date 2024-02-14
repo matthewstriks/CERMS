@@ -3491,6 +3491,10 @@ async function startLoading(){
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Finished loading!'))
 
+  setTimeout(() => {
+    searchForMessage()
+  }, 10000);
+
   setInterval(function () {
     searchForMessage()
   }, 300000);
@@ -3511,7 +3515,21 @@ async function searchForMessage(){
   const querySnapshot1 = await getDocs(query(messagesRef, where('expire', '>', theCurrentTimeMS)));
   querySnapshot1.forEach((doc) => {
     let theMsg = doc.data()
-    notificationSystem(theMsg.type, theMsg.message)
+    if (theMsg.version && (theMsg.version != app.getVersion())) {
+      return
+    }
+    if (theMsg.access) {
+      let readMsg = false
+      theMsg.access.forEach((server) => {
+        if (server == getSystemAccess()) {
+          readMsg = true          
+        }
+      })
+      if (!readMsg) {
+        return
+      }
+    }
+    notificationSystem(theMsg.type, '[SYSTEM] ' + theMsg.message)
   })
 }
 
