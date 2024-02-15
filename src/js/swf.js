@@ -1,61 +1,22 @@
+const { ipcRenderer } = require('electron')
+let sigImageData = document.getElementById('sigImageData')
+let finalBtn = document.getElementById("finalBtn")
 ipcRenderer.send('uploadSignature')
 
 let theProductID;
 let firebaseConfig
 
-document.getElementById("button2").addEventListener("click", function () {
-    setTimeout(() => {
-        var storage = firebase.storage().ref('/member-signatures/' + theProductID + '.png');
-        // Base64 formatted string
-        const message2 = '5b6p5Y+344GX44G+44GX44Gf77yB44GK44KB44Gn44Go44GG77yB';
-        uploadString(storage, sigImageData.value, 'base64').then((snapshot) => {
-            console.log(snapshot);
-            console.log('Uploaded a base64 string!');
-        });
-        
-    }, 1000);
-    if (files.length != 0) {
-        for (let i = 0; i < files.length; i++) {
-            var upload = storage.put(files[i]);
+function uploadSignature(base64Data){
+    console.log(base64Data);
+    ipcRenderer.send('uploadSignatureBase64', base64Data)
+    console.log('hello');
+}
 
-            upload.on(
-                "state_changed",
-                function progress(snapshot) {
-                    var percentage = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    document.getElementById("progress").innerHTML = percentage + '%';
-                    document.getElementById("progress").setAttribute('style', "width: " + percentage + "%;");
-                    document.getElementById("progress").setAttribute('aria-valuenow', percentage);
-                    //                    document.getElementById("progress").value = percentage;
-                },
-
-                function error() {
-                    alert("error uploading file");
-                },
-
-                function complete() {
-                    document.getElementById(
-                        "uploading"
-                    ).innerHTML += `${files[i].name} uploaded <br />`;
-                    getFileUrl('/member-files/' + theProductID + '-' + files[i].name)
-                }
-            );
-        }
-    } else {
-        alert("No file chosen");
-    }
-});
-
-function getFileUrl(filename) {
-    var storage = firebase.storage().ref(filename);
-
-    storage
-        .getDownloadURL()
-        .then(function (url) {
-            ipcRenderer.send('uploadProductFile-complete', Array(theProductID, url, fileName.value, filename))
-        })
-        .catch(function (error) {
-            console.log("error encountered");
-        });
+if (finalBtn) {
+    finalBtn.addEventListener("click", function () {
+        setTimeout(() => {
+        }, 1000);
+    });        
 }
 
 ipcRenderer.on('uploadSignature-return', (event, arg) => {

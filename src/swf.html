@@ -12,8 +12,6 @@
         <title>CERMS - Sign Form</title>
 
         <script type="text/javascript" src="https://www.sigplusweb.com/SigWebTablet.js"></script>
-        <script src="./js/core.js"></script>
-        <script src="./js/swf.js"></script>
     
         <script type="text/javascript">
             var tmr;
@@ -159,8 +157,6 @@
                 SetTabletState(0, tmr);
                 //RETURN TOPAZ-FORMAT SIGSTRING
                 SetSigCompressionMode(1);
-                document.FORM1.bioSigData.value=GetSigString();
-                document.FORM1.sigStringData.value = GetSigString();
                 //this returns the signature in Topaz's own format, with biometric information
         
         
@@ -174,7 +170,7 @@
         
             function SigImageCallback( str )
             {
-            document.FORM1.sigImageData.value = str;
+            uploadSignature(str)
             }
         
             function endDemo()
@@ -199,51 +195,33 @@
         </script>
     </head> 
     <body>  
+        <br>
         <div class="container">
-            <table border="1" cellpadding="0" width="500">
-                <tbody>
-                    <tr>
-                        <td height="100" width="500">
-                            <canvas id="cnv" name="cnv" width="500" height="100"></canvas>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            
-            
-            <br>
-            <canvas name="SigImg" id="SigImg" width="500" height="100"></canvas>
-            <p id="sigWebVrsnNote" style="font-family: Arial;"></p>
-            
-            
-            <form action="#" name="FORM1">
-                <p>
-                    <input id="SignBtn" name="SignBtn" type="button" value="Sign"
-                        onclick="javascript:onSign()">&nbsp;&nbsp;&nbsp;&nbsp;
-                    <input id="button1" name="ClearBtn" type="button" value="Clear"
-                        onclick="javascript:onClear()">&nbsp;&nbsp;&nbsp;&nbsp;
-            
-                    <input id="button2" name="DoneBtn" type="button" value="Done"
-                        onclick="javascript:onDone()">&nbsp;&nbsp;&nbsp;&nbsp;
-            
-                    <input type="HIDDEN" name="bioSigData" value="">
-                    <input type="HIDDEN" name="sigImgData">
-                    <br>
-                    <br>
-                    <textarea name="sigStringData" rows="20" cols="50">SigString: </textarea>
-                    <textarea name="sigImageData" rows="20" cols="50" spellcheck="true">Base64 String: </textarea>
-                </p>
-            </form>
-            
-            <br><br>
+            <div class="container">
+                <button class="btn btn-primary" id="SignBtn" name="SignBtn" type="button" onclick="javascript:onSign()">Begin</button>
+                <button class="btn btn-warning" id="button1" name="ClearBtn" type="button" onclick="javascript:onClear()">Clear</button>
+                <button class="btn btn-success" id="button2" name="DoneBtn" type="button" onclick="javascript:onDone()">Upload</button>        
+            </div>
+            <hr>
+            <div class="container">
+                <table border="1" cellpadding="0" width="500">
+                    <tbody>
+                        <tr>
+                            <td height="100" width="500">
+                                <canvas id="cnv" name="cnv" width="500" height="100"></canvas>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <canvas name="SigImg" id="SigImg" width="500" height="100"></canvas>                        
+            </div>
+
             <p id="pTxt"></p>
+            <p id="sigWebVrsnNote"></p>
             <p id="daysUntilExpElement"></p>
-            <p id="SigWebVersion"></p>
-            <p id="SigWebTabletJSVersion"></p>
-            <p id="CertificateExpirationDate"></p>
         </div>
 
-
+        <script src="./js/swf.js"></script>
         <!-- The core Firebase JS SDK is always required and must be listed first -->
         <script src="https://www.gstatic.com/firebasejs/7.13.1/firebase-app.js"></script>
         

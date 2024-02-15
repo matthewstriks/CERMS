@@ -16,8 +16,6 @@ let membershipCreationInput = document.getElementById('membershipCreationInput')
 let membershipExpireInput = document.getElementById('membershipExpireInput');
 let membershipMemberNumber = document.getElementById('membershipMemberNumber');
 let notesInput = document.getElementById('notesInput');
-let waiverInput = document.getElementById('waiverInput');
-let swfBtn = document.getElementById('swfBtn');
 let idnumInput = document.getElementById('idnumInput');
 let idnumStateInput = document.getElementById('idnumStateInput');
 let submitBtn = document.getElementById('submitBtn');
@@ -197,18 +195,12 @@ function formWasSubmitted(){
     errorMsg.className = 'alert alert-danger'
     errorMsg.innerHTML = theError;
   }
-  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, waiverInput.checked, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value, membershipMemberNumber.value))
+  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, false, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value, membershipMemberNumber.value))
 }
 
 function openMembership() {
   let memID = document.getElementById('lastCreatedID').innerHTML
   ipcRenderer.send('open-membership', memID)
-}
-
-if (swfBtn) {
-  swfBtn.addEventListener('click', function(){
-    ipcRenderer.send('open-form-signing')
-  })
 }
 
 ipcRenderer.on('membership-pending', (event, arg) => {

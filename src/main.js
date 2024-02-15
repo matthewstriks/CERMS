@@ -8,7 +8,7 @@ const { firebaseConfig, quickbooksConfig } = require('./assets/firebase-config.j
 const { initializeApp } = require("firebase/app");
 const { getAuth, updateProfile, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, updateEmail, sendEmailVerification } = require("firebase/auth");
 const { initializeFirestore, CACHE_SIZE_UNLIMITED, collection, onSnapshot, query, where, getFirestore, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp, orderBy, limit, FieldValue, arrayUnion, increment, arrayRemove } = require("firebase/firestore");
-const { getStorage, ref, getDownloadURL, deleteObject } = require("firebase/storage");
+const { getStorage, ref, uploadString, getDownloadURL, deleteObject } = require("firebase/storage");
 const { log } = require('console');
 const delay = require('delay');
 const { address } = require('address');
@@ -5172,8 +5172,32 @@ ipcMain.on('open-form-signing', async (event, arg) => {
 })
 
 ipcMain.on('uploadSignature', async (event, arg) => {
-  theClient = event.sender;
+  theClient2 = event.sender;
   let theConfig;
   theConfig = firebaseConfig
   theClient2.send('uploadSignature-return', Array(theConfig, lastMemberCreated))
+  getDownloadURL(ref(storage, '/member-signatures/test.png'))
+  .then((url) => {
+    console.log('HERE: ' + url);
+  })
+})
+
+ipcMain.on('uploadSignatureBase64', async (event, arg) => {
+  theClient2 = event.sender;
+  let memberID;
+  if (!lastMemberCreated) {
+    memberID = 'test'
+  } else {
+    memberID = lastMemberCreated
+  }
+  const storageRef = ref(storage, '/member-signatures/' + getSystemAccess() + '/' + memberID + '.png');
+  // Base64 formatted string
+  uploadString(storageRef, arg, 'base64').then((snapshot) => {
+    console.log(snapshot);
+    if (swfWin) {
+      swfWin.close()
+      swfWin = false
+    }        
+    notificationSystem('success', 'Signature has been uploaded!')
+  });
 })
