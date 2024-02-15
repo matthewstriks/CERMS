@@ -3575,6 +3575,9 @@ async function getSystemData(){
     } else if (!fileSel) {
       setTimeout(() => {
         notificationSystem('warning', 'There is no directory saved for your report storage. Please contact a manager to address this ASAP!')
+        if (theHostName == "FWIN232PLUSFHD") {
+          return
+        }
         let theMsg = 'There is currently no directory saved for you report storage. Please login to the system on the PC named ' + theHostName + ', and select a directory where you want the reports to save when promoted to do so.'
         createMail(systemData.invWarnEMail, "Report save error!", theMsg, theMsg)
       }, 5000);
