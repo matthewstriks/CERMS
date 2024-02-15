@@ -17,6 +17,7 @@ let membershipExpireInput = document.getElementById('membershipExpireInput');
 let membershipMemberNumber = document.getElementById('membershipMemberNumber');
 let notesInput = document.getElementById('notesInput');
 let waiverInput = document.getElementById('waiverInput');
+let swfBtn = document.getElementById('swfBtn');
 let idnumInput = document.getElementById('idnumInput');
 let idnumStateInput = document.getElementById('idnumStateInput');
 let submitBtn = document.getElementById('submitBtn');
@@ -202,6 +203,12 @@ function formWasSubmitted(){
 function openMembership() {
   let memID = document.getElementById('lastCreatedID').innerHTML
   ipcRenderer.send('open-membership', memID)
+}
+
+if (swfBtn) {
+  swfBtn.addEventListener('click', function(){
+    ipcRenderer.send('open-form-signing')
+  })
 }
 
 ipcRenderer.on('membership-pending', (event, arg) => {

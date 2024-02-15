@@ -60,6 +60,7 @@ const usersData = Array();
 let mainWin;
 let uploadImgWin;
 let uploadFileWin;
+let swfWin;
 let recieptWin;
 let theClient;
 let theClient2;
@@ -3757,6 +3758,22 @@ const createWindow = () => {
   mainWin = mainWindow
 };
 
+const createFormSignScreen = () => {
+  const swfWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    icon: '/assets/cerms-icon.icns',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    }
+    });
+
+  swfWindow.loadFile(path.join(__dirname, 'swf.html'));
+
+  swfWin = swfWindow
+};
+
 const createUploadImageScreen = () => {
   const uploadImgWindow = new BrowserWindow({
     width: 800,
@@ -5146,4 +5163,9 @@ ipcMain.on('submit-support-ticket', async (event, arg) => {
   theURL = theURL + '&subject=' + encodeURIComponent(arg[1])
   theURL = theURL + '&message=' + encodeURIComponent(arg[2])
   shell.openExternal(theURL)
+})
+
+ipcMain.on('open-form-signing', async (event, arg) => {
+  theClient = event.sender;
+  createFormSignScreen()
 })
