@@ -2887,6 +2887,7 @@ async function createMembership(memberInfo){
     }
     updateLID();
     lastMemberCreated = docRef.id
+    createFormSignScreen()
   }
 }
 
@@ -5170,8 +5171,9 @@ ipcMain.on('open-form-signing', async (event, arg) => {
   createFormSignScreen()
 })
 
-ipcMain.on('close-swf-window', async (event, arg) => {
+ipcMain.on('uploadSignature', async (event, arg) => {
   theClient = event.sender;
-  console.log('got it');
-  swfWin.close()
+  let theConfig;
+  theConfig = firebaseConfig
+  theClient2.send('uploadSignature-return', Array(theConfig, lastMemberCreated))
 })

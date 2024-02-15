@@ -199,43 +199,63 @@
         </script>
     </head> 
     <body>  
-        <table border="1" cellpadding="0" width="500">
-            <tbody>
-                <tr>
-                    <td height="100" width="500">
-                        <canvas id="cnv" name="cnv" width="500" height="100"></canvas>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    
-    
-        <br>
-        <canvas name="SigImg" id="SigImg" width="500" height="100"></canvas>
-        <p id="sigWebVrsnNote" style="font-family: Arial;"></p>
-    
-    
-        <form action="#" name="FORM1">
-            <p>
-            <input id="SignBtn" name="SignBtn" type="button" value="Sign" onclick="javascript:onSign()">&nbsp;&nbsp;&nbsp;&nbsp;
-            <input id="button1" name="ClearBtn" type="button" value="Clear" onclick="javascript:onClear()">&nbsp;&nbsp;&nbsp;&nbsp;
-    
-            <input id="button2" name="DoneBtn" type="button" value="Done" onclick="javascript:onDone()">&nbsp;&nbsp;&nbsp;&nbsp;
+        <div class="container">
+            <table border="1" cellpadding="0" width="500">
+                <tbody>
+                    <tr>
+                        <td height="100" width="500">
+                            <canvas id="cnv" name="cnv" width="500" height="100"></canvas>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
             
-            <input type="HIDDEN" name="bioSigData" value="">
-                <input type="HIDDEN" name="sigImgData">
-                <br>
+            
+            <br>
+            <canvas name="SigImg" id="SigImg" width="500" height="100"></canvas>
+            <p id="sigWebVrsnNote" style="font-family: Arial;"></p>
+            
+            
+            <form action="#" name="FORM1">
+                <p>
+                    <input id="SignBtn" name="SignBtn" type="button" value="Sign"
+                        onclick="javascript:onSign()">&nbsp;&nbsp;&nbsp;&nbsp;
+                    <input id="button1" name="ClearBtn" type="button" value="Clear"
+                        onclick="javascript:onClear()">&nbsp;&nbsp;&nbsp;&nbsp;
+            
+                    <input id="button2" name="DoneBtn" type="button" value="Done"
+                        onclick="javascript:onDone()">&nbsp;&nbsp;&nbsp;&nbsp;
+            
+                    <input type="HIDDEN" name="bioSigData" value="">
+                    <input type="HIDDEN" name="sigImgData">
+                    <br>
                     <br>
                     <textarea name="sigStringData" rows="20" cols="50">SigString: </textarea>
                     <textarea name="sigImageData" rows="20" cols="50" spellcheck="true">Base64 String: </textarea>
-                    </p>
-        </form>
-    
-        <br><br>
-        <p id="daysUntilExpElement"></p>
-        <p id="SigWebVersion"></p>
-        <p id="SigWebTabletJSVersion"></p>
-        <p id="CertificateExpirationDate"></p>      
-        <button class="btn btn-danger" id="closeBtn">Close</button>
+                </p>
+            </form>
+            
+            <br><br>
+            <p id="pTxt"></p>
+            <p id="daysUntilExpElement"></p>
+            <p id="SigWebVersion"></p>
+            <p id="SigWebTabletJSVersion"></p>
+            <p id="CertificateExpirationDate"></p>
+        </div>
+
+
+        <!-- The core Firebase JS SDK is always required and must be listed first -->
+        <script src="https://www.gstatic.com/firebasejs/7.13.1/firebase-app.js"></script>
+        
+        <!-- TODO: Add SDKs for Firebase products that you want to use -->
+        <script src="https://www.gstatic.com/firebasejs/7.13.1/firebase-storage.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+            crossorigin="anonymous"></script>
+        
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+            crossorigin="anonymous"></script>
+
     </body>
 </html>
