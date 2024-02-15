@@ -5176,20 +5176,11 @@ ipcMain.on('uploadSignature', async (event, arg) => {
   let theConfig;
   theConfig = firebaseConfig
   theClient2.send('uploadSignature-return', Array(theConfig, lastMemberCreated))
-  getDownloadURL(ref(storage, '/member-signatures/test.png'))
-  .then((url) => {
-    console.log('HERE: ' + url);
-  })
 })
 
 ipcMain.on('uploadSignatureBase64', async (event, arg) => {
   theClient2 = event.sender;
-  let memberID;
-  if (!lastMemberCreated) {
-    memberID = 'test'
-  } else {
-    memberID = lastMemberCreated
-  }
+  let memberID = lastMemberCreated;
   const storageRef = ref(storage, '/member-signatures/' + getSystemAccess() + '/' + memberID + '.png');
   // Base64 formatted string
   uploadString(storageRef, arg, 'base64').then((snapshot) => {
@@ -5198,6 +5189,13 @@ ipcMain.on('uploadSignatureBase64', async (event, arg) => {
       swfWin.close()
       swfWin = false
     }        
+    getDownloadURL(storageRef)
+      .then(async (url) => {
+        const docRef = doc(db, "members", memberID);
+        await updateDoc(docRef, {
+          signature: url
+        });
+      })
     notificationSystem('success', 'Signature has been uploaded!')
   });
 })

@@ -744,6 +744,11 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       memberInfoNotes.value = arg[1].notes
     }
     editFileList2.innerHTML = ""
+    if (arg[1].signature) {
+      let newLi = document.createElement('li')
+//      newLi.className      
+//HERE
+    }
     if (arg[1].files) {
       for (let index = 0; index < arg[1].files.length; index++) {
         let fileURL = arg[1].files[index];
