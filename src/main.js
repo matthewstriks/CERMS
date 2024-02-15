@@ -5169,3 +5169,9 @@ ipcMain.on('open-form-signing', async (event, arg) => {
   theClient = event.sender;
   createFormSignScreen()
 })
+
+ipcMain.on('close-swf-window', async (event, arg) => {
+  theClient = event.sender;
+  console.log('got it');
+  swfWin.close()
+})
