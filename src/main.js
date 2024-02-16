@@ -3791,7 +3791,7 @@ const createESignScreen = (editOF, theMemID, theSigLink) => {
 
   setTimeout(() => {
     if (editOF) {
-      console.log('hey2');
+      // edit stuff
     }
     theClient2.send('esign-edit', Array(theMemID, theSigLink))
   }, 1000);
@@ -5209,7 +5209,6 @@ ipcMain.on('uploadSignatureBase64', async (event, arg) => {
   const storageRef = ref(storage, '/member-signatures/' + getSystemAccess() + '/' + memberID + '.png');
   // Base64 formatted string
   uploadString(storageRef, arg, 'base64').then((snapshot) => {
-    console.log(snapshot);
     if (swfWin) {
       swfWin.close()
       swfWin = false
@@ -5233,6 +5232,6 @@ ipcMain.on('open-esign', async (event, arg) => {
 }) 
 
 ipcMain.on('esign-opened', async (event, arg) => {
+  // Just to send theClient2 (for second window)
   theClient2 = event.sender;
-  console.log('hey');
 }) 
