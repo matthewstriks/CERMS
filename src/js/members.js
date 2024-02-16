@@ -746,8 +746,12 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     editFileList2.innerHTML = ""
     if (arg[1].signature) {
       let newLi = document.createElement('li')
-//      newLi.className      
-//HERE
+      newLi.className = 'list-group-item'
+      newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
+      editFileList2.appendChild(newLi)
+      document.getElementById(arg[0]+'esignView').addEventListener('click', function(){
+        ipcRenderer.send('open-esign', Array(arg[0], arg[1].signature))
+      })
     }
     if (arg[1].files) {
       for (let index = 0; index < arg[1].files.length; index++) {
@@ -837,6 +841,15 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     }
 
     editFileList.innerHTML = ""
+    if (arg[1].signature) {
+      let newLi = document.createElement('li')
+      newLi.className = 'list-group-item'
+      newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
+      editFileList.appendChild(newLi)
+      document.getElementById(arg[0] + 'esignView').addEventListener('click', function () {
+        ipcRenderer.send('open-esign', Array(arg[0], arg[1].signature))
+      })
+    }
     if (arg[1].files) {
       for (let index = 0; index < arg[1].files.length; index++) {
         let fileURL = arg[1].files[index];
@@ -1010,6 +1023,15 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
       memberInfoNotes.value = arg[1].notes
     }
     editFileList2.innerHTML = ""
+    if (arg[1].signature) {
+      let newLi = document.createElement('li')
+      newLi.className = 'list-group-item'
+      newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
+      editFileList2.appendChild(newLi)
+      document.getElementById(arg[0] + 'esignView').addEventListener('click', function () {
+        ipcRenderer.send('open-esign', Array(arg[0], arg[1].signature))
+      })
+    }
     if (arg[1].files) {
       for (let index = 0; index < arg[1].files.length; index++) {
         let fileURL = arg[1].files[index];

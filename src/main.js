@@ -61,6 +61,7 @@ let mainWin;
 let uploadImgWin;
 let uploadFileWin;
 let swfWin;
+let esignWin;
 let recieptWin;
 let theClient;
 let theClient2;
@@ -3775,6 +3776,30 @@ const createFormSignScreen = () => {
   swfWin = swfWindow
 };
 
+const createESignScreen = (editOF, theMemID, theSigLink) => {
+  const esignWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    icon: '/assets/cerms-icon.icns',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    }
+    });
+
+  esignWindow.loadFile(path.join(__dirname, 'esign.html'));
+
+  setTimeout(() => {
+    if (editOF) {
+      console.log('hey2');
+    }
+    theClient2.send('esign-edit', Array(theMemID, theSigLink))
+  }, 1000);
+
+
+  esignWin = esignWindow
+};
+
 const createUploadImageScreen = () => {
   const uploadImgWindow = new BrowserWindow({
     width: 800,
@@ -5193,9 +5218,21 @@ ipcMain.on('uploadSignatureBase64', async (event, arg) => {
       .then(async (url) => {
         const docRef = doc(db, "members", memberID);
         await updateDoc(docRef, {
-          signature: url
+          signature: url,
+          waiver_status: true
         });
       })
     notificationSystem('success', 'Signature has been uploaded!')
   });
 })
+
+ipcMain.on('open-esign', async (event, arg) => {
+  theClient = event.sender;
+  lastMemberCreated = arg[0]
+  createESignScreen(false, lastMemberCreated, arg[1])
+}) 
+
+ipcMain.on('esign-opened', async (event, arg) => {
+  theClient2 = event.sender;
+  console.log('hey');
+}) 
