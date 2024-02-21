@@ -902,7 +902,6 @@ async function recieptProcess(orderInfo, theOrderNumber){
 
     orderInfo[1].forEach(async (productSel, i) => {
       let theProductInfo = await getProductInfo(productSel)
-      dialog.showErrorBox('An Error Message', theProductInfo.name)
       withProductsTxt = withProductsTxt + '<tr><td>' + theProductInfo.name + '</td><td>1</td><td>x</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td></tr>'
       if (orderInfo[1].length == (i + 1)) {
         let withProducts = withCashier.replace('ProductsHere', withProductsTxt)
@@ -941,25 +940,21 @@ async function recieptProcess(orderInfo, theOrderNumber){
             await updateDoc(orderRef, {
               reciept: withDiscounts
             });
-            if (recieptStyle == 1) {
-              fs.writeFile(p2, withDiscounts, err => {
-                if (err) {
-                  console.error(err);
-                  dialog.showErrorBox('An Error Message', 'Demonstrating an error message. ' + err)
-                }
+            fs.writeFile(p2, withDiscounts, err => {
+              if (err) {
+                console.error(err);
+              }
+            });
+            setTimeout(() => {
+              if (recieptStyle == 1) {
                 createRecieptScreen(false)
-              });
-            } else if (recieptStyle == 2) {
-              createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
-            } else if (recieptStyle > 2) {
-              fs.writeFile(p2, withDiscounts, err => {
-                if (err) {
-                  console.error(err);
-                }
+              } else if (recieptStyle == 2) {
+                createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
+              } else if (recieptStyle > 2) {
                 createRecieptScreen(false)
                 createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
-              });
-            }
+              }              
+            }, 1000);
           }
         })
       }
@@ -3852,7 +3847,7 @@ const createRecieptScreen = (shouldChoice, logoutTF) => {
     }
     });
 
-  recieptWindow.loadFile(path.join(__dirname, 'last-reciept.html'));
+  recieptWindow.loadFile(path.join(__dirname, '.', 'last-reciept.html'));
 
   recieptWin = recieptWindow
   
