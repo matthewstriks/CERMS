@@ -3503,7 +3503,17 @@ async function startLoading(){
   await updateTLID();
   setTimeout(() => { 
     notificationSystem('primary', 'Welcome to CERMS! The system will continue to gather data. This may take a couple minutes. You may see less information when you first log in.')
+    updateUserVersion()
   }, 2000);
+}
+
+function updateUserVersion(){
+  if (userData.version != app.getVersion()) {
+    updateDoc(doc(db, "users", getUID()), {
+      version: app.getVersion(),
+    });
+    openChangelog()
+  }
 }
 
 async function searchForMessage(){
@@ -3886,6 +3896,28 @@ const createRecieptScreen = (shouldChoice, logoutTF) => {
     })
   }
 };
+
+async function openChangelog(){
+  const response = await fetch('https://api.github.com/repos/matthewstriks/CERMS/releases/tags/v' + app.getVersion());
+  const bodyJson = await response.json();
+  let changelog = bodyJson.body
+
+  const options = {
+    type: 'info',
+    title: 'Changelog',
+    icon: './assets/cerms-icon.icns',
+    message: "View what is new in this update!\n\n" + changelog + "\n",
+    detail: 'Would you like to open this on GitHub?',
+    buttons: ['Yes', 'No']
+  }
+  dialog.showMessageBox(options, function (index) {
+
+  }).then(result => {
+    if (result.response === 0) {
+      shell.openExternal('https://github.com/matthewstriks/CERMS/releases/tag/v' + app.getVersion());
+    }
+  })
+}
 
 app.on('ready', createWindow);
 
@@ -4900,25 +4932,7 @@ ipcMain.on('request-update', (event, arg) => {
 
 ipcMain.on('request-changelog', async (event, arg) => {
   theClient = event.sender;
-  const response = await fetch('https://api.github.com/repos/matthewstriks/CERMS/releases/tags/v' + app.getVersion());
-  const bodyJson = await response.json();
-  let changelog = bodyJson.body
-
-  const options = {
-    type: 'info',
-    title: 'Changelog',
-    icon: './assets/cerms-icon.icns',
-    message: "View what is new in this update!\n\n" + changelog + "\n",
-    detail: 'Would you like to open this on GitHub?',
-    buttons: ['Yes', 'No']
-  }
-  dialog.showMessageBox(options, function (index) {
-
-  }).then(result => {
-    if (result.response === 0) {
-      shell.openExternal('https://github.com/matthewstriks/CERMS/releases/tag/v'+app.getVersion());
-    }
-  })
+  openChangelog()
 })
 
 ipcMain.on('github-link', (event, arg) => {
