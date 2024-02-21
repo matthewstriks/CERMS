@@ -629,6 +629,17 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
   goProducts()
 }
 
+async function voidOrder(orderNumber){
+  if (!canUser('permissionEditVDTransactions')) {
+    notificationSystem('warning', 'You do not have permission to do this!')
+    return
+  }
+  console.log(orderNumber);
+  await deleteDoc(doc(db, "orders", orderNumber));
+  notificationSystem('success', 'Order #' + orderNumber + ' has been deleted.')
+  theClient.send('history-request-remove', orderNumber)
+}
+
 async function createOrder(memberInfo, orderType, thePendingOrder){
   if (!regStatus) {
     setTimeout(() => {
@@ -4116,7 +4127,8 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditMemberNotes: arg[17],
     permissionEditMemberFiles: arg[18],
     permissionDeleteMembers: arg[19],
-    permissionEditAnalytics: arg[20]
+    permissionEditAnalytics: arg[20],
+    permissionEditVDTransactions: arg[21]
   });
 
   if (arg[0] == getUID()) {
@@ -5245,4 +5257,9 @@ ipcMain.on('open-esign', async (event, arg) => {
 ipcMain.on('esign-opened', async (event, arg) => {
   // Just to send theClient2 (for second window)
   theClient2 = event.sender;
+}) 
+
+ipcMain.on('void-delete-order', async (event, arg) => {
+  theClient = event.sender;
+  voidOrder(arg)
 }) 

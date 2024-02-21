@@ -7,6 +7,9 @@ let membershipSearch = document.getElementById('membershipSearch');
 let orderSearch = document.getElementById('orderSearch');
 let membershipTable = document.getElementById('membershipTable');
 let membershipOrderTable = document.getElementById('membershipOrderTable');
+let vdOrderConfirm = document.getElementById('vdOrderConfirm');
+
+let theEditingOrderID;
 
 let enterPressed = false;
 
@@ -105,6 +108,12 @@ if (orderSearch){
   });
 }
 
+if (vdOrderConfirm) {
+  vdOrderConfirm.addEventListener('click', function () {
+    ipcRenderer.send('void-delete-order', theEditingOrderID)
+  })
+}
+
 function membershipSearchFunct() {
   var filter, tr, td, i, txtValue;
   filter = membershipSearch.value.toUpperCase();
@@ -200,7 +209,7 @@ ipcRenderer.on('history-order-request-return', (event, arg) => {
     cell5.innerHTML = "<button id='viewmemberbtn" + arg[0] + "' class='btn btn-primary' type='button'>View Member</button>";        
   }
 
-  cell5.innerHTML = cell5.innerHTML + " <button id='vieworderbtn" + arg[0] + "' class='btn btn-primary' type='button'>View Order</button>"
+  cell5.innerHTML = cell5.innerHTML + " <button id='vieworderbtn" + arg[0] + "' class='btn btn-primary' type='button'>View Order</button> <button data-bs-toggle='modal' data-bs-target='#myModal' id='deleteorderbtn" + arg[0] + "' class='btn btn-danger'>Void/Delete Order</button>"
 
   if (document.getElementById("viewmemberbtn" + arg[0])) {
     document.getElementById("viewmemberbtn" + arg[0]).addEventListener('click', function () {
@@ -212,6 +221,12 @@ ipcRenderer.on('history-order-request-return', (event, arg) => {
     document.getElementById("vieworderbtn" + arg[0]).addEventListener('click', function () {
       ipcRenderer.send('open-reciept', arg[0])
     })    
+  }
+
+  if (document.getElementById('deleteorderbtn' + arg[0])) {
+    document.getElementById('deleteorderbtn' + arg[0]).addEventListener('click', function(){
+      theEditingOrderID = arg[0]
+    })
   }
 })
 
@@ -286,4 +301,10 @@ ipcRenderer.on('history-request-return', (event, arg) => {
   document.getElementById("viewmemberbtn"+arg[0]).addEventListener('click', function(){
     ipcRenderer.send('open-membership', arg[1].memberID)
   })
+})
+
+ipcRenderer.on('history-request-remove', (event, arg) => {
+  if (document.getElementById('row' + arg)) {
+    document.getElementById('row' + arg).remove()
+  }
 })

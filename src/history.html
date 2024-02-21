@@ -57,6 +57,28 @@
     </div>
     <br>
 
+    <!-- Modal -->
+    <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
+      data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="exampleModalLabel">Void/Delete Order</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Are you sure you want to void/delete this order? This can not be undone.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="vdOrderConfirm" class="btn btn-danger" data-bs-toggle='modal'
+              data-bs-target='#myModal'>Confirm</button>
+            <button type="button" id="vdOrderConfirmClose" class="btn btn-secondary" data-bs-toggle='modal'
+              data-bs-target='#myModal'>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="container">
       <div class="dropdown">
         <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown"
