@@ -902,6 +902,7 @@ async function recieptProcess(orderInfo, theOrderNumber){
 
     orderInfo[1].forEach(async (productSel, i) => {
       let theProductInfo = await getProductInfo(productSel)
+      dialog.showErrorBox('An Error Message', theProductInfo.name)
       withProductsTxt = withProductsTxt + '<tr><td>' + theProductInfo.name + '</td><td>1</td><td>x</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td><td>' + formatter.format(Number(theProductInfo.price)) + '</td></tr>'
       if (orderInfo[1].length == (i + 1)) {
         let withProducts = withCashier.replace('ProductsHere', withProductsTxt)
@@ -944,6 +945,7 @@ async function recieptProcess(orderInfo, theOrderNumber){
               fs.writeFile(p2, withDiscounts, err => {
                 if (err) {
                   console.error(err);
+                  dialog.showErrorBox('An Error Message', 'Demonstrating an error message. ' + err)
                 }
                 createRecieptScreen(false)
               });
