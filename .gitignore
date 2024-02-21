@@ -96,4 +96,3 @@ electron-builder.yml
 src/assets/firebase-config.js
 src/assets/firebase-config.js
 src/assets/reciept.html
-src/assets/register-reciept.html
