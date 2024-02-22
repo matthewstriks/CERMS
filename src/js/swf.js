@@ -12,15 +12,6 @@ let myStorage
 let theProductID;
 let theSystemAccess;
 
-var files = [];
-document.getElementById("files").addEventListener("change", function (e) {
-    files = e.target.files;
-    for (let i = 0; i < files.length; i++) {
-        console.log(files[i]);
-        console.log(files[i].type.replace(/(.*)\//g, ''))
-    }
-});
-
 async function uploadSignature(){
     btnControls.style.display = "none"
     const element = document.getElementById('theBody');
@@ -44,6 +35,13 @@ async function uploadSignature(){
     waiver.style.display = 'none'
     signature.style.display = 'none'
 }
+
+document.getElementById('button2').addEventListener('click', function(){
+    document.getElementById('button2').disabled = true
+    setTimeout(() => {
+        uploadSignature()        
+    }, 1000);
+})
 
 if (finalBtn) {
     finalBtn.addEventListener("click", function () {
