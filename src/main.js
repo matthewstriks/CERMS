@@ -740,7 +740,7 @@ async function resumeOrder(){
 }
 
 async function viewOrderReciept(theOrderNumber){
-  let p2 = path.join(__dirname, '.', 'last-reciept.html');
+  let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
   let theReciept = ""
 
   const docRef = doc(db, "orders", theOrderNumber);
@@ -769,7 +769,7 @@ async function registerReciept(registerID, logoutTF){
   let theSecs = theTimestamp.getSeconds()
   let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
   let theDisplayName = await getDisplayName()
-  let p2 = path.join(__dirname, '.', 'last-reciept.html');
+  let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
 
   const docRef = doc(db, "registers", registerID);
   const docSnap = await getDoc(docRef);
@@ -859,7 +859,7 @@ async function recieptProcess(orderInfo, theOrderNumber){
   let theDisplayName = await getDisplayName()
   let theEMail = orderInfo[7]
   let theCustomersEMail = await getMemberEMail(orderInfo[0])    
-  let p2 = path.join(__dirname, '.', 'last-reciept.html');
+  let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html')
 
   let withDate
   let withOrder
@@ -956,16 +956,14 @@ async function recieptProcess(orderInfo, theOrderNumber){
                 console.error(err);
               }
             });
-            setTimeout(() => {
-              if (recieptStyle == 1) {
-                createRecieptScreen(false)
-              } else if (recieptStyle == 2) {
-                createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
-              } else if (recieptStyle > 2) {
-                createRecieptScreen(false)
-                createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
-              }              
-            }, 1000);
+            if (recieptStyle == 1) {
+              createRecieptScreen(false)
+            } else if (recieptStyle == 2) {
+              createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
+            } else if (recieptStyle > 2) {
+              createRecieptScreen(false)
+              createMail(theEMail, 'Reciept!', withDiscounts, withDiscounts)
+            }              
           }
         })
       }
@@ -3849,7 +3847,7 @@ const createUploadFileScreen = () => {
 }
 
 function emailReciept(theEMail){
-  let p = path.join(__dirname, '.', 'last-reciept.html');
+  let p = path.join(app.getPath('userData'), '.', 'last-reciept.html');
   fs.readFile(p, 'utf-8', (err, data) => {
     if (err) {
       console.log(err.message);
@@ -3868,7 +3866,7 @@ const createRecieptScreen = (shouldChoice, logoutTF) => {
     }
     });
 
-  recieptWindow.loadFile(path.join(__dirname, '.', 'last-reciept.html'));
+  recieptWindow.loadFile(path.join(app.getPath('userData'), '.', 'last-reciept.html'));
 
   recieptWin = recieptWindow
   
@@ -5074,6 +5072,16 @@ ipcMain.on('settings-update-business-info', async (event, arg) => {
   })
   getSystemData()
   notificationSystem('success', 'Business Info has been updated!')
+})
+
+ipcMain.on('settings-update-business-waiver-info', async (event, arg) => {
+  theClient = event.sender
+  const docRef = doc(db, "system", getSystemAccess());
+  updateDoc(docRef, {
+    theWaiver: arg,
+  })
+  getSystemData()
+  notificationSystem('success', 'Business Waiver has been updated!')
 })
 
 ipcMain.on('settings-quickbooks-disconnect', async (event, arg) => {

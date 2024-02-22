@@ -34,6 +34,13 @@ let businessPNumEdit = document.getElementById('businessPNumEdit')
 let businessEMailEdit = document.getElementById('businessEMailEdit')
 let saveBusinessSettingsBtn = document.getElementById('saveBusinessSettingsBtn')
 let cancelBusinessSettingsBtn = document.getElementById('cancelBusinessSettingsBtn')
+let businessWaiverSettingsDisplay = document.getElementById('businessWaiverSettingsDisplay')
+let businessWaiverSettingsEdit = document.getElementById('businessWaiverSettingsEdit')
+let editWaiverSettingsBtn = document.getElementById('editWaiverSettingsBtn')
+let theWaiver = document.getElementById('theWaiver')
+let theWaiverEdit = document.getElementById('theWaiverEdit')
+let saveBusinessWaiverSettingsBtn = document.getElementById('saveBusinessWaiverSettingsBtn')
+let cancelBusinessWaiverSettingsBtn = document.getElementById('cancelBusinessWaiverSettingsBtn')
 let quickbooksStep2 = document.getElementById('quickbooksStep2')
 let quickbooksURL = document.getElementById('quickbooksURL')
 let finishQuickbooks = document.getElementById('finishQuickbooks')
@@ -138,9 +145,22 @@ if (businessSettingsDisplay) {
     businessSettingsEdit.style.display = 'none'
 }
 
+if (businessWaiverSettingsEdit) {
+    businessWaiverSettingsEdit.style.display = 'none'
+}
+
+if (businessWaiverSettingsDisplay) {
+    businessWaiverSettingsEdit.style.display = 'none'
+}
+
 editBusinessSettingsBtn.addEventListener('click', function(){
     businessSettingsDisplay.style.display = 'none'
     businessSettingsEdit.style.display = ''
+})
+
+editWaiverSettingsBtn.addEventListener('click', function(){
+    businessWaiverSettingsDisplay.style.display = 'none'
+    businessWaiverSettingsEdit.style.display = ''
 })
 
 saveBusinessSettingsBtn.addEventListener('click', function(){
@@ -150,6 +170,15 @@ saveBusinessSettingsBtn.addEventListener('click', function(){
 cancelBusinessSettingsBtn.addEventListener('click', function(){
     businessSettingsDisplay.style.display = ''
     businessSettingsEdit.style.display = 'none'
+})
+
+saveBusinessWaiverSettingsBtn.addEventListener('click', function(){
+    ipcRenderer.send('settings-update-business-waiver-info', theWaiverEdit.value)
+})
+
+cancelBusinessWaiverSettingsBtn.addEventListener('click', function(){
+    businessWaiverSettingsDisplay.style.display = ''
+    businessWaiverSettingsEdit.style.display = 'none'
 })
 
 if (quickbooksStep2) {
@@ -306,6 +335,9 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
     businessAddress2Edit.value = arg[1].businessAddress2 || ""
     businessPNumEdit.value = arg[1].businessPNum || ""
     businessEMailEdit.value = arg[1].businessEMail || ""
+
+    theWaiver.innerHTML = arg[1].theWaiver || "No Waiver Found"
+    theWaiverEdit.innerHTML = arg[1].theWaiver || ""
 
     if (arg[2]) {
        quickbooksConnect.disabled = true 
