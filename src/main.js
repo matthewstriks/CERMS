@@ -86,6 +86,9 @@ let pendingOrderID;
 let lastMemberCreated;
 let lastMemberName;
 let lastMemberID;
+let lastMemberDOB; 
+let lastMemberIDState; 
+let lastMemberIDNum;
 let orderSuspended = false
 let theLockerRoomInput
 let theLockerRoomInput2
@@ -2897,6 +2900,9 @@ async function createMembership(memberInfo){
     lastMemberCreated = docRef.id
     lastMemberName = memberInfo[0] + " " + memberInfo[1]
     lastMemberID = idNumber
+    lastMemberDOB = memberInfo[2]
+    lastMemberIDState = memberInfo[7]
+    lastMemberIDNum = memberInfo[6]
     if (systemData.useESigning) {
       createFormSignScreen()      
     }
@@ -5234,7 +5240,7 @@ ipcMain.on('submit-support-ticket', async (event, arg) => {
 
 ipcMain.on('uploadSignature', async (event, arg) => {
   theClient2 = event.sender;
-  theClient2.send('uploadSignature-return', Array(firebaseConfig, systemData.theWaiver, lastMemberName, lastMemberCreated, lastMemberID, getSystemAccess()))
+  theClient2.send('uploadSignature-return', Array(firebaseConfig, systemData.theWaiver, lastMemberName, lastMemberCreated, lastMemberID, getSystemAccess(), lastMemberDOB, lastMemberIDState, lastMemberIDNum))
 })
 
 ipcMain.on('uploadSignatureComplete', async (event, arg) => {
@@ -5250,6 +5256,36 @@ ipcMain.on('uploadSignatureComplete', async (event, arg) => {
   }
   notificationSystem('success', 'Signature has been uploaded!')
 })
+
+ipcMain.on('edit-esign', async (event, arg) => {
+  theClient = event.sender;
+  let theMember = await getMemberInfo(arg)
+  lastMemberName = theMember.name
+  lastMemberCreated = arg
+  lastMemberID = theMember.id_number
+  lastMemberDOB = theMember.dob
+  lastMemberIDState = theMember.idstate
+  lastMemberIDNum = theMember.idnum
+  createFormSignScreen()
+  //  theClient2.send('uploadSignature-return', Array(firebaseConfig, systemData.theWaiver, lastMemberName, lastMemberCreated, lastMemberID, getSystemAccess(), lastMemberDOB, lastMemberIDState, lastMemberIDNum))
+}) 
+
+ipcMain.on('esign-delete', async (event, arg) => {
+  theClient = event.sender;
+
+  const desertRef = ref(storage, '/member-signature-pdfs/' + getSystemAccess() + '/' + arg + '.pdf');
+  deleteObject(desertRef).then(() => {
+    notificationSystem('success', 'Signature has been removed!')
+  }).catch((error) => {
+    notificationSystem('danger', 'Something went wrong!')
+    console.log(error);
+  });  
+  const docRef = doc(db, "members", arg);
+  await updateDoc(docRef, {
+    signature: "",
+    waiver_status: false
+  });
+}) 
 
 ipcMain.on('void-delete-order', async (event, arg) => {
   theClient = event.sender;

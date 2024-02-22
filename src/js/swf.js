@@ -58,6 +58,6 @@ ipcRenderer.on('uploadSignature-return', (event, arg) => {
     theSystemAccess = arg[5]
 
     let datetime = new Date().toLocaleString();
-    waiver.innerHTML = arg[1] + '<br><hr><br><b>Member Name:</b> ' + arg[2] + '<br><br><b>Member ID:</b> ' + arg[3] + ' (' + arg[4] + ')<br><br><b>Timestamp:</b> ' + datetime + '<br><br>'
+    waiver.innerHTML = arg[1] + '<br><hr><br><b>Member Name:</b> ' + arg[2] + '<br><br><b>Member ID:</b> ' + arg[3] + ' (' + arg[4] + ')<br><br><b>Member DOB: </b>' + arg[6] + '<br><br><b>Member State ID Number: </b>' + arg[7] + ' - ' + arg[8] + '<br><br><b>Timestamp:</b> ' + datetime + '<br><br>'
     theProductID = arg[3]
 })

@@ -72,6 +72,7 @@ let editFileList2 = document.getElementById('editFileList2');
 let editmemberInfoDeleteBtn = document.getElementById('editmemberInfoDeleteBtn');
 let editmemberInfoDeleteBtnCloseConfirm = document.getElementById('editmemberInfoDeleteBtnCloseConfirm');
 let editmemberInfoDeleteFileBtnCloseConfirm = document.getElementById('editmemberInfoDeleteFileBtnCloseConfirm');
+let editmemberInfoDeleteESWBtnCloseConfirm = document.getElementById('editmemberInfoDeleteESWBtnCloseConfirm');
 
 let myModal2 = document.getElementById('myModal2');
 
@@ -91,6 +92,8 @@ let rank;
 let isTagged = false
 let fileTrashing
 let fileTrashingList
+let esignRemoving
+let esignRemovingList
 
 
 if (scanIDBtn) {
@@ -228,6 +231,13 @@ if (editmemberInfoDeleteFileBtnCloseConfirm) {
   editmemberInfoDeleteFileBtnCloseConfirm.addEventListener('click', function(){
     ipcRenderer.send('trash-member-file', fileTrashing)
     fileTrashingList.remove()
+  })
+}
+
+if (editmemberInfoDeleteESWBtnCloseConfirm) {
+  editmemberInfoDeleteESWBtnCloseConfirm.addEventListener('click', function(){
+    ipcRenderer.send('esign-delete', esignRemoving)
+    esignRemovingList.remove()
   })
 }
 
@@ -747,10 +757,17 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     if (arg[1].signature) {
       let newLi = document.createElement('li')
       newLi.className = 'list-group-item'
-      newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
-      editFileList2.appendChild(newLi)
-      document.getElementById(arg[0]+'esignView').addEventListener('click', function(){
+      newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button> <button type='button' class='btn btn-warning' id='" + arg[0] + "esignEdit'><i class='fa-solid fa-edit'></i></button> <button data-bs-toggle='modal' data-bs-target='#myModal9' type='button' class='btn btn-danger' id='" + arg[0] + "esignRemove'><i class='fa-solid fa-trash'></i></button>"
+      editFileList.appendChild(newLi)
+      document.getElementById(arg[0] + 'esignView').addEventListener('click', function () {
         ipcRenderer.send('open-link', arg[1].signature)
+      })
+      document.getElementById(arg[0] + 'esignEdit').addEventListener('click', function () {
+        ipcRenderer.send('edit-esign', arg[0])
+      })
+      document.getElementById(arg[0] + 'esignRemove').addEventListener('click', function () {
+        esignRemoving = arg[0]
+        esignRemovingList = newLi
       })
     }
     if (arg[1].files) {
@@ -844,10 +861,17 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     if (arg[1].signature) {
       let newLi = document.createElement('li')
       newLi.className = 'list-group-item'
-      newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
+      newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button> <button type='button' class='btn btn-warning' id='" + arg[0] + "esignEdit'><i class='fa-solid fa-edit'></i></button> <button data-bs-toggle='modal' data-bs-target='#myModal9' type='button' class='btn btn-danger' id='" + arg[0] + "esignRemove'><i class='fa-solid fa-trash'></i></button>"
       editFileList.appendChild(newLi)
       document.getElementById(arg[0] + 'esignView').addEventListener('click', function () {
         ipcRenderer.send('open-link', arg[1].signature)
+      })
+      document.getElementById(arg[0] + 'esignEdit').addEventListener('click', function () {
+        ipcRenderer.send('edit-esign', arg[0])
+      })
+      document.getElementById(arg[0] + 'esignRemove').addEventListener('click', function () {
+        esignRemoving = arg[0]
+        esignRemovingList = newLi
       })
     }
     if (arg[1].files) {
