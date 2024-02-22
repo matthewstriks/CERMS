@@ -61,7 +61,6 @@ let mainWin;
 let uploadImgWin;
 let uploadFileWin;
 let swfWin;
-let esignWin;
 let recieptWin;
 let theClient;
 let theClient2;
@@ -2898,7 +2897,9 @@ async function createMembership(memberInfo){
     lastMemberCreated = docRef.id
     lastMemberName = memberInfo[0] + " " + memberInfo[1]
     lastMemberID = idNumber
-    createFormSignScreen()
+    if (systemData.useESigning) {
+      createFormSignScreen()      
+    }
   }
 }
 
@@ -3794,30 +3795,6 @@ const createFormSignScreen = () => {
   swfWindow.loadFile(path.join(__dirname, 'swf.html'));
 
   swfWin = swfWindow
-};
-
-const createESignScreen = (editOF, theMemID, theSigLink) => {
-  const esignWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    icon: '/assets/cerms-icon.icns',
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-    }
-    });
-
-  esignWindow.loadFile(path.join(__dirname, 'esign.html'));
-
-  setTimeout(() => {
-    if (editOF) {
-      // edit stuff
-    }
-    theClient2.send('esign-edit', Array(theMemID, theSigLink))
-  }, 1000);
-
-
-  esignWin = esignWindow
 };
 
 const createUploadImageScreen = () => {
@@ -5066,6 +5043,11 @@ ipcMain.on('settings-verify-email', (event, arg) => {
 
 ipcMain.on('settings-update-business-info', async (event, arg) => {
   theClient = event.sender
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
   const docRef = doc(db, "system", getSystemAccess());
   updateDoc(docRef, {
     businessName: arg[0],
@@ -5080,12 +5062,36 @@ ipcMain.on('settings-update-business-info', async (event, arg) => {
 
 ipcMain.on('settings-update-business-waiver-info', async (event, arg) => {
   theClient = event.sender
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
   const docRef = doc(db, "system", getSystemAccess());
   updateDoc(docRef, {
     theWaiver: arg,
   })
   getSystemData()
   notificationSystem('success', 'Business Waiver has been updated!')
+})
+
+ipcMain.on('settings-update-esign-enable', async (event, arg) => {
+  theClient = event.sender
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+  const docRef = doc(db, "system", getSystemAccess());
+  updateDoc(docRef, {
+    useESigning: arg,
+  })
+  getSystemData()
+  if (arg) {
+    notificationSystem('success', 'ESigning has been enabled!')    
+  } else {
+    notificationSystem('success', 'ESigning has been disabled!')    
+  }
 })
 
 ipcMain.on('settings-quickbooks-disconnect', async (event, arg) => {
@@ -5226,11 +5232,6 @@ ipcMain.on('submit-support-ticket', async (event, arg) => {
   shell.openExternal(theURL)
 })
 
-ipcMain.on('open-form-signing', async (event, arg) => {
-  theClient = event.sender;
-  createFormSignScreen()
-})
-
 ipcMain.on('uploadSignature', async (event, arg) => {
   theClient2 = event.sender;
   theClient2.send('uploadSignature-return', Array(firebaseConfig, systemData.theWaiver, lastMemberName, lastMemberCreated, lastMemberID, getSystemAccess()))
@@ -5249,17 +5250,6 @@ ipcMain.on('uploadSignatureComplete', async (event, arg) => {
   }
   notificationSystem('success', 'Signature has been uploaded!')
 })
-
-ipcMain.on('open-esign', async (event, arg) => {
-  theClient = event.sender;
-  lastMemberCreated = arg[0]
-  createESignScreen(false, lastMemberCreated, arg[1])
-}) 
-
-ipcMain.on('esign-opened', async (event, arg) => {
-  // Just to send theClient2 (for second window)
-  theClient2 = event.sender;
-}) 
 
 ipcMain.on('void-delete-order', async (event, arg) => {
   theClient = event.sender;

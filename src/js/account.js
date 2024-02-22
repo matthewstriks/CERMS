@@ -41,6 +41,7 @@ let theWaiver = document.getElementById('theWaiver')
 let theWaiverEdit = document.getElementById('theWaiverEdit')
 let saveBusinessWaiverSettingsBtn = document.getElementById('saveBusinessWaiverSettingsBtn')
 let cancelBusinessWaiverSettingsBtn = document.getElementById('cancelBusinessWaiverSettingsBtn')
+let enableSignatureSigningSwitch = document.getElementById('enableSignatureSigningSwitch')
 let quickbooksStep2 = document.getElementById('quickbooksStep2')
 let quickbooksURL = document.getElementById('quickbooksURL')
 let finishQuickbooks = document.getElementById('finishQuickbooks')
@@ -165,6 +166,11 @@ editWaiverSettingsBtn.addEventListener('click', function(){
 
 saveBusinessSettingsBtn.addEventListener('click', function(){
     ipcRenderer.send('settings-update-business-info', Array(businessNameEdit.value, businessAddressEdit.value, businessAddress2Edit.value, businessPNumEdit.value, businessEMailEdit.value))
+})
+
+enableSignatureSigningSwitch.addEventListener('click', function(){
+    console.log(enableSignatureSigningSwitch.checked);
+    ipcRenderer.send('settings-update-esign-enable', enableSignatureSigningSwitch.checked)
 })
 
 cancelBusinessSettingsBtn.addEventListener('click', function(){

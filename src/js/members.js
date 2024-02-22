@@ -750,7 +750,7 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
       editFileList2.appendChild(newLi)
       document.getElementById(arg[0]+'esignView').addEventListener('click', function(){
-        ipcRenderer.send('open-esign', Array(arg[0], arg[1].signature))
+        ipcRenderer.send('open-link', arg[1].signature)
       })
     }
     if (arg[1].files) {
@@ -847,7 +847,7 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
       newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
       editFileList.appendChild(newLi)
       document.getElementById(arg[0] + 'esignView').addEventListener('click', function () {
-        ipcRenderer.send('open-esign', Array(arg[0], arg[1].signature))
+        ipcRenderer.send('open-link', arg[1].signature)
       })
     }
     if (arg[1].files) {
@@ -1029,7 +1029,7 @@ ipcRenderer.on('membership-request-return-update', (event, arg) => {
       newLi.innerHTML = "E-Signed Waiver <button type='button' class='btn btn-primary' id='" + arg[0] + "esignView'><i class='fa-solid fa-eye'></i></button>"
       editFileList2.appendChild(newLi)
       document.getElementById(arg[0] + 'esignView').addEventListener('click', function () {
-        ipcRenderer.send('open-esign', Array(arg[0], arg[1].signature))
+        ipcRenderer.send('open-link', arg[1].signature)
       })
     }
     if (arg[1].files) {
