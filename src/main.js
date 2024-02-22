@@ -85,6 +85,8 @@ let quickbooksIsConnected = false
 let pendingOrders = Array()
 let pendingOrderID;
 let lastMemberCreated;
+let lastMemberName;
+let lastMemberID;
 let orderSuspended = false
 let theLockerRoomInput
 let theLockerRoomInput2
@@ -2894,6 +2896,8 @@ async function createMembership(memberInfo){
     }
     updateLID();
     lastMemberCreated = docRef.id
+    lastMemberName = memberInfo[0] + " " + memberInfo[1]
+    lastMemberID = idNumber
     createFormSignScreen()
   }
 }
@@ -5229,31 +5233,21 @@ ipcMain.on('open-form-signing', async (event, arg) => {
 
 ipcMain.on('uploadSignature', async (event, arg) => {
   theClient2 = event.sender;
-  let theConfig;
-  theConfig = firebaseConfig
-  theClient2.send('uploadSignature-return', Array(theConfig, lastMemberCreated))
+  theClient2.send('uploadSignature-return', Array(firebaseConfig, systemData.theWaiver, lastMemberName, lastMemberCreated, lastMemberID, getSystemAccess()))
 })
 
-ipcMain.on('uploadSignatureBase64', async (event, arg) => {
+ipcMain.on('uploadSignatureComplete', async (event, arg) => {
   theClient2 = event.sender;
-  let memberID = lastMemberCreated;
-  const storageRef = ref(storage, '/member-signatures/' + getSystemAccess() + '/' + memberID + '.png');
-  // Base64 formatted string
-  uploadString(storageRef, arg, 'base64').then((snapshot) => {
-    if (swfWin) {
-      swfWin.close()
-      swfWin = false
-    }        
-    getDownloadURL(storageRef)
-      .then(async (url) => {
-        const docRef = doc(db, "members", memberID);
-        await updateDoc(docRef, {
-          signature: url,
-          waiver_status: true
-        });
-      })
-    notificationSystem('success', 'Signature has been uploaded!')
+  let theURL = arg;
+  const docRef = doc(db, "members", lastMemberCreated);
+  await updateDoc(docRef, {
+    signature: theURL,
+    waiver_status: true
   });
+  if (swfWin) {
+    swfWin.close()
+  }
+  notificationSystem('success', 'Signature has been uploaded!')
 })
 
 ipcMain.on('open-esign', async (event, arg) => {

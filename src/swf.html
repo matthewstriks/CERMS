@@ -165,12 +165,13 @@
                 SetImageYSize(100);
                 SetImagePenWidth(5);
                 GetSigImageB64(SigImageCallback);
+                uploadSignature()
+
             }
             }
         
             function SigImageCallback( str )
             {
-            uploadSignature(str)
             }
         
             function endDemo()
@@ -193,17 +194,23 @@
             //	3. Tab Refresh
             window.onbeforeunload = null;
         </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     </head> 
-    <body>  
+    <body id="theBody">  
         <br>
         <div class="container">
-            <div class="container">
+            <div class="container" id="btnControls">
                 <button class="btn btn-primary" id="SignBtn" name="SignBtn" type="button" onclick="javascript:onSign()">Begin</button>
                 <button class="btn btn-warning" id="button1" name="ClearBtn" type="button" onclick="javascript:onClear()">Clear</button>
                 <button class="btn btn-success" id="button2" name="DoneBtn" type="button" onclick="javascript:onDone()">Upload</button>        
+                <p id="sigWebVrsnNote"></p>
+                <p id="daysUntilExpElement"></p>
+                <hr>
             </div>
-            <hr>
-            <div class="container">
+            <div class="container" id="waiver">
+            
+            </div>
+            <div class="container" id="signature">
                 <table border="1" cellpadding="0" width="500">
                     <tbody>
                         <tr>
@@ -213,20 +220,20 @@
                         </tr>
                     </tbody>
                 </table>
-                <canvas name="SigImg" id="SigImg" width="500" height="100"></canvas>                        
+                <canvas name="SigImg" id="SigImg" width="500" height="100"></canvas>
             </div>
-
-            <p id="pTxt"></p>
-            <p id="sigWebVrsnNote"></p>
-            <p id="daysUntilExpElement"></p>
         </div>
 
-        <script src="./js/swf.js"></script>
-        <!-- The core Firebase JS SDK is always required and must be listed first -->
-        <script src="https://www.gstatic.com/firebasejs/7.13.1/firebase-app.js"></script>
-        
-        <!-- TODO: Add SDKs for Firebase products that you want to use -->
-        <script src="https://www.gstatic.com/firebasejs/7.13.1/firebase-storage.js"></script>
+        <!-- Insert this script at the bottom of the HTML, but before you use any Firebase services -->
+        <script type="module">
+            import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js'
+
+            // Add Firebase products that you want to use
+            import { getStorage, ref, uploadBytes } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js'
+        </script>
+
+        <script type="module" src="./js/swf.js"></script>
+
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
             crossorigin="anonymous"></script>
