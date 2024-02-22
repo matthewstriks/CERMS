@@ -34,6 +34,9 @@ let dinput10c = document.getElementById('dinput10c');
 let dinput5c = document.getElementById('dinput5c');
 let dinput1c = document.getElementById('dinput1c');
 
+let dropPSA = document.getElementById('dropPSA')
+let dropCCardAmt = document.getElementById('dropCCardAmt')
+
 let endingAmt = document.getElementById('endingAmt');
 let dropAmt = document.getElementById('dropAmt');
 let endingSubmitLogoutBtn = document.getElementById('endingSubmitLogoutBtn');
@@ -51,7 +54,7 @@ function editEndingTotal(){
 }
 
 function editDropTotal(){
-  dropAmt.value = (Number(dinput100.value) * 100) + (Number(dinput50.value) * 50) + (Number(dinput20.value) * 20) + (Number(dinput10.value) * 10) + (Number(dinput5.value) * 5) + (Number(dinput1.value) * 1) + (Number(dinput25c.value) * .25) + (Number(dinput10c.value) * .10) + (Number(dinput5c.value) * .05) + (Number(dinput1c.value) * .01)   
+  dropAmt.value = (Number(dinput100.value) * 100) + (Number(dinput50.value) * 50) + (Number(dinput20.value) * 20) + (Number(dinput10.value) * 10) + (Number(dinput5.value) * 5) + (Number(dinput1.value) * 1) + (Number(dinput25c.value) * .25) + (Number(dinput10c.value) * .10) + (Number(dinput5c.value) * .05) + (Number(dinput1c.value) * .01) + (Number(dropPSA.value) + Number(dropCCardAmt.value))   
 }
 
 input100.addEventListener('input', function(){
@@ -132,6 +135,14 @@ dinput5c.addEventListener('input', function(){
 
 dinput1c.addEventListener('input', function(){
   editDropTotal()  
+})
+
+dropPSA.addEventListener('input', function(){
+  editDropTotal()
+})
+
+dropCCardAmt.addEventListener('input', function(){
+  editDropTotal()
 })
 
 if (manageRegisters) {
