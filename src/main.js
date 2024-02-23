@@ -5240,7 +5240,7 @@ ipcMain.on('submit-support-ticket', async (event, arg) => {
 
 ipcMain.on('uploadSignature', async (event, arg) => {
   theClient2 = event.sender;
-  theClient2.send('uploadSignature-return', Array(firebaseConfig, systemData.theWaiver, lastMemberName, lastMemberCreated, lastMemberID, getSystemAccess(), lastMemberDOB, lastMemberIDState, lastMemberIDNum))
+  theClient2.send('uploadSignature-return', Array(firebaseConfig, systemData.theWaiver, lastMemberName, lastMemberCreated, lastMemberID, getSystemAccess(), lastMemberDOB, lastMemberIDState, lastMemberIDNum, getDisplayName()))
 })
 
 ipcMain.on('uploadSignatureComplete', async (event, arg) => {
