@@ -638,7 +638,6 @@ async function voidOrder(orderNumber){
     notificationSystem('warning', 'You do not have permission to do this!')
     return
   }
-  console.log(orderNumber);
   await deleteDoc(doc(db, "orders", orderNumber));
   notificationSystem('success', 'Order #' + orderNumber + ' has been deleted.')
   theClient.send('history-request-remove', orderNumber)
@@ -792,6 +791,12 @@ async function registerReciept(registerID, logoutTF){
   let withInput10C
   let withInput5C
   let withInput1C
+  let withInputDA
+  let withInputPSN
+  let withInputPSA
+  let withInputCCRA
+  let withInputCCRT
+
   let theReturnsHTML = ""
   formatter.format(Math.round((Number(registerInfo.starting) + Number.EPSILON) * 100) / 100)
 
@@ -830,7 +835,16 @@ async function registerReciept(registerID, logoutTF){
       withInput10C = withInput25C.replace('Input10c', registerInfo.input10c)
       withInput5C = withInput10C.replace('Input05c', registerInfo.input5c)
       withInput1C = withInput5C.replace('Input01c', registerInfo.input1c)
-      withReturns = withInput1C.replace('TheReturns', theReturnsHTML)
+      withInputDA = withInput1C.replace('InputDropAmtDrop', registerInfo.drop)
+      withInputPSNDrop = withInputDA.replace('InputPayoutPSNDrop', registerInfo.dropPSN)
+      withInputPSADrop = withInputPSNDrop.replace('InputPSADrop', registerInfo.dropPSA)
+      withInputCCRADrop = withInputPSADrop.replace('InputCCardRanAmtDrop', registerInfo.dropCCardAmtRan)
+      withInputCCRTDrop = withInputCCRADrop.replace('InputCCardTotalAmtDrop', registerInfo.dropCCardAmt)
+      withInputPSN = withInputCCRTDrop.replace('InputPayoutPSN', registerInfo.PSN)
+      withInputPSA = withInputPSN.replace('InputPSA', registerInfo.PSA)
+      withInputCCRA = withInputPSA.replace('InputCCardRanAmt', registerInfo.CCardAmtRan)
+      withInputCCRT = withInputCCRA.replace('InputCCardTotalAmt', registerInfo.ccard)
+      withReturns = withInputCCRT.replace('TheReturns', theReturnsHTML)
       withTotal = withReturns.replace('TheTotal', registerInfo.ending)
       withStarting = withTotal.replace('TheExpTotal', registerInfo.starting)
       withDiff = withStarting.replace('TheDifference', Math.round(((registerInfo.ending - registerInfo.starting) + Number.EPSILON) * 100) / 100)
@@ -1312,7 +1326,14 @@ async function startRegister(registerInfo, redirect){
     ending: false,
     drop: 0,
     ccard: 0,
-    gcard: 0
+    gcard: 0,
+    dropPSN: 0,
+    dropPSA: 0,
+    dropCCardAmtRan: 0,
+    dropCCardAmt: 0,
+    PSN: 0,
+    PSA: 0,
+    CCardAmtRan: 0,
   });
 
   if (redirect) {
@@ -1355,6 +1376,9 @@ async function endRegister(registerInfo, logoutTF){
     input10c: registerInfo[8],
     input5c: registerInfo[9],
     input1c: registerInfo[10],
+    PSN: registerInfo[12],
+    PSA: registerInfo[13],
+    CCardAmtRan: registerInfo[14],
     active: false
   });
   registerReciept(regStatusID, logoutTF)
@@ -1374,6 +1398,10 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
   registerAmount = registerAmount + amount[2]
 
   let dropAmt = registerInfo.drop
+  let dropPSNAmt = registerInfo.dropPSN
+  let dropPSAAmt = registerInfo.dropPSA
+  let dropCCardAmtRan = registerInfo.dropCCardAmtRan
+  let dropCCardAmt = registerInfo.dropCCardAmt
 
   let paymentTotal = 0;
   if (!drop) {
@@ -1389,13 +1417,28 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
     }    
   }else{
     dropAmt = (dropAmt + Math.abs(amount[2]))
+    dropPSNAmt = dropPSNAmt + drop[0]
+    dropPSAAmt = dropPSAAmt + drop[1]
+    dropCCardAmtRan = dropCCardAmtRan + drop[2]
+    dropCCardAmt = dropCCardAmt + drop[3]
+
+    //Number(dropPSN.value), Number(dropPSA.value), Number(dropCCardAmtRan.value), Number(dropCCardAmt.value)
   }
   const registerRef = doc(db, "registers", regStatusID);
   await updateDoc(registerRef, {
     starting: Number(registerAmount),
     gcard: Number(gCardAmt),
-    drop: Number(dropAmt)
-  });      
+    drop: Number(dropAmt),
+    dropPSN: Number(dropPSNAmt),
+    dropPSA: Number(dropPSAAmt),
+    dropCCardAmtRan: Number(dropCCardAmtRan),
+    dropCCardAmt: Number(dropCCardAmt)
+  });   
+  if (drop) {
+    goRegister()
+    registerStatus()   
+    notificationSystem('success', 'Money drop has been logged.') 
+  }   
 }
 
 async function startRegisterReport(registerID, isFinal) {
@@ -4526,8 +4569,7 @@ ipcMain.on('ending-register', (event, arg) => {
 
 ipcMain.on('drop-register', (event, arg) => {
   theClient = event.sender;
-  //function updateRegisterSub(registerInfo: any, amount: any, total: any, drop: any): Promise<void>
-  updateRegisterSub(arg[0], Array(0, 0, -arg[1]), false, true)
+  updateRegisterSub(arg[0], Array(0, 0, -arg[1]), false, Array(arg[12], arg[13], arg[14], arg[15]))
 })
 
 ipcMain.on('manage-ending-register', (event, arg) => {
