@@ -2865,20 +2865,20 @@ async function createMembership(memberInfo){
   const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1), where('access', '==', getSystemAccess()));
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
+    update = true;
     theClient.send('membership-pending-waiting-for-id')
     notificationSystem('warning', 'Creating member... (waiting for new ID)')
     updateLID()
     getSystemData();
-    update = true;
     setTimeout(function(){createMembership(memberInfo)}, 1000);
   });
   if (!update){
     const q2 = query(collection(db, "members"), where("name", "==", memberInfo[0] + " " + memberInfo[1]), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]), where('access', '==', getSystemAccess()));
     const querySnapshot2 = await getDocs(q2);
     querySnapshot2.forEach( async (doc) => {
+      update = true;
       updateMembership(doc.id, doc.data(), memberInfo);
       updateOrderCustomerID(pendingOrderID, doc.id)
-      update = true;
     });
   }
   if (!update) {
