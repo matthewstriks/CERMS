@@ -68,12 +68,15 @@
         <div class="mb-3">
           <label for="ticketType" class="form-label">Support Ticket Type</label>
           <select class="form-control" id="ticketType">
-            <option value="">---</option>
+            <option value="0">---</option>
             <option value="1">General</option>
             <option value="2">Bug Report</option>
             <option value="3">Error Report</option>
             <option value="4">Feature Request</option>
+            <option value="5">Report Request</option>
           </select>
+          <br>
+          <p id="typeLbl"></p>
         </div>
         <div class="mb-3">
           <input type="text" class="form-control" id="ticketSubject" placeholder="Subject">
