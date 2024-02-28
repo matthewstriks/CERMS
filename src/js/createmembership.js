@@ -21,6 +21,8 @@ let idnumStateInput = document.getElementById('idnumStateInput');
 let submitBtn = document.getElementById('submitBtn');
 let scanIDBtn = document.getElementById('scanIDBtn');
 let scanIDTxt = document.getElementById('scanIDTxt');
+let waiverInputDiv = document.getElementById('waiverInputDiv');
+let waiverInput = document.getElementById('waiverInput');
 let scannerOn = false
 let memberUnder18 = false
 let memberUnder21 = false
@@ -195,7 +197,11 @@ function formWasSubmitted(){
     errorMsg.className = 'alert alert-danger'
     errorMsg.innerHTML = theError;
   }
-  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, false, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value, membershipMemberNumber.value))
+  let theWaiver = false
+  if (waiverInput.checked) {
+    theWaiver = waiverInput.checked
+  }
+  ipcRenderer.send('membership-create', Array(fnameInput.value, lnameInput.value, dobInput.value, membershipInput.options[membershipInput.selectedIndex].text, notesInput.value, false, idnumInput.value, idnumStateInput.value, emailInput.value, mnameInput.value, suffixInput.value, membershipCreationInput.value, membershipExpireInput.value, membershipMemberNumber.value, theWaiver))
 }
 
 function openMembership() {
@@ -234,7 +240,12 @@ if (membershipInputDiv) {
 }
 
 ipcRenderer.on('import-memberships-mode-status-return', (event, arg) => {
-  if (arg) {
+  if (arg[0]) {
     membershipInputDiv.style.display = ''    
+  }
+  if (arg[1]){
+    waiverInputDiv.style.display = 'none'
+  } else {
+    waiverInputDiv.style.display = ''
   }
 })

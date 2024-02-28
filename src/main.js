@@ -2907,6 +2907,11 @@ async function createMembership(memberInfo){
       theNotes = Array(stringStarter + memberInfo[4])      
     }
 
+    let waiverStatus = false
+    if (memberInfo[14]) {
+      waiverStatus = memberInfo[14]
+    }
+
     const docRef = await addDoc(collection(db, "members"), {
       access: getSystemAccess(),
       notes: theNotes,
@@ -2917,7 +2922,7 @@ async function createMembership(memberInfo){
       suffix: memberInfo[10],
       dna: false,
       id_number: idNumber,
-      waiver_status: memberInfo[5],
+      waiver_status: waiverStatus,
       id_expiration: expireTime,
       dob: memberInfo[2],
       creation_time: creationTime,
@@ -4171,7 +4176,7 @@ ipcMain.on('account-edit', async (event, arg) => {
 
 ipcMain.on('import-memberships-mode-status', (event, arg) => {
   theClient = event.sender;
-  theClient.send('import-memberships-mode-status-return', importMembershipsMode)
+  theClient.send('import-memberships-mode-status-return', Array(importMembershipsMode, systemData.useESigning))
 })
 
 ipcMain.on('account-change-password', (event, arg) => {
