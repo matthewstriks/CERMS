@@ -7,6 +7,7 @@ let typeLbl = document.getElementById('typeLbl')
 let ticketSubject = document.getElementById('ticketSubject')
 let ticketMessage = document.getElementById('ticketMessage')
 let ticketSubmitBtn = document.getElementById('ticketSubmitBtn')
+let viewKnowledgebase = document.getElementById('viewKnowledgebase')
 
 
 if (githubLink) {
@@ -32,6 +33,12 @@ if (sbmtTicket2) {
     ticketType.value = 0
     ticketSubject.value = ""
     ticketMessage.value = ""
+  })
+}
+
+if (viewKnowledgebase){
+  viewKnowledgebase.addEventListener('click', function(){
+    ipcRenderer.send('open-link', "https://clubentertainmentrms.com/support/knowledgebase.php")
   })
 }
 
