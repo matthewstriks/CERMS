@@ -1,7 +1,7 @@
 {
   "name": "club-entertainment-rms-system",
   "productName": "CERMS",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "description": "Club Entertainment RMS Desktop Application",
   "main": "src/main.js",
   "scripts": {
