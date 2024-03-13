@@ -250,12 +250,12 @@ ipcRenderer.on('register-all-request-return', (event, arg) => {
   currentRegisterCard = newCard
 
   let theShift = 'No Shift Assigned'
-  if (arg[1].shift == 'b') {
-    theShift = '7am - 3pm'
-  } else if (arg[1].shift == 'c') {
-    theShift = '3pm - 11pm'
-  } else if (arg[1].shift == 'a') {
-    theShift = '11pm - 7am'
+  if (arg[1].shift == 'B') {
+    theShift = arg[2][1]
+  } else if (arg[1].shift == 'C') {
+    theShift = arg[2][2]
+  } else if (arg[1].shift == 'A') {
+    theShift = arg[2][0]
   }
 
   let cardHeader = document.createElement('div')

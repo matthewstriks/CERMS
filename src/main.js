@@ -1286,7 +1286,7 @@ async function gatherAllRegisters(){
   const q = query(collection(db, "registers"), where("active", "==", true), where('uid', '!=', getUID()), where('access', '==', getSystemAccess()));
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach(async (doc) => {
-    theClient.send('register-all-request-return', Array(doc.id, doc.data()))    
+    theClient.send('register-all-request-return', Array(doc.id, doc.data(), Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC)))    
   });
 }
 
