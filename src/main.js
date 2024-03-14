@@ -5282,6 +5282,7 @@ ipcMain.on('submit-support-ticket', async (event, arg) => {
   theURL = theURL + '&catid=' + encodeURIComponent(arg[0])
   theURL = theURL + '&subject=' + encodeURIComponent(arg[1])
   theURL = theURL + '&message=' + encodeURIComponent(arg[2])
+  theURL = theURL + '&custom2=' + encodeURIComponent(systemData.businessName)
   shell.openExternal(theURL)
 })
 
