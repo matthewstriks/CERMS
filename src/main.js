@@ -1935,15 +1935,15 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   detailWB.cell(3, 3)
-    .string('7a - 3p')
+    .string(systemData.shiftTimeB)
     .style(boldStyle)
 
   detailWB.cell(3, 5)
-    .string('3p - 11p')
+    .string(systemData.shiftTimeC)
     .style(boldStyle)
 
   detailWB.cell(3, 7)
-    .string('11p - 7a')
+    .string(systemData.shiftTimeA)
     .style(boldStyle)
 
   detailWB.cell(4, 3)
@@ -2143,7 +2143,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(5, 2)
-    .string("7a to 3p")
+    .string(systemData.shiftTimeB)
     .style(boldStyle)
 
   summaryWB.cell(5, 3)
@@ -2184,7 +2184,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(6, 2)
-    .string("3p to 11p")
+    .string(systemData.shiftTimeC)
     .style(boldStyle)
 
   summaryWB.cell(6, 3)
@@ -2225,7 +2225,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(7, 2)
-    .string("11p to 7a")
+    .string(systemData.shiftTimeA)
     .style(boldStyle)
 
   summaryWB.cell(7, 3)
@@ -2342,7 +2342,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(13, 2)
-    .string('7a to 3p')
+    .string(systemData.shiftTimeB)
     .style(boldStyle)
 
   summaryWB.cell(13, 3)
@@ -2379,7 +2379,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(14, 2)
-    .string('3p to 11p')
+    .string(systemData.shiftTimeC)
     .style(boldStyle)
 
   summaryWB.cell(14, 3)
@@ -2416,7 +2416,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(15, 2)
-    .string('11p to 7a')
+    .string(systemData.shiftTimeA)
     .style(boldStyle)
 
   summaryWB.cell(15, 3)
