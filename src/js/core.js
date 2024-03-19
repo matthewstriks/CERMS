@@ -38,6 +38,11 @@ if (errorMsg) {
   }, 1);
 }
 
+function openMembership() {
+  let memID = document.getElementById('lastCreatedID').innerHTML
+  ipcRenderer.send('open-membership', memID)
+}
+
 ipcRenderer.on('recieve-dark-mode', (event, arg) => {
   if (arg) {
     darkMode = true

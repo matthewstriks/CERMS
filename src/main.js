@@ -2873,7 +2873,7 @@ async function createMembership(memberInfo){
     setTimeout(function(){createMembership(memberInfo)}, 1000);
   });
   if (!update){
-    const q2 = query(collection(db, "members"), where("name", "==", memberInfo[0] + " " + memberInfo[1]), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]), where('access', '==', getSystemAccess()));
+    const q2 = query(collection(db, "members"), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]), where('access', '==', getSystemAccess()));
     const querySnapshot2 = await getDocs(q2);
     querySnapshot2.forEach( async (doc) => {
       update = true;
@@ -2881,6 +2881,20 @@ async function createMembership(memberInfo){
       updateOrderCustomerID(pendingOrderID, doc.id)
     });
   }
+  if (!update && memberInfo[13]) {
+    const q3 = query(collection(db, "members"), where("id_number", "==", memberInfo[13]), where('access', '==', getSystemAccess()));
+    const querySnapshot3 = await getDocs(q3);
+    querySnapshot3.forEach(async (doc) => {
+      update = true;
+      let theID = ""
+      if (doc.id) {
+        theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc.id + "</a>"
+      }
+      let theMsg = "This member already exists! ID: " + theID
+      notificationSystem('warning', theMsg)
+    });
+  }
+
   if (!update) {
     let creationTime = serverTimestamp()
     let expireTime = idExpiration
@@ -4043,7 +4057,7 @@ ipcMain.on('account-logout', (event, arg) => {
 ipcMain.on('membership-create', async (event, arg) => {
   theClient = event.sender;
   let alreadyExists = false
-  const q2 = query(collection(db, "members"), where("name", "==", arg[0] + " " + arg[1]), where("dob", "==", arg[2]), where('idnum', "==", arg[6]), where('access', '==', getSystemAccess()));
+  const q2 = query(collection(db, "members"), where("dob", "==", arg[2]), where('idnum', "==", arg[6]), where('access', '==', getSystemAccess()));
   const querySnapshot2 = await getDocs(q2);
   querySnapshot2.forEach(async (doc) => {
     let theID = ""
