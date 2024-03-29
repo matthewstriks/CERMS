@@ -306,7 +306,7 @@ if (checkoutBtn) {
     theDiscountInfoArray = Array()
     let discountApplied = false;
     productsSelected.forEach((item, i) => {
-      let currentProductCard = document.getElementById(item + 'newCard')
+      let currentProductCard = document.getElementById(item[0] + 'newCard')
       let currQuantity = currentProductCard.getAttribute('quantity');
       let discountInfo = currentProductCard.getAttribute('discount')
       let discountInfoWaive = (currentProductCard.getAttribute('waived'))
@@ -314,38 +314,53 @@ if (checkoutBtn) {
       discountsData.forEach((discountItem, di) => {
         if (discountItem[0] == discountInfo){
           theDiscountInfo = discountItem
-          theDiscountInfoArray.push(Array(item, discountInfo))
+          theDiscountInfoArray.push(Array(item[0], discountInfo))
           console.log(theDiscountInfo);
           console.log(theDiscountInfoArray);
         } 
       })
       for (var i2 = 0; i2 < currQuantity; i2++) {
         productsData.forEach((item2, i3) => {
-          if (item2[0] == item) {
+          if (item2[0] == item[0]) {
             let newP = document.createElement('p')
             let theProductPrice = item2[1].price
             if (theDiscountInfo && !discountApplied) {
               if (theDiscountInfo[1].dollar) {
                 theProductPrice = theProductPrice - theDiscountInfo[1].amount
                 newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (Discount ' + theDiscountInfo[1].code + ': ' + formatter.format(theDiscountInfo[1].amount) + ' OFF ' + formatter.format(item2[1].price) + ')'                
+                if (item[1]) {
+                  newP.innerHTML = item2[1].name + ' (' + item[1] + ') - ' + formatter.format(theProductPrice) + ' (Discount ' + theDiscountInfo[1].code + ': ' + formatter.format(theDiscountInfo[1].amount) + ' OFF ' + formatter.format(item2[1].price) + ')'                                  
+                }
                 discountApplied = true
               } else if (theDiscountInfo[0] == 'return'){
                 theProductPrice = -Math.abs(theProductPrice) 
                 newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (Return)'
+                if (item[1]) {
+                  newP.innerHTML = item2[1].name + ' (' + item[1] + ') - ' + formatter.format(theProductPrice) + ' (Return)'                  
+                }
                 discountApplied = true
               } else {
                 let thePer = (theDiscountInfo[1].amount / 100)
                 let theOff = theProductPrice * thePer
                 theProductPrice = theProductPrice - theOff
                 newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (Discount ' + theDiscountInfo[1].code + ': ' + theDiscountInfo[1].amount + '% OFF ' + formatter.format(item2[1].price) + ')'                
+                if (item[1]) {
+                  newP.innerHTML = item2[1].name + ' (' + item[1] + ') - ' + formatter.format(theProductPrice) + ' (Discount ' + theDiscountInfo[1].code + ': ' + theDiscountInfo[1].amount + '% OFF ' + formatter.format(item2[1].price) + ')'                                  
+                }
                 discountApplied = true
               }    
             } else{
               newP.innerHTML = item2[1].name + ' - ' + formatter.format(item2[1].price)
+              if (item[1]) {
+                newP.innerHTML = item2[1].name + ' (' + item[1] + ') - ' + formatter.format(item2[1].price)                
+              }
             } 
             if (discountInfoWaive == "1") {
               theProductPrice = 0
               newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice) + ' (WAIVED)'
+              if (item[1]) {
+                newP.innerHTML = item2[1].name + ' (' + item[1] + ') - ' + formatter.format(theProductPrice) + ' (WAIVED)'                
+              }
               discountApplied = true
             }    
             productCheckoutList.appendChild(newP)
@@ -408,7 +423,7 @@ const formatter = new Intl.NumberFormat('en-US', {
   currency: 'USD',
 });
 
-function addProductCard(theProduct){  
+function addProductCard(theProduct, theProductInfo){  
   checkoutBtn.disabled = false
   let productPrice = theProduct[1].price
   if (isReturn) {
@@ -420,7 +435,10 @@ function addProductCard(theProduct){
     let currQuantity = currentProductCard.getAttribute('quantity');
     currQuantity = Number(currQuantity) + 1
     currentProductCard.setAttribute('quantity', currQuantity)
-    currentProductCardInfo.innerHTML = theProduct[1].name + " - " + formatter.format(productPrice) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'    
+    currentProductCardInfo.innerHTML = theProduct[1].name + " - " + formatter.format(productPrice) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'        
+    if (theProductInfo) {
+      currentProductCardInfo.innerHTML = theProduct[1].name + " (" + theProductInfo + ") - " + formatter.format(productPrice) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'          
+    }
 
     let plusBtn = document.getElementById(theProduct[0] + 'plus')
     if (plusBtn) {
@@ -433,7 +451,7 @@ function addProductCard(theProduct){
     productsTotal.push(theProduct[0])
     return
   }
-  productsSelected.push(theProduct[0])
+  productsSelected.push(Array(theProduct[0], theProductInfo))
   productsTotal.push(theProduct[0])
   let newCard = document.createElement('div')
   newCard.setAttribute("quantity", 1)
@@ -446,6 +464,9 @@ function addProductCard(theProduct){
   let cardHeader = document.createElement('div')
   cardHeader.className = 'card-header'
   cardHeader.innerHTML = theProduct[1].name + " - " + formatter.format(productPrice) + ' - x1 <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'    
+  if (theProductInfo) {
+    cardHeader.innerHTML = theProduct[1].name + " (" + theProductInfo + ") - " + formatter.format(productPrice) + ' - x1 <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'        
+  }
   cardHeader.id = theProduct[0] + 'cardHeader'
 
   let cardBody = document.createElement('div')
@@ -541,7 +562,7 @@ function removeProductCard(theProduct){
     let currQuantity = currentProductCard.getAttribute('quantity');
     currQuantity = Number(currQuantity) - 1
     productsSelected.forEach((item, i) => {
-      if (theProduct[0] == item) {
+      if (theProduct[0] == item[0]) {
         productsTotal.splice(i, 1)
         return
       }
@@ -549,7 +570,7 @@ function removeProductCard(theProduct){
     if (currQuantity <= 0) {
       currentProductCard.remove()
       productsSelected.forEach((item, i) => {
-        if (theProduct[0] == item) {
+        if (theProduct[0] == item[0]) {
           productsSelected.splice(i, 1)
         }
       });
@@ -903,7 +924,7 @@ ipcRenderer.on('send-customer-info', (event, arg) => {
 })
 
 ipcRenderer.on('send-product-info', (event, arg) => {
-  addProductCard(arg)
+  addProductCard(arg[0], arg[1])
 })
 
 ipcRenderer.on('order-suspended', (event, arg) => {

@@ -671,7 +671,7 @@ async function createOrder(memberInfo, orderType, thePendingOrder){
     theClient.send('send-customer-info', Array(theMembersName, theMembersData, memberInfo[0]))
     productsData.forEach((item, i) => {
       if (item[1].name == memberInfo[1]) {        
-        theClient.send('send-product-info', item)
+        theClient.send('send-product-info', Array(item, memberInfo[2]))
       }
     });
   }, 1000)
