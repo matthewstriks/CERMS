@@ -47,6 +47,7 @@ let quickbooksURL = document.getElementById('quickbooksURL')
 let finishQuickbooks = document.getElementById('finishQuickbooks')
 let quickbooksConnect = document.getElementById('quickbooksConnect')
 let quickbooksDisConnect = document.getElementById('quickbooksDisConnect')
+let debugModeSwitch = document.getElementById('debugModeSwitch')
 let importMembershipModeSwitch = document.getElementById('importMembershipModeSwitch')
 let saveDirTxt = document.getElementById('saveDirTxt')
 let editModalDirs = document.getElementById('editModalDirs')
@@ -208,6 +209,10 @@ quickbooksDisConnect.addEventListener("click", function(){
     ipcRenderer.send('settings-quickbooks-disconnect')
 })
 
+debugModeSwitch.addEventListener('change', function(){
+    ipcRenderer.send('settings-debug-mode-toggle', debugModeSwitch.checked)
+})
+
 importMembershipModeSwitch.addEventListener('change', function(){
     ipcRenderer.send('settings-import-membership-mode-toggle', importMembershipModeSwitch.checked)
 })
@@ -352,6 +357,8 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
         quickbooksDisConnect.style.display = ''
     }
 
+    debugModeSwitch.checked = arg[5]
+    
     importMembershipModeSwitch.checked = arg[3]
 
     saveDirTxt.innerHTML = arg[1].fileSaveSystemDir    

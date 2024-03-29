@@ -97,6 +97,7 @@ let regStatus = false;
 let regStatusID = false;
 
 let importMembershipsMode = false
+let debugMode = false
 
 let notificationsData = Array()
 
@@ -221,6 +222,20 @@ function removeNotification(theNotificationID){
       notification[3] = false
     }
   });
+}
+
+async function addLog(type, message){
+  if (debugMode) {
+    console.log('Logging: ' + type + '(' + message + ')');
+    const docRef = await addDoc(collection(db, "logs"), {
+      access: getSystemAccess(),
+      type: type,
+      message: message,
+      timestamp: serverTimestamp(),
+      user: getUID()
+    });
+
+  }
 }
 
 async function getMemberInfo(memberID){
@@ -4141,7 +4156,7 @@ ipcMain.on('request-account', (event, arg) => {
   let displayName = getDisplayName();
   let rank = getRank();
   theClient.send('recieve-account', Array(displayName, rank, systemData, oauthClient.isAccessTokenValid()))
-  theClient.send('recieve-account2', Array(userData, systemData, oauthClient.isAccessTokenValid(), importMembershipsMode, user.emailVerified))
+  theClient.send('recieve-account2', Array(userData, systemData, oauthClient.isAccessTokenValid(), importMembershipsMode, user.emailVerified, debugMode))
 })
 
 ipcMain.on('account-create', (event, arg) => {
@@ -5196,6 +5211,18 @@ ipcMain.on('settings-import-membership-mode-toggle', async (event, arg) => {
     importMembershipsMode = true
   }
   theClient.send('import-memberships-mode-status-return', importMembershipsMode)
+  getSystemData()
+})
+
+ipcMain.on('settings-debug-mode-toggle', async (event, arg) => {
+  theClient = event.sender;
+  if (debugMode) {
+    addLog('settings', 'Debug mode turned off.')
+    debugMode = false
+  } else {
+    debugMode = true
+    addLog('settings', 'Debug mode turned on.')
+  }
   getSystemData()
 })
 
