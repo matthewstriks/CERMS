@@ -2837,9 +2837,14 @@ async function updateTLID(){
   });
 }
 
+function getNewID(){
+  return Math.floor(100000 + Math.random() * 900000);
+}
+
 async function createMembership(memberInfo){
   theClient.send('membership-pending')
   notificationSystem('warning', "Creating member...")
+  let theNewID = getNewID()
   let update = false;
   let idExpiration;
   let theCurrentTime = Math.floor(Date.now() / 1000);
@@ -2862,13 +2867,12 @@ async function createMembership(memberInfo){
 
   idExpiration = Number(theCurrentTime) + Number(theProductInfo[1].membershipLength)
 
-  const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1), where('access', '==', getSystemAccess()));
+  const q1 = query(collection(db, "members"), where("id_number", "==", theNewID), where('access', '==', getSystemAccess()));
   const querySnapshot1 = await getDocs(q1);
   querySnapshot1.forEach((doc) => {
     update = true;
     theClient.send('membership-pending-waiting-for-id')
     notificationSystem('warning', 'Creating member... (waiting for new ID)')
-    updateLID()
     getSystemData();
     setTimeout(function(){createMembership(memberInfo)}, 1000);
   });
@@ -2898,7 +2902,7 @@ async function createMembership(memberInfo){
   if (!update) {
     let creationTime = serverTimestamp()
     let expireTime = idExpiration
-    let idNumber = systemData.lid + 1
+    let idNumber = theNewID
     if (importMembershipsMode) {
       if (memberInfo[11]) {
         let dateStr = memberInfo[11];
@@ -4462,12 +4466,14 @@ ipcMain.on('searchForMember', (event, arg) => {
         wasFound = true
         theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
       }else{
+        /*
         brokenArg.forEach((item, itemi) => {
           if (theName.includes(item) && !wasFound) {
             wasFound = true
             theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
           }
         });
+        */
       }
     }
   } else{
