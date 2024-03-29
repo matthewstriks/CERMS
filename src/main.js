@@ -4108,11 +4108,16 @@ ipcMain.on('membership-request-dna', (event, arg) => {
 
 ipcMain.on('rentals-request', (event, arg) => {
   theClient = event.sender;
+  let rentalsToSend = Array()
   productsData.forEach(product => {
     if (product[1].rental) {
-      theClient.send('rentals-request-return', product[1].name)
-      theClient.send('home-checkoutmsg-return', systemData.checkoutMsg)
+      rentalsToSend.push(product[1].name)
     }
+  });
+  rentalsToSend.sort()
+  rentalsToSend.forEach(rental => {
+    theClient.send('rentals-request-return', rental)
+    theClient.send('home-checkoutmsg-return', systemData.checkoutMsg)    
   });
 })
 
