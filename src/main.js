@@ -3447,6 +3447,7 @@ async function attemptLogin(details){
   loginCreds = details;
   signInWithEmailAndPassword(auth, details[0], details[1])
   .then(async(userCredential) => {
+    addLog('auth', 'Login successful for ' + details[1])
     user = userCredential.user;
     await getUserData()
     if (!getSystemAccess()) {
@@ -3462,7 +3463,22 @@ async function attemptLogin(details){
     const errorCode = error.code;
     const errorMessage = error.message;
     console.log(error);
-    notificationSystem('danger', errorMessage + ' (' + errorCode + ')')
+    addLog('auth', 'Login attempt failed for user ' + details[0] + '. (' + errorCode + ')')
+    if (errorCode == 'auth/invalid-email') {
+      notificationSystem('danger', 'You must input an EMail.')
+    } else if (errorCode == 'auth/missing-password') {
+      notificationSystem('danger', 'You must input a Password.')
+    } else if (errorCode == 'auth/user-not-found') {
+      notificationSystem('danger', 'No account was found with this email/password combination.')
+    } else if (errorCode == 'auth/wrong-password') {
+      notificationSystem('danger', 'No account was found with this email/password combination.')
+    } else if (errorCode == 'auth/user-disabled') {
+      notificationSystem('danger', 'Your account was disabled/deleted. It has not yet been deleted. Create a support ticket.')
+    } else if (errorCode == 'auth/too-many-requests') {
+      notificationSystem('danger', 'Access to this account has been temporarily disabled due to many failed login attempts. You can immediately restore it by resetting your password or you can try again later.')
+    } else {
+      notificationSystem('danger', errorMessage + ' (' + errorCode + ')')
+    }
   });
 }
 
