@@ -2957,7 +2957,7 @@ async function createMembership(memberInfo){
       mname: memberInfo[9],
       suffix: memberInfo[10],
       dna: false,
-      id_number: idNumber,
+      id_number: Number(idNumber),
       waiver_status: waiverStatus,
       id_expiration: expireTime,
       dob: memberInfo[2],
