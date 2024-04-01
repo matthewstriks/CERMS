@@ -92,6 +92,7 @@ let lastMemberIDNum;
 let orderSuspended = false
 let theLockerRoomInput
 let theLockerRoomInput2
+let withProductsTxtTrial
 
 let regStatus = false;
 let regStatusID = false;
@@ -943,6 +944,8 @@ async function recieptProcess(orderInfo, theOrderNumber){
     if (theDiscountsUsed.length == 0) {
       theDiscountsUsed.push(Array(0, 0))
     }
+
+    withProductsTxt = withProductsTxtTrial
 
     orderInfo[1].forEach(async (productSel, i) => {
       let theProductInfo = await getProductInfo(productSel)
@@ -4624,6 +4627,7 @@ ipcMain.on('manage-ending-register', (event, arg) => {
 
 ipcMain.on('order-checkout', (event, arg) => {
   theClient = event.sender;
+  withProductsTxtTrial = arg[10]
   completeOrder(arg)
 })
 

@@ -45,6 +45,7 @@ let discountingOrder = false
 let theCustomerInfo;
 let favPros = Array()
 let isReturn = false
+let theProductCheckoutList = ""
 
 
 if (searchProducts) {
@@ -113,6 +114,7 @@ if (gCardEnter) {
 
 if (document.getElementById('myModal')) {
   document.getElementById('myModal').addEventListener('hidden.bs.modal', function() {
+    theProductCheckoutList = productCheckoutList.innerHTML
     productCheckoutList.innerHTML = ''
   })
 }
@@ -159,14 +161,14 @@ if (noRecieptBtn) {
     membersEmailInput.style.display = 'none'  
     printEmailCompleteBtn.style.display = 'none'  
     recieptStyle = 0
-    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), Number(theChange)), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value))
+    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), Number(theChange)), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value, theProductCheckoutList))
   })  
 }
 
 if (printBtn) {
   printBtn.addEventListener('click', function(){
     recieptStyle = 1
-    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), Number(theChange)), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value))
+    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), Number(theChange)), theDiscountInfoArray, recieptStyle, "", addLockerRoomInput.value, addLockerRoomInput2.value, theProductCheckoutList))
   })  
 }
 
@@ -206,7 +208,7 @@ if (printEmailCompleteBtn) {
     membersEmailInput.style.display = 'none'
     membersEmailInputTxt.style.display = 'none'
     printEmailCompleteBtn.style.display = 'none'
-    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), theChange), theDiscountInfoArray, recieptStyle, membersEmailInput.value, addLockerRoomInput.value, addLockerRoomInput2.value))  
+    ipcRenderer.send('order-checkout', Array(theCustomerID, productsTotal, discountsSelected, Array(productsSub, productsTax, productsTot, productsOGTot), Array(Number(cdCardEnter.value), Number(gCardEnter.value), Number(cashEnter.value), theChange), theDiscountInfoArray, recieptStyle, membersEmailInput.value, addLockerRoomInput.value, addLockerRoomInput2.value, theProductCheckoutList))  
   })
 }
 
