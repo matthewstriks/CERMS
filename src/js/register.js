@@ -50,6 +50,7 @@ let dropSubmitBtn = document.getElementById('dropSubmitBtn');
 let manageRegisters = document.getElementById('manageRegisters');
 
 let theRegInfo;
+let regsRequested = false
 
 function editEndingTotal(){
   endingAmt.value = (Number(input100.value) * 100) + (Number(input50.value) * 50) + (Number(input20.value) * 20) + (Number(input10.value) * 10) + (Number(input5.value) * 5) + (Number(input1.value) * 1) + (Number(input25c.value) * .25) + (Number(input10c.value) * .10) + (Number(input5c.value) * .05) + (Number(input1c.value) * .01)   
@@ -229,7 +230,10 @@ ipcRenderer.on('register-status-change', (event, arg) => {
   }
   if (arg[1]) {
     manageRegisters.style.display = ''
-    ipcRenderer.send('register-all-request')
+    if (!regsRequested) {
+      ipcRenderer.send('register-all-request')
+      regsRequested = true      
+    }
   } else {
     manageRegisters.style.display = 'none'
   }
