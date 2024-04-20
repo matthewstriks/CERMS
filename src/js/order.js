@@ -538,6 +538,7 @@ function addProductCard(theProduct, theProductInfo){
   if (trashBtn) {
     trashBtn.addEventListener('click', function(){
       removeProductCard(theProduct)
+      ipcRenderer.send('remove-from-order', Array(theProduct, theProductInfo))
     })
   }
 
@@ -858,7 +859,9 @@ ipcRenderer.on('return-products-order', (event, arg) => {
     } else {
       theAddingRental = arg
     }
-    ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
+    setTimeout(() => {
+      ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))      
+    }, 5000);
   })
   
   var productBody = document.createElement('div')

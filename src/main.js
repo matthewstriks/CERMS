@@ -4662,12 +4662,28 @@ ipcMain.on('suspend-order', (event, arg) => {
   suspendOrder()
 })
 
+ipcMain.on('remove-from-order', (event, arg) => {
+  theClient = event.sender
+  if (arg[0][1].rental) {
+    pendingOrders.forEach(porder => {
+      if (porder[0][1] == arg[0][1].name && porder[0][2] == arg[1]) {
+        porder[0] = false
+        porder[1] = false
+        porder[2] = false
+        console.log('Hello!');
+      }
+    });
+  }
+})
+
 ipcMain.on('add-to-order', (event, arg) => {
   theClient = event.sender;
-
   if (arg[2]) {
     theLockerRoomInput = arg[2]
     theLockerRoomInput2 = arg[3]
+  } else {
+    theLockerRoomInput = false
+    theLockerRoomInput2 = false
   }
   productsData.forEach(product => {
     if ((product[0] == arg[1][0]) && (!product[1].rental)) {
