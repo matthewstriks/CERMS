@@ -4269,7 +4269,7 @@ ipcMain.on('activity-create', (event, arg) => {
 ipcMain.on('activity-renew', (event, arg) => {
   theClient = event.sender;
   goOrder()
-  createOrder(Array(arg[2], arg[1][2], false), 'renew', arg)
+  createOrder(Array(arg[2], arg[1][2], arg[1][1]), 'renew', arg)
 })
 
 ipcMain.on('activity-close', (event, arg) => {

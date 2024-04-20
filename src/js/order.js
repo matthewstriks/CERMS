@@ -41,6 +41,8 @@ let completeTagNotes = document.getElementById('completeTagNotes');
 let accordionFavoriteheadingZero = document.getElementById('accordionFavoriteheadingZero');
 let favoriteProductCardRow = document.getElementById('favoriteProductCardRow');
 
+let theAddingRental;
+
 let totalLeftAmt;
 let ran = false
 let discountingOrder = false
@@ -216,6 +218,7 @@ if (printEmailCompleteBtn) {
 
 if (completeCheckIn) {
   completeCheckIn.addEventListener('click', function(){
+    addProductCard(theAddingRental, addLockerRoomInput.value)
     ipcRenderer.send('complete-rental-info-order', Array(addLockerRoomInput.value, addLockerRoomInput2.value))
   })
 }
@@ -850,7 +853,11 @@ ipcRenderer.on('return-products-order', (event, arg) => {
     productImg.setAttribute('data-bs-target', '#myModal3')
   }
   productImg.addEventListener('click', function(){
-    addProductCard(arg)
+    if (!arg[1].rental) {
+      addProductCard(arg)
+    } else {
+      theAddingRental = arg
+    }
     ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
   })
   
