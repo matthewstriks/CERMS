@@ -311,7 +311,7 @@ if (checkoutBtn) {
     let discountApplied = false;
     productsSelected.forEach((item, i) => {
       let currentProductCard = document.getElementById(item[0] + 'newCard')
-      let currQuantity = currentProductCard.getAttribute('quantity');
+      let currQuantity = 1
       let discountInfo = currentProductCard.getAttribute('discount')
       let discountInfoWaive = (currentProductCard.getAttribute('waived'))
       let theDiscountInfo;
@@ -319,8 +319,6 @@ if (checkoutBtn) {
         if (discountItem[0] == discountInfo){
           theDiscountInfo = discountItem
           theDiscountInfoArray.push(Array(item[0], discountInfo))
-          console.log(theDiscountInfo);
-          console.log(theDiscountInfoArray);
         } 
       })
       for (var i2 = 0; i2 < currQuantity; i2++) {
@@ -401,7 +399,6 @@ if (checkoutBtn) {
       productsTot = 0
     }    
     */
-    console.log(productsTot);
     totalLeft.innerHTML = 'Total Left: ' + formatter.format(productsTot)
     updateOrderTotalPaid()
 
@@ -436,12 +433,6 @@ function addProductCard(theProduct, theProductInfo){
     });
   }
 
-  if (typeof theProductInfo === 'object' && !Array.isArray(theProductInfo) && theProductInfo !== null) {
-    console.log('here');
-    console.log(theProductInfo);
-    theProductInfo = 'Test'
-  }
-
   checkoutBtn.disabled = false
   let productPrice = theProduct[1].price
   if (isReturn) {
@@ -455,7 +446,12 @@ function addProductCard(theProduct, theProductInfo){
     currentProductCard.setAttribute('quantity', currQuantity)
     currentProductCardInfo.innerHTML = theProduct[1].name + " - " + formatter.format(productPrice) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'        
     if (theProductInfo) {
-      currentProductCardInfo.innerHTML = theProduct[1].name + " (" + theProductInfo + ") - " + formatter.format(productPrice) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'          
+      if (!currentProductCard.getAttribute('itemNum')) {
+        currentProductCard.setAttribute('itemNum', theProductInfo)        
+      } else {
+        currentProductCard.setAttribute('itemNum', currentProductCard.getAttribute('itemNum') + ', ' + theProductInfo)
+      }
+      currentProductCardInfo.innerHTML = theProduct[1].name + " (" + currentProductCard.getAttribute('itemNum') + ") - " + formatter.format(productPrice) + ' - x' + currQuantity + ' <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'          
     }
 
     let plusBtn = document.getElementById(theProduct[0] + 'plus')
@@ -465,6 +461,8 @@ function addProductCard(theProduct, theProductInfo){
         ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct, addLockerRoomInput.value, addLockerRoomInput2.value))
       })
     }
+
+    productsSelected.push(Array(theProduct[0], theProductInfo))
 
     productsTotal.push(theProduct[0])
     return
@@ -483,6 +481,7 @@ function addProductCard(theProduct, theProductInfo){
   cardHeader.className = 'card-header'
   cardHeader.innerHTML = theProduct[1].name + " - " + formatter.format(productPrice) + ' - x1 <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'    
   if (theProductInfo) {
+    newCard.setAttribute('itemNum', theProductInfo)
     cardHeader.innerHTML = theProduct[1].name + " (" + theProductInfo + ") - " + formatter.format(productPrice) + ' - x1 <a id="' + theProduct[0] + 'plus" href="#" class="btn btn-success"><i class="fa-solid fa-plus"></i></a>'        
   }
   cardHeader.id = theProduct[0] + 'cardHeader'
@@ -675,7 +674,6 @@ function startProductDiscount(discountCode, theDiscountWarning, theProductDiscou
       discountFound = true
       discountsSelected = item
     } else if ((item[0] == 'return') && (discountCode == 'return')) {
-      console.log('its a return');
       theProductCard.setAttribute('discount', item[0])
       theDiscountWarning.innerHTML = 'Return applied!'
       theDiscountWarning.style = 'color:green'
@@ -737,8 +735,6 @@ ipcRenderer.on('return-products-order-all', (event, arg) => {
   productsData = arg[0];
   discountsData = arg[1];
   discountsData.push(Array("return", Array()))
-  console.log(discountsData);
-
 })
 
 ipcRenderer.on('return-category-order-all', (event, arg) => {
