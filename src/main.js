@@ -183,6 +183,8 @@ function getUID(){
 }
 
 function notificationSystem(notificationType, notificationMsg){
+  addLog('notification', 'New ' + notificationType + ' notification: ' + notificationMsg)
+
   let theNotificationID = notificationsData.length + 1
   let keepMsg = true
   if (notificationMsg == 'Logging in...') {
@@ -288,6 +290,7 @@ async function resetUserPassword(theEmailPass, theUserID){
   } else {
     theEmail = await getEMail();
   }
+  addLog('auth', 'Password reset requested for ' + theEmail)
 
   sendPasswordResetEmail(auth, theEmail)
     .then(() => {
@@ -309,6 +312,7 @@ async function updateMembershipEMail(memberID, newEMail){
 }
 
 async function updateMembership(memberID, theOldDoc, memberInfo){
+  addLog('membership', 'Updating Membership ' + memberID)
   let idExpiration = "";
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theTimestamp = new Date(Math.floor(Date.now()))
