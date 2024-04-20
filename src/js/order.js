@@ -1,3 +1,5 @@
+const { isArray } = require("jquery");
+
 let productSection = document.getElementById('productSection');
 let cardHeader = document.getElementById('cardHeader');
 let customerName = document.getElementById('customerName');
@@ -426,6 +428,20 @@ const formatter = new Intl.NumberFormat('en-US', {
 });
 
 function addProductCard(theProduct, theProductInfo){  
+  if (!Array.isArray(theProduct)) {
+    productsData.forEach(pro => {
+      if (theProduct == pro[0]) {
+        theProduct = pro
+      }
+    });
+  }
+
+  if (typeof theProductInfo === 'object' && !Array.isArray(theProductInfo) && theProductInfo !== null) {
+    console.log('here');
+    console.log(theProductInfo);
+    theProductInfo = 'Test'
+  }
+
   checkoutBtn.disabled = false
   let productPrice = theProduct[1].price
   if (isReturn) {

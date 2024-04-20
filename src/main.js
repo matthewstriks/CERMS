@@ -751,7 +751,7 @@ async function resumeOrder(){
           theName = porder[2][1]
         }
         if (porder[2][1] && (item[1].name == theName)) {
-          theClient.send('send-product-info', item)
+          theClient.send('send-product-info', Array(item, porder[0][2]))
         }
       });
     }, 1000)
