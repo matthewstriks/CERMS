@@ -182,6 +182,10 @@ function getUID(){
   return user.uid;
 }
 
+function getLastRegister(){
+  return userData.lastRegister;
+}
+
 function notificationSystem(notificationType, notificationMsg){
   addLog('notification', 'New ' + notificationType + ' notification: ' + notificationMsg)
 
@@ -1374,7 +1378,9 @@ async function manageEndRegister(registerInfo){
     ending: Number(registerInfo[1]),
     active: false
   });
+
   goRegister()
+  registerReciept(registerInfo[0], false)
   startRegisterReport(registerInfo[0], false)
   registerStatus()
 }
@@ -1403,6 +1409,13 @@ async function endRegister(registerInfo, logoutTF){
     CCardAmtRan: registerInfo[14],
     active: false
   });
+
+  const userRef = doc(db, "users", getUID());
+  await updateDoc(userRef, {
+    lastRegister: regStatusID,
+  });
+
+  getUserData()
   registerReciept(regStatusID, logoutTF)
   startRegisterReport(regStatusID, false)
   regStatus = false
@@ -5431,3 +5444,14 @@ ipcMain.on('void-delete-order', async (event, arg) => {
   theClient = event.sender;
   voidOrder(arg)
 }) 
+
+ipcMain.on('print-last-register-receipt', (event, arg) => {
+  theClient = event.sender
+  let lastRID = getLastRegister()
+  notificationSystem('warning', 'Gathering last register receipt...')
+  if (lastRID) {
+    registerReciept(lastRID, false)    
+  } else {
+    notificationSystem('danger', 'You do not have a previous register saved...')
+  }
+})

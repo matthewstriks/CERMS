@@ -48,6 +48,7 @@ let endingSubmitLogoutBtn = document.getElementById('endingSubmitLogoutBtn');
 let endingSubmitBtn = document.getElementById('endingSubmitBtn');
 let dropSubmitBtn = document.getElementById('dropSubmitBtn');
 let manageRegisters = document.getElementById('manageRegisters');
+let plrrBtn = document.getElementById('plrrBtn')
 
 let theRegInfo;
 let regsRequested = false
@@ -215,6 +216,10 @@ endingSubmitBtn.addEventListener('click', function(){
 
 dropSubmitBtn.addEventListener('click', function(){
   ipcRenderer.send('drop-register', Array(theRegInfo, dropAmt.value, Number(dinput100.value), Number(dinput50.value), Number(dinput20.value), Number(dinput10.value), Number(dinput5.value), Number(dinput1.value), Number(dinput25c.value), Number(dinput10c.value), Number(dinput5c.value), Number(dinput1c.value), Number(dropPSN.value), Number(dropPSA.value), Number(dropCCardAmtRan.value), Number(dropCCardAmt.value)))
+})
+
+plrrBtn.addEventListener('click', function(){
+  ipcRenderer.send('print-last-register-receipt')
 })
 
 ipcRenderer.on('register-status-change', (event, arg) => {
