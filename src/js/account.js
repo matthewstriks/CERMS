@@ -52,6 +52,7 @@ let importMembershipModeSwitch = document.getElementById('importMembershipModeSw
 let saveDirTxt = document.getElementById('saveDirTxt')
 let editModalDirs = document.getElementById('editModalDirs')
 let editSaveDir = document.getElementById('editSaveDir')
+let hideNPPSwitch = document.getElementById('hideNPPSwitch')
 let invWarnEMailDiv = document.getElementById('invWarnEMailDiv')
 let invWarnEMail = document.getElementById('invWarnEMail')
 let invWarnEMailBtn = document.getElementById('invWarnEMailBtn')
@@ -217,6 +218,10 @@ importMembershipModeSwitch.addEventListener('change', function(){
     ipcRenderer.send('settings-import-membership-mode-toggle', importMembershipModeSwitch.checked)
 })
 
+hideNPPSwitch.addEventListener('change', function(){
+    ipcRenderer.send('settings-hide-npp-toggle', hideNPPSwitch.checked)
+})
+
 includeExpireTimeRenewSwitch.addEventListener('change', function(){
     ipcRenderer.send('settings-include-expire-time-renew-toggle', includeExpireTimeRenewSwitch.checked)
 })
@@ -360,6 +365,8 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
     debugModeSwitch.checked = arg[5]
     
     importMembershipModeSwitch.checked = arg[3]
+
+    hideNPPSwitch.checked = arg[1].hideNPPSwitch
 
     saveDirTxt.innerHTML = arg[1].fileSaveSystemDir    
 

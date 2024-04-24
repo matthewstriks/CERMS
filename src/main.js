@@ -5279,6 +5279,21 @@ ipcMain.on('settings-debug-mode-toggle', async (event, arg) => {
   getSystemData()
 })
 
+ipcMain.on('settings-hide-npp-toggle', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+
+  const docRef = doc(db, "system", userData.access);
+  await updateDoc(docRef, {
+    hideNPPSwitch: arg
+  });
+  await getSystemData()
+})
+
 ipcMain.on('settings-include-expire-time-renew-toggle', async (event, arg) => {
   theClient = event.sender;
   let userAllowed = canUser("permissionEditSystemSettings");
