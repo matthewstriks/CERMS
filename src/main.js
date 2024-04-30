@@ -1730,6 +1730,7 @@ async function startRegisterReport(registerID, isFinal) {
         }
       })
     })
+
     if (Array.isArray(orderInfo.discounts)) {
       orderInfo.discounts.forEach((discount, i) => {
         discountsAndAmounts.forEach((discountAA, i2) => {
@@ -1889,6 +1890,17 @@ async function startRegisterReport(registerID, isFinal) {
     }
   })
 
+  if (systemData.hideNPPSwitch) {
+    for (let index = 0; index < productsAndAmounts.length; index++) {
+      const element = productsAndAmounts[index];
+      if (element[1] == 0) {
+        delete element[0]
+        delete element[1]
+      }
+    }
+  }
+
+
   totalNetA = totalMoneyA + totalTaxA
   totalNetB = totalMoneyB + totalTaxB
   totalNetC = totalMoneyC + totalTaxC
@@ -1913,26 +1925,34 @@ async function startRegisterReport(registerID, isFinal) {
 
   let productDescLine = 16;
   let productNames = Array()
-  productsData.forEach((product, i) => {
-    productNames.push(product[1].name)
-    detailWB.cell(productDescLine, 2)
-      .string(product[1].name);
-    productsAndAmounts.forEach((productsAA, i2) => {
-      if (productsAA[0] == product[0]) {
-        detailWB.cell(productDescLine, 3)
-          .number(productsAA[1]);
 
-        detailWB.cell(productDescLine, 4)
-          .number(product[1].price * productsAA[1])
-          .style(moneyStyle);
-      }
-    })
-    productDescLine = productDescLine + 1
+  productsAndAmounts.forEach(productsAA => {
+    if (productsAA[0]) {
+      productsData.forEach(products => {
+        if (productsAA[0] == products[0]) {
+          productNames.push(products[1].name)
+          detailWB.cell(productDescLine, 2)
+            .string(products[1].name);
+
+          detailWB.cell(productDescLine, 3)
+            .number(productsAA[1]);
+
+          detailWB.cell(productDescLine, 4)
+            .number(products[1].price * productsAA[1])
+            .style(moneyStyle);
+
+        }
+      })
+      productDescLine = productDescLine + 1
+    }
   });
   productDescLine = productDescLine + 1
 
   const lengthArr = productNames.map(productNames => productNames.length)
-  const maxWidth = Math.max(...lengthArr)
+  let maxWidth = Math.max(...lengthArr)
+  if (maxWidth <= 0 || !maxWidth) {
+    maxWidth = 11
+  }
   detailWB.column(2).setWidth(maxWidth)
 
   //      (Y, X)  
