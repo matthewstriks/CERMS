@@ -3513,6 +3513,8 @@ async function attemptLogin(details){
       notificationSystem('danger', 'Your account was disabled/deleted. It has not yet been deleted. Create a support ticket.')
     } else if (errorCode == 'auth/too-many-requests') {
       notificationSystem('danger', 'Access to this account has been temporarily disabled due to many failed login attempts. You can immediately restore it by resetting your password or you can try again later.')
+    } else if (errorCode == 'auth/network-request-failed') {
+      notificationSystem('danger', 'Network Error. You do not have internet connection.')
     } else {
       notificationSystem('danger', errorMessage + ' (' + errorCode + ')')
     }
@@ -4790,7 +4792,6 @@ ipcMain.on('generate-report-now', (event, arg) => {
 
 ipcMain.on('generate-final-report-now', (event, arg) => {
   theClient = event.sender;
-  // HERE
   startRegisterReport(false, true)
 })
 
