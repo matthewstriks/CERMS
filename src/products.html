@@ -245,6 +245,17 @@
                   <br>
                 </div>
               </div>              
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="productPayout">
+                <label checked class="form-check-label" for="productPayout">Product is Payout</label>
+                <div id='productPayoutDiv' class="container">
+                  <p style="color:red">This will make whatever price the product is set to a negative amount. (Paying out from your drawer/card machine)</p>
+                </div>
+              </div>
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="productAskForPrice">
+                <label class="form-check-label" for="productAskForPrice">Ask for payment amount. (Price must be 0)</label>
+              </div>
               <div class="mb-3">
                 <label for="productDesc" class="form-label">Product Description</label>
                 <textarea class="form-control" id="productDesc" rows="3"></textarea>
@@ -365,6 +376,19 @@
                 <div id='editProductRestrictDiv' class="container">
                   <br>
                 </div>
+              </div>
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="editProductPayout">
+                <label checked class="form-check-label" for="editProductPayout">Product is Payout</label>
+                <div id='editProductPayoutDiv' class="container">
+                  <p>This will make whatever price the product is set to a negative amount. (Paying out from your drawer/card machine)
+                  </p>
+                  <br>
+                </div>
+              </div>
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="editProductAskForPrice">
+                <label class="form-check-label" for="editProductAskForPrice">Ask for payment amount. (Price must be 0)</label>
               </div>
               <div class="mb-3">
                 <label for="editProductDesc" class="form-label">Product Description</label>

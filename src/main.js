@@ -200,7 +200,7 @@ function notificationSystem(notificationType, notificationMsg){
   if (userData && userData.notificationSecs) {
     theNotSecs = userData.notificationSecs * 1000
   }  
-  theClient.send('notification-system', Array(notificationType, notificationMsg, theNotSecs, theNotificationID))
+  theClient.send('notification-system', Array(notificationType, notificationMsg, false, theNotificationID))
   setTimeout(() => {
     theClient.send('notification-system-remove', theNotificationID)
     notificationsData.forEach(notification => {
@@ -541,7 +541,7 @@ async function createCategory(catName, catDesc, catColor){
   goProducts()
 }
 
-async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proFavorite, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode, proRentalLength, proRentalLengthType, proRestricted, proRestrictedUsers){
+async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, proInv, proFavorite, proTaxable, proActive, proCore, proRental, proMembership, proMembershipLength, proMembershipLengthType, proInvPar, proBarcode, proRentalLength, proRentalLengthType, proRestricted, proRestrictedUsers, proPayout, proAskForPrice){
   notificationSystem('warning', 'Creating Product...')
   let userAllowed = canUser('permissionEditProducts')
   let userAllowedCore = canUser('permissionEditCoreProducts')
@@ -589,6 +589,11 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     }
     theRentalLength = proRentalLength * theMultiple
   }
+
+  if (Number(proPrice) > 0 && proAskForPrice) {
+    proAskForPrice = false
+  }
+
   const docRef = await addDoc(collection(db, 'products'), {
     access: getSystemAccess(),
     cat: proCat,
@@ -613,7 +618,9 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     barcode: proBarcode,
     image: false,
     restricted: proRestricted,
-    restrictedUsers: proRestrictedUsers
+    restrictedUsers: proRestrictedUsers,
+    payout: proPayout,
+    askforprice: proAskForPrice
   });
   notificationSystem('success', 'Product Added!')
   goProducts()
@@ -1711,7 +1718,7 @@ async function startRegisterReport(registerID, isFinal) {
   let productsAndAmounts = Array()
   let discountsAndAmounts = Array()
   productsData.forEach((product, i) => {
-    productsAndAmounts.push(Array(product[0], 0))
+    productsAndAmounts.push(Array(product[0], 0, false))
   });
   discountsData.forEach((discount, i) => {
     discountsAndAmounts.push(Array(discount[0], 0))
@@ -1726,6 +1733,12 @@ async function startRegisterReport(registerID, isFinal) {
     orderInfo.products.forEach((products, i) => {
       productsAndAmounts.forEach((productsAA, i2) => {
         if (productsAA[0] == products) {
+          productsData.forEach(proLoop => {
+            if (products == proLoop[0] && proLoop[1].payout) {
+              productsAA[2] = productsAA[2] + orderInfo.total[2]               
+            }
+          });
+
           productsAA[1] = productsAA[1] + 1
         }
       })
@@ -1923,6 +1936,12 @@ async function startRegisterReport(registerID, isFinal) {
     }
   });
 
+  var redStyle = wb.createStyle({
+    font: {
+      color: "#FF0800"
+    }
+  })
+
   let productDescLine = 16;
   let productNames = Array()
 
@@ -1934,6 +1953,11 @@ async function startRegisterReport(registerID, isFinal) {
           detailWB.cell(productDescLine, 2)
             .string(products[1].name);
 
+          if (products[1].payout) {
+            detailWB.cell(productDescLine, 2)
+              .style(redStyle)
+          }
+
           detailWB.cell(productDescLine, 3)
             .number(productsAA[1]);
 
@@ -1941,6 +1965,11 @@ async function startRegisterReport(registerID, isFinal) {
             .number(products[1].price * productsAA[1])
             .style(moneyStyle);
 
+          if (productsAA[2]) {
+            detailWB.cell(productDescLine, 4)
+              .number(productsAA[2])
+              .style(moneyStyle);            
+          }
         }
       })
       productDescLine = productDescLine + 1
@@ -1953,7 +1982,7 @@ async function startRegisterReport(registerID, isFinal) {
   if (maxWidth <= 0 || !maxWidth) {
     maxWidth = 11
   }
-  detailWB.column(2).setWidth(maxWidth)
+  detailWB.column(2).setWidth(maxWidth + 3)
 
   //      (Y, X)  
   detailWB.cell(1, 1)
@@ -1963,6 +1992,10 @@ async function startRegisterReport(registerID, isFinal) {
 
   detailWB.cell(1, 10)
     .string('Deposit Date/Time')
+    .style(boldStyle)
+
+  detailWB.cell(2, 10)
+    .string('Start Date/Time')
     .style(boldStyle)
 
   detailWB.cell(1, 12)
@@ -1981,9 +2014,6 @@ async function startRegisterReport(registerID, isFinal) {
 
   detailWB.cell(2, 3)
     .string(startDateStr)
-
-  detailWB.cell(2, 10)
-    .string('Weekday')
 
   detailWB.cell(3, 1)
     .string('CERMS 2.0')
@@ -2149,6 +2179,10 @@ async function startRegisterReport(registerID, isFinal) {
     .string('CERMS 2.0')
     .style(boldStyle)
 
+  summaryWB.cell(1, 17)
+    .string(registerID)
+    .style(boldStyle)
+
   summaryWB.cell(3, 1)
     .string("Biz Date")
     .style(boldStyle)
@@ -2187,10 +2221,6 @@ async function startRegisterReport(registerID, isFinal) {
 
   summaryWB.cell(3, 10)
     .string("Days Gross")
-    .style(boldStyle)
-
-  summaryWB.cell(3, 11)
-    .string("Weekday")
     .style(boldStyle)
 
   summaryWB.cell(5, 1)
@@ -2352,9 +2382,6 @@ async function startRegisterReport(registerID, isFinal) {
     .number((daysGrossA + daysGrossB + daysGrossC)) // Days Gross Totals
     .style(moneyStyle)
     .style(boldStyle)
-
-  summaryWB.cell(9, 11)
-    .string("") // Weekday
 
   summaryWB.cell(11, 1)
     .string('Biz Date')
@@ -2795,6 +2822,12 @@ async function editProduct(productInfo){
     theRentalLength = productInfo[17] * theMultiple
   }
 
+
+  let proAskForPrice = productInfo[22]
+  if (Number(productInfo[3]) > 0 && proAskForPrice) {
+    proAskForPrice = false
+  }
+
   const docRef = doc(db, "products", productInfo[0]);
   await updateDoc(docRef, {
     cat: productInfo[1],
@@ -2818,7 +2851,9 @@ async function editProduct(productInfo){
     inventoryPar: productInfo[15],
     barcode: productInfo[16],
     restricted: productInfo[19],
-    restrictedUsers: productInfo[20]
+    restrictedUsers: productInfo[20],
+    payout: productInfo[21],
+    askforprice: proAskForPrice
   });
   notificationSystem('success', 'Product Edited!')
 //  goProducts()
@@ -4597,7 +4632,7 @@ ipcMain.on('remove-category', (event, arg) => {
 
 ipcMain.on('create-product', (event, arg) => {
   theClient = event.sender;
-  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15], arg[16], arg[17], arg[18], arg[19])
+  createProduct(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10], arg[11], arg[12], arg[13], arg[14], arg[15], arg[16], arg[17], arg[18], arg[19], arg[20], arg[21])
 })
 
 ipcMain.on('gather-products-order', (event, arg) => {

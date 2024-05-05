@@ -33,6 +33,9 @@ let productMembershipLength = document.getElementById('productMembershipLength')
 let productMembershipLengthType = document.getElementById('productMembershipLengthType')
 let productRestrict = document.getElementById('productRestrict')
 let productRestrictDiv = document.getElementById('productRestrictDiv')
+let productPayout = document.getElementById('productPayout')
+let productPayoutDiv = document.getElementById('productPayoutDiv')
+let productAskForPrice = document.getElementById('productAskForPrice')
 let productDesc = document.getElementById('productDesc')
 let productInventory = document.getElementById('productInventory')
 let productInventoryPar = document.getElementById('productInventoryPar')
@@ -59,6 +62,9 @@ let editProductMembershipLength = document.getElementById('editProductMembership
 let editProductMembershipLengthType = document.getElementById('editProductMembershipLengthType')
 let editProductRestrict = document.getElementById('editProductRestrict')
 let editProductRestrictDiv = document.getElementById('editProductRestrictDiv')
+let editProductPayout = document.getElementById('editProductPayout')
+let editProductPayoutDiv = document.getElementById('editProductPayoutDiv')
+let editProductAskForPrice = document.getElementById('editProductAskForPrice')
 let editProductDesc = document.getElementById('editProductDesc')
 let editProductInventory = document.getElementById('editProductInventory')
 let editProductInventoryPar = document.getElementById('editProductInventoryPar')
@@ -112,6 +118,11 @@ if (productRestrictDiv) {
   ipcRenderer.send('request-users')
 }
 
+if (productPayoutDiv) {
+  productPayoutDiv.style.display = 'none'
+  editProductRestrictDiv.style.display = 'none'
+}
+
 if (productRentalDiv) {
   productRentalDiv.style.display = 'none'  
 }
@@ -144,12 +155,32 @@ if (productRestrict) {
   })
 }
 
+if (productPayout) {
+  productPayout.addEventListener('change', function(){
+    if (productPayout.checked) {
+      productPayoutDiv.style.display = ''
+    }else{
+      productPayoutDiv.style.display = 'none'
+    }
+  })
+}
+
 if (editProductRestrict) {
   editProductRestrict.addEventListener('change', function(){
     if (editProductRestrict.checked) {
       editProductRestrictDiv.style.display = ''
     }else{
       editProductRestrictDiv.style.display = 'none'
+    }
+  })
+}
+
+if (editProductPayout) {
+  editProductPayout.addEventListener('change', function(){
+    if (editProductPayout.checked) {
+      editProductPayoutDiv.style.display = ''
+    }else{
+      editProductPayoutDiv.style.display = 'none'
     }
   })
 }
@@ -269,8 +300,7 @@ function addProduct(){
       }
     });    
   }
-
-  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productFavorite.checked, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value, productRentalLength.value, productRentalLengthType.value, productRestrict.checked, usersChecked))
+  ipcRenderer.send('create-product', Array(productCategory.value, productName.value, productPrice.value, productInvWarning.value, productDesc.value, productInventory.value, productFavorite.checked, productTaxable.checked, productActive.checked, productCore.checked, productRental.checked, productMembership.checked, productMembershipLength.value, productMembershipLengthType.value, productInventoryPar.value, productBarcode.value, productRentalLength.value, productRentalLengthType.value, productRestrict.checked, usersChecked, productPayout.checked, productAskForPrice.checked))
   usersData.forEach(user => {
     document.getElementById('userCheck' + user).checked = false
   });
@@ -286,7 +316,7 @@ function editProduct(){
       }
     });
   }
-  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductFavorite.checked, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value, editProductRentalLength.value, editProductRentalLengthType.value, editProductRestrict.checked, usersChecked))
+  ipcRenderer.send('edit-product', Array(productEditing, editProductCategory.value, editProductName.value, editProductPrice.value, editProductInvWarning.value, editProductDesc.value, editProductInventory.value, editProductFavorite.checked, editProductTaxable.checked, editProductActive.checked, editProductCore.checked, editProductRental.checked, editProductMembership.checked, editProductMembershipLength.value, editProductMembershipLengthType.value, editProductInventoryPar.value, editProductBarcode.value, editProductRentalLength.value, editProductRentalLengthType.value, editProductRestrict.checked, usersChecked, editProductPayout.checked, editProductAskForPrice.checked))
   usersData.forEach(user => {
     document.getElementById('editUserCheck' + user).checked = false
   });
@@ -414,6 +444,7 @@ if (productTable) {
 
         document.getElementById("edit" + arg[0]).addEventListener('click', function () {
           editProductRestrictDiv.style.display = 'none'
+          editProductPayoutDiv.style.display = 'none'
           usersData.forEach(user => {
             document.getElementById('editUserCheck' + user).checked = false
           });
@@ -434,8 +465,11 @@ if (productTable) {
           editProductRentalLength.value = arg[1].rentalLengthRaw
           editProductRentalLengthType.value = arg[1].rentalLengthType
           editProductRestrict.checked = arg[1].restricted
+          editProductPayout.checked = arg[1].payout
+          editProductAskForPrice.checked = arg[1].askforprice
           if (arg[1].restricted) {
             editProductRestrictDiv.style.display = ''
+            editProductPayoutDiv.style.display = ''
             arg[1].restrictedUsers.forEach(user => {
               document.getElementById('editUserCheck' + user).checked = true
             });    
@@ -604,6 +638,7 @@ ipcRenderer.on('return-products-update', (event, arg) => {
 
   document.getElementById("edit"+arg[0]).addEventListener('click', function(){
     editProductRestrictDiv.style.display = 'none'
+    editProductPayoutDiv.style.display = 'none'
     usersData.forEach(user => {
       document.getElementById('editUserCheck' + user).checked = false
     });
@@ -620,8 +655,10 @@ ipcRenderer.on('return-products-update', (event, arg) => {
     editProductRental.checked = arg[1].rental
     editProductMembership.checked = arg[1].membership
     editProductRestrict.checked = arg[1].restricted
+    editProductPayout.checked = arg[1].payout
     if (arg[1].restricted) {
       editProductRestrictDiv.style.display = ''
+      editProductPayoutDiv.style.display = ''
       arg[1].restrictedUsers.forEach(user => {
         document.getElementById('editUserCheck' + user).checked = true
       });

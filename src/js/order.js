@@ -329,6 +329,20 @@ if (checkoutBtn) {
           if (item2[0] == item[0]) {
             let newP = document.createElement('p')
             let theProductPrice = item2[1].price
+
+            if (item2[1].askforprice) {
+              productsAFP.forEach(afp => {
+                if (afp[0] == item2[0]) {
+                  theProductPrice = afp[1]              
+                  delete afp
+                }
+              });
+            }
+
+            if (item2[1].payout) {
+              theProductPrice = -theProductPrice
+            }
+
             if (theDiscountInfo && !discountApplied) {
               if (theDiscountInfo[1].dollar) {
                 theProductPrice = theProductPrice - theDiscountInfo[1].amount
@@ -355,9 +369,9 @@ if (checkoutBtn) {
                 discountApplied = true
               }    
             } else{
-              newP.innerHTML = item2[1].name + ' - ' + formatter.format(item2[1].price)
+              newP.innerHTML = item2[1].name + ' - ' + formatter.format(theProductPrice)
               if (item[1]) {
-                newP.innerHTML = item2[1].name + ' (' + item[1] + ') - ' + formatter.format(item2[1].price)                
+                newP.innerHTML = item2[1].name + ' (' + item[1] + ') - ' + formatter.format(theProductPrice)                
               }
             } 
             if (discountInfoWaive == "1") {
@@ -427,7 +441,59 @@ const formatter = new Intl.NumberFormat('en-US', {
   currency: 'USD',
 });
 
+let proPrice = false
+let proPriceArray = false
+let productsAFP = Array()
+let restrictPros = false
+// TODO: Add this to the top
+
+document.getElementById('myModal5Close').addEventListener('click', function () {
+  // Get the backdrop so we can remove it from the body
+  const backdrop = document.querySelector(".modal-backdrop.fade.show");
+  const modal = document.getElementById('myModal5')
+  // Remove the `modal-open` class from the body
+  document.body.classList.remove("modal-open");
+  // Re-hide the modal from screen readers
+  modal.setAttribute("aria-hidden", "true");
+  // Remove the `show` class from the backdrop
+  backdrop.classList.remove("show");
+  // Remove the `show` class from the modal
+  modal.classList.remove("show");
+  // Change the modal `display` style to `none`
+  modal.style.display = "none";
+  // Remove the backdrop div from the body
+  backdrop.remove();
+})
+
+document.getElementById('submitProPrice').addEventListener("click", function(){
+
+  proPrice = document.getElementById('proPrice').value
+  productsAFP.push(Array(proPriceArray[0][0], proPrice))
+
+  addProductCard(proPriceArray[0], proPriceArray[1])  
+  // Get the backdrop so we can remove it from the body
+  const backdrop = document.querySelector(".modal-backdrop.fade.show");
+  const modal = document.getElementById('myModal5')
+  // Remove the `modal-open` class from the body
+  document.body.classList.remove("modal-open");
+  // Re-hide the modal from screen readers
+  modal.setAttribute("aria-hidden", "true");
+  // Remove the `show` class from the backdrop
+  backdrop.classList.remove("show");
+  // Remove the `show` class from the modal
+  modal.classList.remove("show");
+  // Change the modal `display` style to `none`
+  modal.style.display = "none";
+  // Remove the backdrop div from the body
+  backdrop.remove();
+  restrictPros = true
+})
+
 function addProductCard(theProduct, theProductInfo){  
+  if (restrictPros) {
+    notificationSystem('warning', 'You can only process one payout at a time. (no additional products allowed)', 5000, 99)
+    return
+  }
   if (!Array.isArray(theProduct)) {
     productsData.forEach(pro => {
       if (theProduct == pro[0]) {
@@ -436,8 +502,37 @@ function addProductCard(theProduct, theProductInfo){
     });
   }
 
-  checkoutBtn.disabled = false
   let productPrice = theProduct[1].price
+
+  if (theProduct[1].askforprice && !proPrice) {
+    // Create the backdrop div element
+    const backdrop = document.createElement("div");
+    const modal = document.getElementById('myModal5')
+    // Add the required classes to it.
+    backdrop.classList.add("modal-backdrop", "fade", "show");
+    // Add the `modal-open` class to the body
+    document.body.classList.add("modal-open");
+    // Append the backdrop div to the body
+    document.body.appendChild(backdrop);
+    // Set the `display` style of the modal to `block`
+    modal.style.display = "block";
+    // This is for accessibility tools.  We want to make it no longer hidden to screen readers.
+    modal.setAttribute("aria-hidden", "false", "show");
+    // Add the show class to the modal
+    modal.classList.add("show");
+
+    document.getElementById('proPrice').focus()
+
+    proPriceArray = Array(theProduct, theProductInfo)    
+
+    return
+  } else if (theProduct[1].askforprice) {
+    productPrice = proPrice
+    proPrice = false
+    proPriceArray = false
+  }
+
+  checkoutBtn.disabled = false
   if (isReturn) {
     productPrice = -Math.abs(productPrice)
   }
@@ -539,6 +634,14 @@ function addProductCard(theProduct, theProductInfo){
     trashBtn.addEventListener('click', function(){
       removeProductCard(theProduct)
       ipcRenderer.send('remove-from-order', Array(theProduct, theProductInfo))
+      if (theProduct[1].payout) {
+        productsAFP.forEach(afp => {
+          if (afp[0] == theProduct[0]) {
+            delete afp
+          }
+        });
+        restrictPros = false          
+      }
     })
   }
 
@@ -573,7 +676,6 @@ function addProductCard(theProduct, theProductInfo){
       startProductDiscount(discount[1].code, productDiscountWarning, productDiscount, productDiscountBtn, productWaiveBtn, removeProductDiscountBtn, currentProductCard)
     }
   });
-
 }
 
 function removeProductCard(theProduct){

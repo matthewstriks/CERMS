@@ -53,22 +53,34 @@ ipcRenderer.on('recieve-dark-mode', (event, arg) => {
   }
 })
 
-ipcRenderer.on('notification-system', (event, arg) => {
-  if (document.getElementById('cermsLogo')) {
-    document.getElementById('cermsLogo').style.display = 'none'
-  }
-  let theDiv = document.createElement('div')
-  theDiv.className = 'alert alert-' + arg[0] + ' alert-dismissible'
-  theDiv.innerHTML = arg[1] + ' <button id="closeNotification' + arg[3] + '" notificationIDBtn=' + arg[3] + ' type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
-  theDiv.setAttribute('role', 'alert')
-  theDiv.setAttribute('notificationID', arg[3])
-  errorMsg.appendChild(theDiv)
+//  theClient.send('notification-system', Array(notificationType, notificationMsg, theNotSecs, theNotificationID))
 
-  document.getElementById('closeNotification' + arg[3]).addEventListener('click', function(){
-    ipcRenderer.send('notification-system-remove-id', arg[3])
-  })
+ipcRenderer.on('notification-system', (event, arg) => {
+  notificationSystem(arg[0], arg[1], arg[2], arg[3])
 }) 
 
 ipcRenderer.on('notification-system-remove', (event, arg) => {
   document.querySelector('[notificationID="' + arg + '"]').remove();
 })
+
+function notificationSystem(notificationType, notificationMsg, theNotSecs, theNotificationID) {
+  if (document.getElementById('cermsLogo')) {
+    document.getElementById('cermsLogo').style.display = 'none'
+  }
+  let theDiv = document.createElement('div')
+  theDiv.className = 'alert alert-' + notificationType + ' alert-dismissible'
+  theDiv.innerHTML = notificationMsg + ' <button id="closeNotification' + theNotificationID + '" notificationIDBtn=' + theNotificationID + ' type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
+  theDiv.setAttribute('role', 'alert')
+  theDiv.setAttribute('notificationID', theNotificationID)
+  errorMsg.appendChild(theDiv)
+
+  document.getElementById('closeNotification' + theNotificationID).addEventListener('click', function () {
+    ipcRenderer.send('notification-system-remove-id', theNotificationID)
+  })
+
+  if (theNotSecs) {
+    setTimeout(() => {
+      document.querySelector('[notificationID="' + theNotificationID + '"]').remove();          
+    }, theNotSecs);
+  }
+}
