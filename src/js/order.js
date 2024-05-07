@@ -50,7 +50,10 @@ let theCustomerInfo;
 let favPros = Array()
 let isReturn = false
 let theProductCheckoutList = ""
-
+let proPrice = false
+let proPriceArray = false
+let productsAFP = Array()
+let restrictPros = false
 
 if (searchProducts) {
   searchProducts.addEventListener('click', function(){
@@ -440,12 +443,6 @@ const formatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
 });
-
-let proPrice = false
-let proPriceArray = false
-let productsAFP = Array()
-let restrictPros = false
-// TODO: Add this to the top
 
 document.getElementById('myModal5Close').addEventListener('click', function () {
   // Get the backdrop so we can remove it from the body
