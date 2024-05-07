@@ -552,8 +552,8 @@ function addProductCard(theProduct, theProductInfo){
     let plusBtn = document.getElementById(theProduct[0] + 'plus')
     if (plusBtn) {
       plusBtn.addEventListener('click', function () {
-        addProductCard(theProduct)
         ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct, addLockerRoomInput.value, addLockerRoomInput2.value))
+        addProductCard(theProduct)
       })
     }
 
@@ -644,8 +644,8 @@ function addProductCard(theProduct, theProductInfo){
 
   if (plusBtn) {
     plusBtn.addEventListener('click', function(){
-      addProductCard(theProduct)
       ipcRenderer.send('add-to-order', Array(theCustomerInfo, theProduct, addLockerRoomInput.value, addLockerRoomInput2.value))
+      addProductCard(theProduct)
     })
   }
 
@@ -913,8 +913,8 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   productSearchItem.tabIndex = 0
   productSearchItem.setAttribute('barcode', arg[1].barcode)
   productSearchItem.addEventListener('click', function(){
-    addProductCard(arg)
     ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
+    addProductCard(arg)
   })
   productSearchItem.onkeypress = function (event) {
     if (event.key == 'Enter') {
@@ -966,8 +966,8 @@ ipcRenderer.on('return-products-order', (event, arg) => {
   var productBody = document.createElement('div')
   productBody.className = 'card-body'
   productBody.addEventListener('click', function () {
-    addProductCard(arg)
     ipcRenderer.send('add-to-order', Array(theCustomerInfo, arg, addLockerRoomInput.value, addLockerRoomInput2.value))
+    addProductCard(arg)
   })
 
   var productTitle = document.createElement('h5')

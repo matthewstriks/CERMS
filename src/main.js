@@ -4811,13 +4811,25 @@ ipcMain.on('suspend-order', (event, arg) => {
 ipcMain.on('remove-from-order', (event, arg) => {
   theClient = event.sender
   if (arg[0][1].rental) {
+    notificationSystem('warning', 'If you are removing a rental, you must exit out of the order page and start over. Re-select the member to ensure you do not get duplicate check-ins.')
     pendingOrders.forEach(porder => {
-      if (porder[0][1] == arg[0][1].name && porder[0][2] == arg[1]) {
-        porder[0] = false
-        porder[1] = false
-        porder[2] = false
+      if (porder[3]) {
+        if ((porder[3]) && (porder[3][0] == arg[0][0]) && (porder[3][1].name == arg[0][1].name) && (arg[1] == porder[2][2])) {
+          porder[0] = false
+          porder[1] = false
+          porder[2] = false
+          return
+        }
+        if (porder[0][1] == arg[0][1].name && porder[0][2] == arg[1]) {
+          porder[0] = false
+          porder[1] = false
+          porder[2] = false
+          return
+        }
       }
     });
+  } else if (arg[0][1].membership) {
+
   }
 })
 
@@ -4835,9 +4847,9 @@ ipcMain.on('add-to-order', (event, arg) => {
       addToOrder(arg[0], arg[1][0])      
     } else if ((product[0] == arg[1][0]) && (product[1].rental)) {
       if (!arg[0] || !arg[0][1]) {
-        pendingOrders.unshift(Array(0, 'activity', Array(0, product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
+        pendingOrders.unshift(Array(0, 'activity', Array(0, product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false), arg[1]))
       }else{
-        pendingOrders.unshift(Array(arg[0], 'activity', Array(arg[0][2], product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false)))
+        pendingOrders.unshift(Array(arg[0], 'activity', Array(arg[0][2], product[1].name, theLockerRoomInput, theLockerRoomInput2, false, false), arg[1]))
       }
     }
   });
