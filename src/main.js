@@ -877,7 +877,7 @@ async function registerReciept(registerID, logoutTF){
       withInputCCRT = withInputCCRA.replace('InputCCardTotalAmt', registerInfo.ccard)
       withReturns = withInputCCRT.replace('TheReturns', theReturnsHTML)
       withTotal = withReturns.replace('TheTotal', registerInfo.ending)
-      withStarting = withTotal.replace('TheExpTotal', registerInfo.starting)
+      withStarting = withTotal.replace('TheExpTotal', Math.round(((registerInfo.starting) + Number.EPSILON) * 100) / 100)
       withDiff = withStarting.replace('TheDifference', Math.round(((registerInfo.ending - registerInfo.starting) + Number.EPSILON) * 100) / 100)
       withChargeTotal = withDiff.replace('TheTotalCharge', formatter.format(Math.round((Number(registerInfo.ccard) + Number.EPSILON) * 100) / 100))
 
@@ -1492,6 +1492,7 @@ async function startRegisterReport(registerID, isFinal) {
   let reportType = 'Generated'
   let cashName = 'No Cashier Assigned (Full Report)'
   let startDates
+  let endDates
 
   let totalMoneyA = 0
   let totalMoneyB = 0
@@ -1549,6 +1550,10 @@ async function startRegisterReport(registerID, isFinal) {
   let passThruTotalsB = 0
   let passThruTotalsC = 0
 
+  let payoutTotalsA = 0
+  let payoutTotalsB = 0
+  let payoutTotalsC = 0
+
   let detailCCardA = 0
   let detailCCardB = 0
   let detailCCardC = 0
@@ -1604,6 +1609,7 @@ async function startRegisterReport(registerID, isFinal) {
 
   let currentDate = `${month}/${day}/${year}`;
   let yesterDate = `${month}/${day - 1}/${year}`;
+  let tomDate = `${month}/${day + 1}/${year}`;
   let currentDateFile = `${month}-${day}-${year}`;
   let currentTime = `${hour}:${min}:${sec} ${ampm}`;
   let currentTimeFile = `${hour}-${min}-${sec}-${ampm}`;
@@ -1670,14 +1676,17 @@ async function startRegisterReport(registerID, isFinal) {
 
     startDateStr = startDateS + ' ' + startTime
     startDates = new Date(registerInfo.timestampStart['seconds'] * 1000)
+    endDates = new Date(registerInfo.timestampEnd['seconds'] * 1000)
     q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID), where("access", "==", getSystemAccess()));
   } else if (!registerID && isFinal) {
     reportType = 'Final'
     startDates = new Date(yesterDate + ' 07:00');
+    endDates = new Date(currentDate + ' ' + currentTime);
     q1 = query(ordersRef, where("timestamp", ">", startDates), where("access", "==", getSystemAccess()));
   } else {
     reportType = 'Generated'
     startDates = new Date(currentDate + ' 07:00');
+    endDates = new Date(currentDate + ' ' + currentTime);
     q1 = query(ordersRef, where("timestamp", ">", startDates), where("access", "==", getSystemAccess()));
   }
 
@@ -1688,7 +1697,7 @@ async function startRegisterReport(registerID, isFinal) {
   let hour2 = startDate.getHours();
   let min2 = startDate.getMinutes();
   let sec2 = startDate.getSeconds();
-  let ampm2 = hour >= 12 ? 'pm' : 'am';
+  let ampm2 = hour2 >= 12 ? 'pm' : 'am';
 
   if (day2 < 10) {
     day2 = '0' + day2
@@ -1714,6 +1723,40 @@ async function startRegisterReport(registerID, isFinal) {
   let startTime = `${hour2}:${min2}:${sec2} ${ampm2}`;
 
   startDateStr = startDateS + ' ' + startTime
+
+  const endDate = endDates;
+  let day2E = endDate.getDate();
+  let month2E = endDate.getMonth() + 1;
+  let year2E = endDate.getFullYear();
+  let hour2E = endDate.getHours();
+  let min2E = endDate.getMinutes();
+  let sec2E = endDate.getSeconds();
+  let ampm2E = hour2E >= 12 ? 'pm' : 'am';
+
+  if (day2E < 10) {
+    day2E = '0' + day2E
+  }
+
+  if (month2E < 10) {
+    month2E = '0' + month2E
+  }
+
+  if (min2E < 10) {
+    min2E = '0' + min2E
+  }
+
+  if (sec2E < 10) {
+    sec2E = '0' + sec2E
+  }
+
+  if (hour2E > 12) {
+    hour2E = hour2E - 12
+  }
+
+  let endDateS = `${month2E}/${day2E}/${year2E}`;
+  let endTime = `${hour2E}:${min2E}:${sec2E} ${ampm2E}`;
+
+  let endDateStr = endDateS + ' ' + endTime
 
   let productsAndAmounts = Array()
   let discountsAndAmounts = Array()
@@ -1835,6 +1878,14 @@ async function startRegisterReport(registerID, isFinal) {
               counterTxTotalsB = counterTxTotalsB + Number(product[1].price)
             } else if (orderInfo.shift == "C") {
               counterTxTotalsC = counterTxTotalsC + Number(product[1].price)
+            }
+          } else if (product[1].payout) {
+            if (orderInfo.shift == "A") {
+              payoutTotalsA = payoutTotalsA + Number(orderInfo.total[2])
+            } else if (orderInfo.shift == "B") {
+              payoutTotalsB = payoutTotalsB + Number(orderInfo.total[2])
+            } else if (orderInfo.shift == "C") {
+              payoutTotalsC = payoutTotalsC + Number(orderInfo.total[2])
             }
           } else {
             if (orderInfo.shift == "A") {
@@ -1986,20 +2037,23 @@ async function startRegisterReport(registerID, isFinal) {
 
   //      (Y, X)  
   detailWB.cell(1, 1)
-    .string('CERMS')
+    .string('CERMS ' + app.getVersion())
     .style(boldStyle)
     .style({ font: { size: 20 } })
 
   detailWB.cell(1, 10)
-    .string('Deposit Date/Time')
+    .string('Deposit Start Date/Time')
     .style(boldStyle)
 
   detailWB.cell(2, 10)
-    .string('Start Date/Time')
+    .string('Deposit End Date/Time')
     .style(boldStyle)
 
   detailWB.cell(1, 12)
     .string(startDateStr)
+
+  detailWB.cell(2, 12)
+    .string(endDateStr)
 
   detailWB.cell(1, 15)
     .string('Cashier: ')
@@ -2008,16 +2062,15 @@ async function startRegisterReport(registerID, isFinal) {
   detailWB.cell(1, 17)
     .string(cashName)
 
+  detailWB.cell(1, 21)
+    .string(registerID)
+
   detailWB.cell(2, 1)
     .string("Deposit Detail Worksheet")
     .style(boldStyle)
 
   detailWB.cell(2, 3)
     .string(startDateStr)
-
-  detailWB.cell(3, 1)
-    .string('CERMS 2.0')
-    .style(boldStyle)
 
   detailWB.cell(3, 3)
     .string(systemData.shiftTimeB)
@@ -2154,7 +2207,7 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(1, 1)
-    .string("CERMS")
+    .string("CERMS " + app.getVersion())
     .style(boldStyle)
 
   summaryWB.cell(1, 4)
@@ -2162,11 +2215,18 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(1, 7)
-    .string('Deposit Date/Time')
+    .string('Deposit Start Date/Time')
+    .style(boldStyle)
+
+  summaryWB.cell(2, 7)
+    .string('Deposit End Date/Time')
     .style(boldStyle)
 
   summaryWB.cell(1, 9)
     .string(startDateStr)
+
+  summaryWB.cell(2, 9)
+    .string(endDateStr)
 
   summaryWB.cell(1, 11)
     .string('Cashier: ')
@@ -2174,10 +2234,6 @@ async function startRegisterReport(registerID, isFinal) {
 
   summaryWB.cell(1, 13)
     .string(cashName)
-
-  summaryWB.cell(1, 16)
-    .string('CERMS 2.0')
-    .style(boldStyle)
 
   summaryWB.cell(1, 17)
     .string(registerID)
@@ -2220,6 +2276,10 @@ async function startRegisterReport(registerID, isFinal) {
     .style(boldStyle)
 
   summaryWB.cell(3, 10)
+    .string("Payout")
+    .style(boldStyle)
+
+  summaryWB.cell(3, 11)
     .string("Days Gross")
     .style(boldStyle)
 
@@ -2259,8 +2319,12 @@ async function startRegisterReport(registerID, isFinal) {
     .number(passThruTotalsB) // PassThru (7a-3p)
     .style(moneyStyle)
 
-  let daysGrossB = (membershipTotalsB + lockerTotalsB + roomTotalsB + counterTxTotalsB + salesTxTotalsB + noCounterTxTotalsB + passThruTotalsB)
   summaryWB.cell(5, 10)
+    .number(payoutTotalsB) // Payout (7a-3p)
+    .style(moneyStyle)
+
+  let daysGrossB = (membershipTotalsB + lockerTotalsB + roomTotalsB + counterTxTotalsB + salesTxTotalsB + noCounterTxTotalsB + passThruTotalsB + payoutTotalsB)
+  summaryWB.cell(5, 11)
     .number(daysGrossB) // Days Gross (7a-3p)
     .style(moneyStyle)
 
@@ -2300,8 +2364,12 @@ async function startRegisterReport(registerID, isFinal) {
     .number(passThruTotalsC) // PassThru (3p-11p)
     .style(moneyStyle)
 
-  let daysGrossC = (membershipTotalsC + lockerTotalsC + roomTotalsC + counterTxTotalsC + salesTxTotalsC + noCounterTxTotalsC + passThruTotalsC)
   summaryWB.cell(6, 10)
+    .number(payoutTotalsC) // Payout (3p-11p)
+    .style(moneyStyle)
+
+  let daysGrossC = (membershipTotalsC + lockerTotalsC + roomTotalsC + counterTxTotalsC + salesTxTotalsC + noCounterTxTotalsC + passThruTotalsC + payoutTotalsC)
+  summaryWB.cell(6, 11)
     .number(daysGrossC) // Days Gross (3p-11p)
     .style(moneyStyle)
 
@@ -2341,8 +2409,12 @@ async function startRegisterReport(registerID, isFinal) {
     .number(passThruTotalsA) // PassThru (11p-7a)
     .style(moneyStyle)
 
-  let daysGrossA = (membershipTotalsA + lockerTotalsA + roomTotalsA + counterTxTotalsA + salesTxTotalsA + noCounterTxTotalsA + passThruTotalsA)
   summaryWB.cell(7, 10)
+    .number(payoutTotalsA) // Payout (11p-7a)
+    .style(moneyStyle)
+
+  let daysGrossA = (membershipTotalsA + lockerTotalsA + roomTotalsA + counterTxTotalsA + salesTxTotalsA + noCounterTxTotalsA + passThruTotalsA + payoutTotalsA)
+  summaryWB.cell(7, 11)
     .number(daysGrossA) // Days Gross (11p-7a)
     .style(moneyStyle)
 
@@ -2379,6 +2451,10 @@ async function startRegisterReport(registerID, isFinal) {
     .style(moneyStyle)
 
   summaryWB.cell(9, 10)
+    .number((payoutTotalsA + payoutTotalsB + payoutTotalsC)) // Payout Totals
+    .style(moneyStyle)
+
+  summaryWB.cell(9, 11)
     .number((daysGrossA + daysGrossB + daysGrossC)) // Days Gross Totals
     .style(moneyStyle)
     .style(boldStyle)
@@ -4740,7 +4816,6 @@ ipcMain.on('remove-from-order', (event, arg) => {
         porder[0] = false
         porder[1] = false
         porder[2] = false
-        console.log('Hello!');
       }
     });
   }
