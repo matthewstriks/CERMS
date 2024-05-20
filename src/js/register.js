@@ -61,7 +61,7 @@ function editEndingTotal(){
 }
 
 function editDropTotal(){
-  dropAmt.value = (Number(dinput100.value) * 100) + (Number(dinput50.value) * 50) + (Number(dinput20.value) * 20) + (Number(dinput10.value) * 10) + (Number(dinput5.value) * 5) + (Number(dinput1.value) * 1) + (Number(dinput25c.value) * .25) + (Number(dinput10c.value) * .10) + (Number(dinput5c.value) * .05) + (Number(dinput1c.value) * .01) + (Number(dropPSA.value) + Number(dropCCardAmt.value))   
+  dropAmt.value = (Number(dinput100.value) * 100) + (Number(dinput50.value) * 50) + (Number(dinput20.value) * 20) + (Number(dinput10.value) * 10) + (Number(dinput5.value) * 5) + (Number(dinput1.value) * 1) + (Number(dinput25c.value) * .25) + (Number(dinput10c.value) * .10) + (Number(dinput5c.value) * .05) + (Number(dinput1c.value) * .01) + (Number(dropPSA.value))   
 }
 
 input100.addEventListener('input', function(){
@@ -211,11 +211,32 @@ endingSubmitLogoutBtn.addEventListener('click', function(){
 })
 
 endingSubmitBtn.addEventListener('click', function(){
-  ipcRenderer.send('ending-register', Array(Array(endingAmt.value, Number(input100.value), Number(input50.value), Number(input20.value), Number(input10.value), Number(input5.value), Number(input1.value), Number(input25c.value), Number(input10c.value), Number(input5c.value), Number(input1c.value), Number(endingCCardAmt.value), Number(endingPSN.value), Number(endingPSA.value), Number(endingCCardAmtRan.value)), false))
+  ipcRenderer.send('ending-register', Array(
+    Array(
+      endingAmt.value, 
+      Number(input100.value), 
+      Number(input50.value), 
+      Number(input20.value), 
+      Number(input10.value), 
+      Number(input5.value), 
+      Number(input1.value), 
+      Number(input25c.value), 
+      Number(input10c.value), 
+      Number(input5c.value), 
+      Number(input1c.value), 
+      Number(endingCCardAmt.value), 
+      Number(endingPSN.value), 
+      Number(endingPSA.value), 
+      Number(endingCCardAmtRan.value)
+    ), 
+    false,
+    theRegInfo
+  ))
 })
 
 dropSubmitBtn.addEventListener('click', function(){
   ipcRenderer.send('drop-register', Array(theRegInfo, dropAmt.value, Number(dinput100.value), Number(dinput50.value), Number(dinput20.value), Number(dinput10.value), Number(dinput5.value), Number(dinput1.value), Number(dinput25c.value), Number(dinput10c.value), Number(dinput5c.value), Number(dinput1c.value), Number(dropPSN.value), Number(dropPSA.value), Number(dropCCardAmtRan.value), Number(dropCCardAmt.value)))
+  ipcRenderer.send('drop-register', Array(theRegInfo, Array(dropAmt.value, Number(dinput100.value), Number(dinput50.value), Number(dinput20.value), Number(dinput10.value), Number(dinput5.value), Number(dinput1.value), Number(dinput25c.value), Number(dinput10c.value), Number(dinput5c.value), Number(dinput1c.value), Number(dropPSN.value), Number(dropPSA.value), Number(dropCCardAmtRan.value), Number(dropCCardAmt.value))))
 })
 
 plrrBtn.addEventListener('click', function(){

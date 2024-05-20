@@ -793,6 +793,8 @@ async function viewOrderReciept(theOrderNumber){
   }
 }
 
+//TODO: Create getTimestampString(date(date), time(bool)) function to clean some of the dates/timestamps up
+
 async function registerReciept(registerID, logoutTF){
   let theTimestamp = new Date(Math.floor(Date.now()))
   let theMonth = theTimestamp.getMonth() + 1
@@ -808,6 +810,43 @@ async function registerReciept(registerID, logoutTF){
   const docRef = doc(db, "registers", registerID);
   const docSnap = await getDoc(docRef);
   let registerInfo = docSnap.data()
+
+
+  let theDropsHTML = "<b>Drop Information</b><br><br>"
+  docRef2 = query(collection(db, "drops"), where("registerID", "==", registerID), where('access', '==', getSystemAccess()));
+  const docSnap2 = await getDocs(docRef2);
+  docSnap2.forEach(async drop => {
+    let dropData = drop.data()
+    let theData = dropData.timestamp.toDate()
+    let day = theData.getDate();
+    let month = theData.getMonth() + 1;
+    let year = theData.getFullYear();
+    let hour = theData.getHours();
+    let min = theData.getMinutes();
+    let sec = theData.getSeconds();
+    let ampm = hour >= 12 ? 'PM' : 'AM';
+
+    if (day < 10) {
+      day = '0' + day
+    }
+    if (month < 10) {
+      month = '0' + month
+    }
+    if (min < 10) {
+      min = '0' + min
+    }
+    if (sec < 10) {
+      sec = '0' + sec
+    }
+    if (hour > 12) {
+      hour = hour - 12
+    }
+
+    let currentDate = `${month}/${day}/${year}`;
+    let currentTime = `${hour}:${min}:${sec} ${ampm}`;
+    let theTimeStamp = currentDate + ' ' + currentTime
+    theDropsHTML = theDropsHTML + "<b>Drop Timestamp:</b> " + theTimeStamp + "<br><b>Drop Amount:</b> $" + dropData.dropAmt + "<br><b>Payout Slip #/Amount:</b> " + dropData.dropPSN + "<b>/</b>$" + dropData.dropPSA + "<br><b>Credit Cards #/Amount:</b> " + dropData.dropCCardAmtRan + "<b>/</b>$" + dropData.dropCCardAmt + "<br><br>" 
+  });
 
   let theHTML
   let withDate
@@ -866,7 +905,8 @@ async function registerReciept(registerID, logoutTF){
       withInput10C = withInput25C.replace('Input10c', registerInfo.input10c)
       withInput5C = withInput10C.replace('Input05c', registerInfo.input5c)
       withInput1C = withInput5C.replace('Input01c', registerInfo.input1c)
-      withInputDA = withInput1C.replace('InputDropAmtDrop', registerInfo.drop)
+      withDrops = withInput1C.replace('InputDrops', theDropsHTML)
+      withInputDA = withDrops.replace('InputDropAmtDrop', registerInfo.drop)
       withInputPSNDrop = withInputDA.replace('InputPayoutPSNDrop', registerInfo.dropPSN)
       withInputPSADrop = withInputPSNDrop.replace('InputPSADrop', registerInfo.dropPSA)
       withInputCCRADrop = withInputPSADrop.replace('InputCCardRanAmtDrop', registerInfo.dropCCardAmtRan)
@@ -1400,7 +1440,6 @@ async function endRegister(registerInfo, logoutTF){
   await updateDoc(registerRef, {
     timestampEnd: serverTimestamp(),
     ending: Number(registerInfo[0]),
-    ccard: Number(registerInfo[11]),
     input100: registerInfo[1],
     input50: registerInfo[2],
     input20: registerInfo[3],
@@ -1413,7 +1452,6 @@ async function endRegister(registerInfo, logoutTF){
     input1c: registerInfo[10],
     PSN: registerInfo[12],
     PSA: registerInfo[13],
-    CCardAmtRan: registerInfo[14],
     active: false
   });
 
@@ -1433,8 +1471,13 @@ async function endRegister(registerInfo, logoutTF){
 }
 
 async function updateRegisterSub(registerInfo, amount, total, drop) {
+  console.log('Ran updateRegisterSub');
+  //  // paymentMethod: credit card, gift card, cash
+
   let registerAmount = registerInfo.starting
+  let cCardAmt = registerInfo.ccard
   let gCardAmt = registerInfo.gcard
+  cCardAmt = (cCardAmt + amount[0])
   gCardAmt = (gCardAmt + amount[1])
 
   registerAmount = registerAmount + amount[2]
@@ -1446,7 +1489,7 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
   let dropCCardAmt = registerInfo.dropCCardAmt
 
   let paymentTotal = 0;
-  if (!drop) {
+  if (!drop && total) {
     paymentTotal = paymentTotal + amount[0]
     paymentTotal = paymentTotal + amount[1]
     paymentTotal = paymentTotal + amount[2]
@@ -1457,7 +1500,7 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
         registerAmount = registerAmount + totalSub
       }
     }    
-  }else{
+  } else if (drop) {
     dropAmt = (dropAmt + Math.abs(amount[2]))
     dropPSNAmt = dropPSNAmt + drop[0]
     dropPSAAmt = dropPSAAmt + drop[1]
@@ -1470,6 +1513,7 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
   await updateDoc(registerRef, {
     starting: Number(registerAmount),
     gcard: Number(gCardAmt),
+    ccard: Number(cCardAmt),
     drop: Number(dropAmt),
     dropPSN: Number(dropPSNAmt),
     dropPSA: Number(dropPSAAmt),
@@ -1481,6 +1525,34 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
     registerStatus()   
     notificationSystem('success', 'Money drop has been logged.') 
   }   
+}
+
+async function createMoneyDrop(registerInfo, dropInfo){
+  if (!regStatus) {
+    return
+  }
+
+  const docRef = await addDoc(collection(db, "drops"), {
+    access: getSystemAccess(),
+    registerID: regStatusID,
+    timestamp: serverTimestamp(),
+    user: getUID(),
+    dropAmt: Number(dropInfo[0]),
+    dinput100: dropInfo[1],
+    dinput50: dropInfo[2],
+    dinput20: dropInfo[3],
+    dinput10: dropInfo[4],
+    dinput5: dropInfo[5],
+    dinput1: dropInfo[6],
+    dinput25c: dropInfo[7],
+    dinput10c: dropInfo[8],
+    dinput5c: dropInfo[9],
+    dinput1c: dropInfo[10],
+    dropPSN: dropInfo[11],
+    dropPSA: dropInfo[12],
+    dropCCardAmtRan: dropInfo[13],
+    dropCCardAmt: dropInfo[14]
+  });
 }
 
 async function startRegisterReport(registerID, isFinal) {
@@ -4778,12 +4850,19 @@ ipcMain.on('starting-register-no-redirect', (event, arg) => {
 
 ipcMain.on('ending-register', (event, arg) => {
   theClient = event.sender;
-  endRegister(arg[0], arg[1])
+//  updateRegisterSub(arg[2], Array(arg[0][11], 0, arg[0][13]), false, false)
+  setTimeout(() => {
+    endRegister(arg[0], arg[1])    
+  }, 1000);
 })
 
 ipcMain.on('drop-register', (event, arg) => {
   theClient = event.sender;
-  updateRegisterSub(arg[0], Array(0, 0, -arg[1]), false, Array(arg[12], arg[13], arg[14], arg[15]))
+  if (arg.length > 3) {
+    updateRegisterSub(arg[0], Array(0, 0, -arg[1]), false, Array(arg[12], arg[13], arg[14], arg[15]))
+  } else {
+    createMoneyDrop(arg[0], arg[1])
+  }
 })
 
 ipcMain.on('manage-ending-register', (event, arg) => {
