@@ -1471,7 +1471,6 @@ async function endRegister(registerInfo, logoutTF){
 }
 
 async function updateRegisterSub(registerInfo, amount, total, drop) {
-  console.log('Ran updateRegisterSub');
   //  // paymentMethod: credit card, gift card, cash
 
   let registerAmount = registerInfo.starting
