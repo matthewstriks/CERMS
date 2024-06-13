@@ -133,6 +133,22 @@ if (fileName[0] != 'login.html' && fileName[0] != 'index.html' && fileName[0] !=
     navBarBtnListList.appendChild(navBarBtnListBtn)
   });
 
+
+  let navBarBtnListListMsg = document.createElement('li')
+  navBarBtnListListMsg.classList = 'nav-item'
+  navBarBtnList.appendChild(navBarBtnListListMsg)
+
+  let navBarBtnListBtnMsg = document.createElement('a')
+  navBarBtnListBtnMsg.classList = 'nav-link position-relative'
+  navBarBtnListBtnMsg.innerHTML = 'Messages'
+  navBarBtnListListMsg.appendChild(navBarBtnListBtnMsg)
+
+  let navBarBtnListListMsgSpan = document.createElement('span')
+  navBarBtnListListMsgSpan.id = 'messagesStatus'
+  navBarBtnListListMsgSpan.classList = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger'
+  navBarBtnListListMsgSpan.innerHTML = 'NEW'
+  navBarBtnListBtnMsg.appendChild(navBarBtnListListMsgSpan)
+
   let navBarBtnListEnd = document.createElement('ul')
   navBarBtnListEnd.classList = 'nav justify-content-end'
   navBarDivBtnListDiv.appendChild(navBarBtnListEnd)
