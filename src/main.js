@@ -1,3 +1,5 @@
+// TEST
+
 const devMode = false;
 const { app, BrowserWindow, ipcMain, dialog, webContents, shell, systemPreferences } = require('electron');
 const { autoUpdater } = require('electron-updater');
