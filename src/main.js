@@ -5692,3 +5692,8 @@ ipcMain.on('print-last-register-receipt', (event, arg) => {
     notificationSystem('danger', 'You do not have a previous register saved...')
   }
 })
+
+ipcMain.on('support-btn', (event, arg) => {
+  theClient = event.sender
+  shell.openExternal("https://www.clubentertainmentrms.com/support")
+})

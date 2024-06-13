@@ -2,6 +2,7 @@ let inputEMail = document.getElementById('inputEMail');
 let inputPassword = document.getElementById('inputPassword');
 let loginForm = document.getElementById('loginForm');
 let resetPassword = document.getElementById('resetPassword');
+let supportBtn = document.getElementById('supportBtn');
 
 if (loginForm) {
   loginForm.addEventListener('submit', function(){
@@ -26,4 +27,10 @@ if(resetPassword){
 
 if(inputEMail){
   inputEMail.focus()
+}
+
+if (supportBtn) {
+  supportBtn.addEventListener('click', function(){
+    ipcRenderer.send('support-btn')
+  })
 }
