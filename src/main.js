@@ -3858,6 +3858,7 @@ function updateUserVersion(){
 }
 
 async function searchForMessage(){
+  // TODO: CREATE SNAPSHOT TO LISTEN LIVE INSTEAD OF 5 MINUTES
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeMS = new Date(theCurrentTime * 1000);
 

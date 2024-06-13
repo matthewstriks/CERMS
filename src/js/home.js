@@ -81,7 +81,9 @@ function updateTime(){
 }
 
 if (editRentalInfoType) {
-  ipcRenderer.send('rentals-request')
+  setTimeout(() => {
+    ipcRenderer.send('rentals-request')    
+  }, 1000);
 }
 
 if (document.getElementById('quickSaleBtn')) {
@@ -212,7 +214,8 @@ ipcRenderer.on('activity-request-return-update', (event, arg) => {
   var cell5 = document.getElementById('timeCell'+arg[0]);
   var cell6 = document.getElementById('buttonCell'+arg[0]);
   var cell7 = document.getElementById('iconCell'+arg[0]);
-  cell1.outerHTML = "<th scope='row' id='lockerRoomNumCell"+arg[0]+"'>"+parseInt(arg[1].lockerRoomStatus[1])+"</th>"
+  let theLockerRoomNum = parseInt(arg[1].lockerRoomStatus[1]) || "Unknown"
+  cell1.outerHTML = "<th scope='row' id='lockerRoomNumCell"+arg[0]+"'>"+theLockerRoomNum+"</th>"
   cell2.innerHTML = arg[1].lockerRoomStatus[2];
 
   if (arg[1].lockerRoomStatus[1] == 0) {
@@ -287,8 +290,8 @@ ipcRenderer.on('activity-request-return-update', (event, arg) => {
     activityInfoType.innerHTML = 'Membership Type: ' + arg[2].membership_type;
     activityInfoRentalInfo.innerHTML = 'Rental Type/Number: ' + arg[1].lockerRoomStatus[2] + ' (' + arg[1].lockerRoomStatus[1] + ')';
     activityInfoTimeIn.innerHTML = time;
-    if (arg[1].notes) {
-      activityInfoNotes.innerHTML = arg[1].notes;
+    if (arg[1].notes && arg[1].notes != 'false') {
+      activityInfoNotes.innerHTML = "Notes:<br>" + arg[1].notes;
     }else{
       activityInfoNotes.innerHTML = 'No notes found.';
     }
@@ -297,7 +300,11 @@ ipcRenderer.on('activity-request-return-update', (event, arg) => {
     currActivityViewingLS = arg[1].lockerRoomStatus;
     currActivityViewingLT = arg[1].lockerRoomStatus[2];
     currActivityViewingLN = arg[1].lockerRoomStatus[1];
-    currActivityViewingNotes = arg[1].notes;
+    if (arg[1].notes && arg[1].notes != 'false') {
+      currActivityViewingNotes = arg[1].notes;
+    } else {
+      currActivityViewingNotes = "";
+    }
 
     if (arg[1].waitlist) {
       document.getElementById('removeFromWaitlist').style.display = ""
@@ -347,7 +354,8 @@ ipcRenderer.on('activity-request-return', (event, arg) => {
 
   row.setAttribute('memberid', arg[0]);
   if (arg[1].lockerRoomStatus[0]) {
-    cell1.outerHTML = "<th scope='row' id='lockerRoomNumCell"+arg[0]+"'>"+parseInt(arg[1].lockerRoomStatus[1])+"</th>"
+    let theLockerRoomNum = parseInt(arg[1].lockerRoomStatus[1]) || "Unknown"
+    cell1.outerHTML = "<th scope='row' id='lockerRoomNumCell"+arg[0]+"'>"+theLockerRoomNum+"</th>"
     cell2.innerHTML = arg[1].lockerRoomStatus[2];
 
     if (arg[1].lockerRoomStatus[1] == 0) {
@@ -447,8 +455,8 @@ ipcRenderer.on('activity-request-return', (event, arg) => {
     activityInfoType.innerHTML = 'Membership Type: ' + arg[2].membership_type;
     activityInfoRentalInfo.innerHTML = 'Rental Type/Number: ' + arg[1].lockerRoomStatus[2] + ' (' + arg[1].lockerRoomStatus[1] + ')';
     activityInfoTimeIn.innerHTML = time;
-    if (arg[1].notes) {
-      activityInfoNotes.innerHTML = arg[1].notes;
+    if (arg[1].notes && arg[1].notes != 'false') {
+      activityInfoNotes.innerHTML = "Notes:<br>" + arg[1].notes;
     }else{
       activityInfoNotes.innerHTML = 'No notes found.';
     }
@@ -457,7 +465,11 @@ ipcRenderer.on('activity-request-return', (event, arg) => {
     currActivityViewingLS = arg[1].lockerRoomStatus;
     currActivityViewingLT = arg[1].lockerRoomStatus[2];
     currActivityViewingLN = arg[1].lockerRoomStatus[1];
-    currActivityViewingNotes = arg[1].notes;
+    if (arg[1].notes && arg[1].notes != 'false') {
+      currActivityViewingNotes = arg[1].notes;
+    } else {
+      currActivityViewingNotes = ""       
+    }
 
     if (arg[1].waitlist) {
       document.getElementById('removeFromWaitlist').style.display = ""
