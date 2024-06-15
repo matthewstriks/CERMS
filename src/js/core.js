@@ -61,7 +61,7 @@ function notificationSystem(notificationType, notificationMsg, theNotSecs, theNo
   if (theNotSecs) {
     setTimeout(() => {
       document.querySelector('[notificationID="' + theNotificationID + '"]').remove();          
-    }, theNotSecs);
+    }, theNotSecs * 1000);
   }
 }
 

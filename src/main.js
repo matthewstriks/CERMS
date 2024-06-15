@@ -3858,6 +3858,10 @@ function updateUserVersion(){
 }
 
 async function searchForMessage(){
+  if (systemData.maintenanceMode) {
+    notificationSystem("warning", '[SYSTEM] Maintence Mode has been enabled. You may see data that you did not create. You may still use CERMS.')
+  }
+
   // TODO: CREATE SNAPSHOT TO LISTEN LIVE INSTEAD OF 5 MINUTES
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeMS = new Date(theCurrentTime * 1000);
