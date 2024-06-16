@@ -13,7 +13,6 @@ const { log } = require('console');
 const delay = require('delay');
 const { address } = require('address');
 const os = require('os');
-const { getSystemMemoryInfo } = require('process');
 const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
 const { compareAsc, format } = require("date-fns");
@@ -150,16 +149,13 @@ function getSystemAccess(){
 }
 
 async function getEMailByID(theUserID){
-  const docRef = doc(db, "users", theUserID);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('users', theUserID);
 
-  if (docSnap.exists()) {
-    return docSnap.data().email;
+  if (docSnap) {
+    return docSnap.email;
   } else {
     return false;
   }
-
-  return userData.email;
 }
 
 function isQuickbooksConnected(){
@@ -184,6 +180,77 @@ function getUID(){
 
 function getLastRegister(){
   return userData.lastRegister;
+}
+
+// TODO: Firebase Functions
+async function firebaseSetDocument(theCollection, theID, theData){
+  const docRef = await setDoc(doc(db, theCollection, theID), theData);
+  return docRef
+}
+
+async function firebaseAddDocument(theCollection, theData){
+  const docRef = await addDoc(collection(db, theCollection), theData);
+  return docRef
+}
+
+async function firebaseUpdateDocument(theCollection, theID, theData){
+  const docRef = doc(db, theCollection, theID);
+  // TODO: Update the rest (find updateDoc and replace with firebaseUpdateDocument)
+  await updateDoc(docRef, theData);
+  return true
+}
+
+async function firebaseDeleteDocument(theCollection, theID){
+  await deleteDoc(doc(db, theCollection, theID));
+  return true
+}
+
+async function firebaseGetDocument(theCollection, theID){
+  const docRef = doc(db, theCollection, theID);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return docSnap.data()
+  } else {
+    return false
+  }  
+}
+
+// FOV = Array(field, op, value)
+async function firebaseGetDocuments(theCollection, fov, includeAccess){
+  // TODO: NEED TO REPLACE
+  let q = collection(db, theCollection);
+  if (includeAccess) {
+    q = query(q, where('access', '==', getSystemAccess()));
+  }
+  fov.forEach(condition => {
+    if (Array.isArray(condition) && condition.length === 3) {
+      let field = condition[0]
+      let operator = condition[1]
+      let value = condition[2]
+      q = query(q, where(field, operator, value));
+    } else {
+      console.log('Incorrect formatting for FOV (firebaseGetDocuments)');
+      return false
+    }
+  });
+
+  const querySnapshot = await getDocs(q);
+
+  const results = Array();
+  querySnapshot.forEach((doc) => {
+    results.push(Array(doc.id, doc.data()));
+  });
+  return results
+}
+
+async function firebaseGetAllDocuments(theCollection){
+  // TODO: NEED TO REPLACE
+  const querySnapshot = await getDocs(collection(db, theCollection));
+  let results = Array()
+  querySnapshot.forEach((doc) => {
+    results.push(Array(doc.id, doc.data()))
+  });
+  return results
 }
 
 function notificationSystem(notificationType, notificationMsg){
@@ -233,16 +300,35 @@ function removeNotification(theNotificationID){
 
 async function addLog(type, message){
   if (debugMode) {
-    console.log('Logging: ' + type + '(' + message + ')');
-    const docRef = await addDoc(collection(db, "logs"), {
-      access: getSystemAccess(),
-      type: type,
-      message: message,
-      timestamp: serverTimestamp(),
-      user: getUID()
-    });
+    const filePath = path.join(app.getPath('userData'), '.', 'devLog.txt');
+    const logMessage = `${new Date().toISOString()} ${type}: ${message}\n`;
 
+    fs.appendFile(filePath, logMessage, (err) => {
+      if (err) {
+        console.error(`Failed to write to log file: ${err.message}`);
+      }
+    });
   }
+}
+
+async function gapLogFile(){
+  const filePath = path.join(app.getPath('userData'), '.', 'devLog.txt');
+  const logMessage = `\n`;
+
+  fs.appendFile(filePath, logMessage, (err) => {
+    if (err) {
+      console.error(`Failed to write to log file: ${err.message}`);
+    }
+  });
+}
+
+async function destroyLogFile(){
+  const filePath = path.join(app.getPath('userData'), '.', 'devLog.txt');
+  fs.writeFile(filePath, "", (err) => {
+    if (err) {
+      console.error(`Failed to write to log file: ${err.message}`);
+    }
+  })
 }
 
 async function getMemberInfo(memberID){
@@ -250,39 +336,18 @@ async function getMemberInfo(memberID){
     return false
   }
 
-  const docRef = doc(db, "members", memberID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data();
-  } else {
-    return false;
-  }
+  return await firebaseGetDocument('members', memberID)
 }
 
 async function getMemberEMail(memberID){
   if (!memberID || memberID <= 0) {
     return false
   }
-  const docRef = doc(db, "members", memberID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data().email;
-  } else {
-    return false;
-  }
+  return await firebaseGetDocument('members', memberID)
 }
 
 async function getMemberFromActivity(activityID){
-  const docRef = doc(db, "activity", activityID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data().memberID;
-  } else {
-    return false;
-  }
+  return await firebaseGetDocument('activity', activityID).memberID
 }
 
 async function resetUserPassword(theEmailPass, theUserID){
@@ -309,10 +374,9 @@ async function resetUserPassword(theEmailPass, theUserID){
 }
 
 async function updateMembershipEMail(memberID, newEMail){
-  const docRef = doc(db, "members", memberID);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberID, {
     email: newEMail
-  });
+  })
 }
 
 async function updateMembership(memberID, theOldDoc, memberInfo){
@@ -338,13 +402,12 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 
   idExpiration = theCurrentTime + theProductInfo[1].membershipLength
 
-  const docRef = doc(db, "members", memberID);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberID, {
     notes: arrayUnion(stringStarter + memberInfo[4]),
     dna: false,
     id_expiration: idExpiration,
     membership_type: memberInfo[3]
-  });
+  })
   theClient.send('membership-success', memberID)
 }
 
@@ -369,11 +432,10 @@ async function memberDNA(memberInfo){
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     dna: true,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member added to the DNA list')
 }
 
@@ -397,11 +459,10 @@ async function memberUNDNA(memberInfo){
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     dna: false,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member removed from the DNA list')
 }
 
@@ -426,11 +487,10 @@ async function memberTag(memberInfo){
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     tag: true,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member added to the Tag list')
 }
 
@@ -454,11 +514,10 @@ async function memberUNTag(memberInfo){
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     tag: false,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member removed from the Tag list')
 }
 
@@ -498,8 +557,7 @@ async function renewActivity(memberInfo){
     theTimeExpire = timestampInSeconds + theTimeToAdd;    
   }
 
-  const docRef = doc(db, "activity", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('activity', memberInfo[0], {
     lockerRoomStatus: Array(
       memberInfo[1][0],
       memberInfo[1][1],
@@ -508,12 +566,12 @@ async function renewActivity(memberInfo){
       theCurrentTime,
       theTimeExpire
     )
-  });
+  })
   notificationSystem('success', 'Time renewed!')
 }
 
 async function createMail(toWho, theSubject, theText, theHTML, attachmentFile){
-  const docRef = await addDoc(collection(db, "mail"), {
+  firebaseAddDocument('mail', {
     access: getSystemAccess(),
     to: toWho,
     message: {
@@ -521,7 +579,7 @@ async function createMail(toWho, theSubject, theText, theHTML, attachmentFile){
       text: theText,
       html: theHTML,
     }
-  });
+  })
 }
 
 async function createCategory(catName, catDesc, catColor){
@@ -531,12 +589,12 @@ async function createCategory(catName, catDesc, catColor){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  const docRef = await addDoc(collection(db, 'categories'), {
+  firebaseAddDocument('categories', {
     access: getSystemAccess(),
     name: catName,
     desc: catDesc,
     color: catColor
-  });
+  })
   notificationSystem('success', 'Category created!')
   goProducts()
 }
@@ -594,7 +652,7 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     proAskForPrice = false
   }
 
-  const docRef = await addDoc(collection(db, 'products'), {
+  firebaseAddDocument('products', {
     access: getSystemAccess(),
     cat: proCat,
     name: proName,
@@ -621,7 +679,7 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     restrictedUsers: proRestrictedUsers,
     payout: proPayout,
     askforprice: proAskForPrice
-  });
+  })
   notificationSystem('success', 'Product Added!')
   goProducts()
 
@@ -646,7 +704,7 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
     theDiscLimit = false
   }
 
-  const docRef = await addDoc(collection(db, 'discounts'), {
+  firebaseAddDocument('discounts', {
     access: getSystemAccess(),
     code: discCode,
     dollar: discDollar,
@@ -659,7 +717,7 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
     typeOrder: discTypeO,
     limit: theDiscLimit,
     used: discUsed
-  });
+  })
   notificationSystem('success', 'Discount Added!')
   goProducts()
 }
@@ -669,7 +727,7 @@ async function voidOrder(orderNumber){
     notificationSystem('warning', 'You do not have permission to do this!')
     return
   }
-  await deleteDoc(doc(db, "orders", orderNumber));
+  firebaseDeleteDocument('orders', orderNumber)
   notificationSystem('success', 'Order #' + orderNumber + ' has been deleted.')
   theClient.send('history-request-remove', orderNumber)
 }
@@ -776,12 +834,9 @@ async function resumeOrder(){
 async function viewOrderReciept(theOrderNumber){
   let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
   let theReciept = ""
-
-  const docRef = doc(db, "orders", theOrderNumber);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    theReciept = docSnap.data().reciept
+  let docSnap = await firebaseGetDocument('orders', theOrderNumber)
+  if (docSnap) {
+    theReciept = docSnap.reciept
     fs.writeFile(p2, theReciept, err => {
       if (err) {
         console.error(err);
@@ -789,7 +844,7 @@ async function viewOrderReciept(theOrderNumber){
       createRecieptScreen(true)
     });
   } else {
-    return false;
+    return false
   }
 }
 
@@ -807,8 +862,7 @@ async function registerReciept(registerID, logoutTF){
   let theDisplayName = await getDisplayName()
   let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
 
-  const docRef = doc(db, "registers", registerID);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('registers', registerID)
   let registerInfo = docSnap.data()
 
 
@@ -1038,10 +1092,9 @@ async function recieptProcess(orderInfo, theOrderNumber){
               withDiscountsTxt = ""
             }
             withDiscounts = withProducts.replace('TheDiscountsApplied', withDiscountsTxt)
-            const orderRef = doc(db, "orders", theOrderNumber);
-            await updateDoc(orderRef, {
+            firebaseUpdateDocument('orders', theOrderNumber, {
               reciept: withDiscounts
-            });
+            })
             fs.writeFile(p2, withDiscounts, err => {
               if (err) {
                 console.error(err);
@@ -1078,11 +1131,9 @@ async function completeOrder(orderInfo){
   }
 
   if (orderInfo[2] && (orderInfo[2][0] != 0) && (orderInfo[2][0] != 'return')) {
-    const discountRef = doc(db, "discounts", orderInfo[2][0]);
-
-    await updateDoc(discountRef, {
+    firebaseUpdateDocument('discounts', orderInfo[2][0], {
       used: increment(1)
-    });
+    })
   }
   let registerInfo = await getActiveRegister()
   let discountsInformation = orderInfo[2]
@@ -1090,12 +1141,11 @@ async function completeOrder(orderInfo){
   if (orderInfo[2][0] == 'return') {
     isReturn = true
     discountsInformation = 'return'
-    let registerRef = doc(db, "registers", regStatusID)
     let theReturns = registerInfo.returns || Array()
     orderInfo[1].forEach(products => {
       theReturns.push(products)       
     });
-    await updateDoc(registerRef, {
+    firebaseUpdateDocument('registers', regStatusID, {
       returns: theReturns
     })
   }
@@ -1115,7 +1165,7 @@ async function completeOrder(orderInfo){
 
   // paymentMethod: credit card, gift card, cash
   // total: Sub, Tax, Tot, OGTot
-  const docRef = await addDoc(collection(db, "orders"), {
+  firebaseAddDocument("orders", {
     access: getSystemAccess(),
     customerID: theCustomerID,
     products: orderInfo[1],
@@ -1126,7 +1176,7 @@ async function completeOrder(orderInfo){
     timestamp: serverTimestamp(),
     shift: theShift,
     return: isReturn
-  });
+  })
 
   updateRegisterSub(registerInfo, orderInfo[4], orderInfo[3], false)
 
@@ -1183,7 +1233,7 @@ async function createActivity(memberInfo){
       if (theMemberID == 0) {
         theMemberID = lastMemberCreated
       }
-      const docRef = await addDoc(collection(db, "activity"), {
+      firebaseAddDocument('activity', {
         access: getSystemAccess(),
         active: true,
         goingInactive: false,
@@ -1201,14 +1251,13 @@ async function createActivity(memberInfo){
         notes: useTheLockerRoomInput2,
         timeIn: serverTimestamp(),
         timeOut: null
-      });
+      })
       notificationSystem('success', 'Customer checked in!')
 
       if (memberInfo[5]) {
-        const memberRef = doc(db, "members", theMemberID);
-        await updateDoc(memberRef, {
+        firebaseUpdateDocument('members', theMemberID, {
           waiver_status: true
-        });
+        })
       }
     }
   });
@@ -1216,7 +1265,7 @@ async function createActivity(memberInfo){
 
 async function editActivity(activityInfo){
   const activityRef = doc(db, "activity", activityInfo[0]);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', activityInfo[0], {
     'lockerRoomStatus.0': activityInfo[4][0],
     'lockerRoomStatus.1': activityInfo[2],
     'lockerRoomStatus.2': activityInfo[1],
@@ -1224,58 +1273,52 @@ async function editActivity(activityInfo){
     'lockerRoomStatus.4': activityInfo[4][4],
     'lockerRoomStatus.5': activityInfo[4][5],
     notes: activityInfo[3]
-  });
+  })
   goHome()
 }
 
 
 async function changeInOut(activityInfo){
-  const activityRef = doc(db, "activity", activityInfo[0]);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', activityInfo[0], {
     currIn: activityInfo[1]
-  });
+  })
 }
 
 async function changeWaitlist(activityInfo){
-  const activityRef = doc(db, "activity", activityInfo[0]);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', activityInfo[0], {
     waitlist: activityInfo[1]
-  });
+  })
 }
 
 async function closeActivity(memberInfo) {
-  const activityRef = doc(db, "activity", memberInfo);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', memberInfo, {
     timeOut: serverTimestamp(),
     goingInactive: true
-  });
+  })
   setTimeout(async () => {
-    const activityRef = doc(db, "activity", memberInfo);
-    await updateDoc(activityRef, {
+    firebaseUpdateDocument('activity', memberInfo, {
       active: false
-    });
+    })
   }, 1000);
 }
 
 async function addLockerRoom(lockerRoomInfo){
-  const activityRef = doc(db, "activity", lockerRoomInfo[0]);
   let userAdding = getUID();
   let theTimestamp = Math. round((new Date()). getTime() / 1000);
   let theTimestamp2 = Math. round((new Date()). getTime() / 1000); + 10000
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', lockerRoomInfo[0], {
     lockerRoomStatus: Array(true, lockerRoomInfo[2], lockerRoomInfo[1], userAdding, theTimestamp, theTimestamp2)
-  });
+  })
 }
 
 async function deleteMember(memberInfo){
   let userAllowed = canUser("permissionDeleteMembers");
   if (userAllowed) {
-    await deleteDoc(doc(db, "members", memberInfo));
+    firebaseDeleteDocument('members', memberInfo)
     docRef = query(collection(db, "activity"), where("memberID", "==", memberInfo), where('access', '==', getSystemAccess()));
     const docSnap = await getDocs(docRef);
     docSnap.forEach(async activity => {
-      const activityRef = doc(db, 'activity', activity.id)
-      await updateDoc(activityRef, {
+      firebaseUpdateDocument('activity', activity.id, {
         removed: true
       })
     });
@@ -1290,7 +1333,7 @@ async function removeCategory(categoryInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  await deleteDoc(doc(db, "categories", categoryInfo));
+  firebaseDeleteDocument('categories', categoryInfo)
 }
 
 async function removeProduct(productInfo){
@@ -1299,7 +1342,7 @@ async function removeProduct(productInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  await deleteDoc(doc(db, "products", productInfo));
+  firebaseDeleteDocument('products', productInfo)
 }
 
 async function removeDiscount(discountInfo){
@@ -1308,18 +1351,11 @@ async function removeDiscount(discountInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  await deleteDoc(doc(db, "discounts", discountInfo));
+  firebaseDeleteDocument('discounts', discountInfo)
 }
 
 async function getActiveRegister(){
-  const docRef = doc(db, "registers", regStatusID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data();
-  } else {
-    return false;
-  }
+  return await firebaseGetDocument('registers', regStatusID)
 }
 
 async function registerStatus(){
@@ -1388,7 +1424,7 @@ async function startRegister(registerInfo, redirect){
 
   theClient.send('register-started')
 
-  const docRef = await addDoc(collection(db, "registers"), {
+  firebaseAddDocument('registers', {
     access: getSystemAccess(),
     active: true,
     timestampStart: serverTimestamp(),
@@ -1407,7 +1443,7 @@ async function startRegister(registerInfo, redirect){
     PSN: 0,
     PSA: 0,
     CCardAmtRan: 0,
-  });
+  })
 
   if (redirect) {
     goRegister()    
@@ -1419,12 +1455,11 @@ async function manageEndRegister(registerInfo){
   if (!userAllowed) {
     return
   }
-  const registerRef = doc(db, "registers", registerInfo[0]);
-  await updateDoc(registerRef, {
+  firebaseUpdateDocument('registers', registerInfo[0], {
     timestampEnd: serverTimestamp(),
     ending: Number(registerInfo[1]),
     active: false
-  });
+  })
 
   goRegister()
   registerReciept(registerInfo[0], false)
@@ -1436,8 +1471,7 @@ async function endRegister(registerInfo, logoutTF){
   if (!regStatus) {
     return
   }
-  const registerRef = doc(db, "registers", regStatusID);
-  await updateDoc(registerRef, {
+  firebaseUpdateDocument('register', regStatusID, {
     timestampEnd: serverTimestamp(),
     ending: Number(registerInfo[0]),
     input100: registerInfo[1],
@@ -1453,12 +1487,11 @@ async function endRegister(registerInfo, logoutTF){
     PSN: registerInfo[12],
     PSA: registerInfo[13],
     active: false
-  });
+  })
 
-  const userRef = doc(db, "users", getUID());
-  await updateDoc(userRef, {
+  firebaseUpdateDocument('users', getUID(), {
     lastRegister: regStatusID,
-  });
+  })
 
   getUserData()
   registerReciept(regStatusID, logoutTF)
@@ -1508,8 +1541,7 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
 
     //Number(dropPSN.value), Number(dropPSA.value), Number(dropCCardAmtRan.value), Number(dropCCardAmt.value)
   }
-  const registerRef = doc(db, "registers", regStatusID);
-  await updateDoc(registerRef, {
+  firebaseUpdateDocument('registers', regStatusID, {
     starting: Number(registerAmount),
     gcard: Number(gCardAmt),
     ccard: Number(cCardAmt),
@@ -1518,7 +1550,7 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
     dropPSA: Number(dropPSAAmt),
     dropCCardAmtRan: Number(dropCCardAmtRan),
     dropCCardAmt: Number(dropCCardAmt)
-  });   
+  })
   if (drop) {
     goRegister()
     registerStatus()   
@@ -1531,7 +1563,7 @@ async function createMoneyDrop(registerInfo, dropInfo){
     return
   }
 
-  const docRef = await addDoc(collection(db, "drops"), {
+  firebaseAddDocument('drops', {
     access: getSystemAccess(),
     registerID: regStatusID,
     timestamp: serverTimestamp(),
@@ -1551,7 +1583,7 @@ async function createMoneyDrop(registerInfo, dropInfo){
     dropPSA: dropInfo[12],
     dropCCardAmtRan: dropInfo[13],
     dropCCardAmt: dropInfo[14]
-  });
+  })
 }
 
 async function startRegisterReport(registerID, isFinal) {
@@ -1692,9 +1724,7 @@ async function startRegisterReport(registerID, isFinal) {
 
   if (registerID) {
     reportType = 'Register'
-    const docRef = doc(db, "registers", registerID);
-    const docSnap = await getDoc(docRef);
-    registerInfo = docSnap.data()
+    let registerInfo = await firebaseGetDocument('registers', registerID)
     let theCID = registerInfo.uid
     cashName = registerInfo.uname
     theShift = registerInfo.shift
@@ -2795,17 +2825,10 @@ async function startRegisterReport(registerID, isFinal) {
 async function updateMemberNotes(memberID){
   let currMemberInfo = await getMemberInfo(memberID)
   let currNotes = currMemberInfo['notes']
-  const docRef = doc(db, "members", memberID);
   if (!Array.isArray(currNotes)) {
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', memberID, {
       notes: Array('(old system): ' + currNotes),
-    }).catch((error) => {
-      const errorCode = error.code;
-      const errorMessage = error.message;
-      console.log(error);
-      notificationSystem('danger', errorMessage + ' (' + errorCode + ') [updateMemberNotes]')
-    });
-
+    })
     return true
   }else{
     return true
@@ -2818,7 +2841,6 @@ async function editMembership(memberInfo){
   const date = new Date(dateStr);
   const timestampInMs = date.getTime();
   const unixTimestamp = Math.floor(date.getTime() / 1000);
-  const docRef = doc(db, "members", memberInfo[0]);
   await updateMemberNotes(memberInfo[0])
   let theTimestamp = new Date(Math.floor(Date.now()))
   let theMonth = theTimestamp.getMonth() + 1
@@ -2831,7 +2853,7 @@ async function editMembership(memberInfo){
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   if (!memberInfo[4]) {
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', memberInfo[0], {
       fname: memberInfo[1],
       mname: memberInfo[12],
       lname: memberInfo[2],
@@ -2843,9 +2865,9 @@ async function editMembership(memberInfo){
       waiver_status: memberInfo[9],
       name: memberInfo[1] + ' ' + memberInfo[2],
       email: memberInfo[10]
-    });
+    })
   } else {
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', memberInfo[0], {
       fname: memberInfo[1],
       mname: memberInfo[12],
       lname: memberInfo[2],
@@ -2859,7 +2881,7 @@ async function editMembership(memberInfo){
       waiver_status: memberInfo[9],
       name: memberInfo[1] + ' ' + memberInfo[2],
       email: memberInfo[10]
-    });
+    })
   }
   notificationSystem('success', 'Member updated!')
 }
@@ -2871,44 +2893,39 @@ async function editCategory(categoryInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  const docRef = doc(db, "categories", categoryInfo[0]);
-
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('categories', categoryInfo[0], {
     name: categoryInfo[1],
     desc: categoryInfo[2],
     color: categoryInfo[3],
-  });
+  })
   notificationSystem('success', 'Category edited!')
 }
 
-async function productIsCore(productID){
-  const docRef = doc(db, "products", productID);
-  const docSnap = await getDoc(docRef);
+async function productIsCore(productID){  
+  let docSnap = await firebaseGetDocument('products', productID)
 
-  if (docSnap.exists()) {
-    return docSnap.data().core;
+  if (docSnap) {
+    return docSnap.core;
   } else {
     return false;
   }
 }
 
 async function getProductInfo(productID){
-  const docRef = doc(db, "products", productID);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('products', productID);
 
-  if (docSnap.exists()) {
-    return docSnap.data();
+  if (docSnap) {
+    return docSnap;
   } else {
     return false;
   }
 }
 
 async function getDiscountInfo(discountID){
-  const docRef = doc(db, "discounts", discountID);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('discounts', discountID)
 
-  if (docSnap.exists()) {
-    return docSnap.data();
+  if (docSnap) {
+    return docSnap;
   } else {
     return false;
   }
@@ -2974,9 +2991,7 @@ async function editProduct(productInfo){
   if (Number(productInfo[3]) > 0 && proAskForPrice) {
     proAskForPrice = false
   }
-
-  const docRef = doc(db, "products", productInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('products', productInfo[0], {
     cat: productInfo[1],
     name: productInfo[2],
     price: productInfo[3],
@@ -3001,18 +3016,16 @@ async function editProduct(productInfo){
     restrictedUsers: productInfo[20],
     payout: productInfo[21],
     askforprice: proAskForPrice
-  });
+  })
   notificationSystem('success', 'Product Edited!')
-//  goProducts()
 }
 
 async function editProductInventory(productInfo) {
   let currInv = false;
-  const docRef = doc(db, "products", productInfo);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('products', productInfo)
 
-  if (docSnap.exists()) {
-    currInv = docSnap.data().inventory
+  if (docSnap) {
+    currInv = docSnap.inventory
   }
 
   if (currInv > 0) {
@@ -3027,8 +3040,8 @@ async function editProductInventory(productInfo) {
       inventory: currInv,
       active: isActive
     });
-    if (currInv <= docSnap.data().invWarning) {
-      let theMsg = "Be advised... You are recieving this alert because the product '" + docSnap.data().name + "' is running low. Inventory is currently " + currInv;
+    if (currInv <= docSnap.invWarning) {
+      let theMsg = "Be advised... You are recieving this alert because the product '" + docSnap.name + "' is running low. Inventory is currently " + currInv;
       createMail(systemData.invWarnEMail, "Inventory Warning", theMsg, theMsg)
     }
     return true
@@ -3167,7 +3180,7 @@ async function createMembership(memberInfo){
       waiverStatus = memberInfo[14]
     }
 
-    const docRef = await addDoc(collection(db, "members"), {
+    const docRef = await firebaseAddDocument('members', {
       access: getSystemAccess(),
       notes: theNotes,
       name: memberInfo[0] + " " + memberInfo[1],
@@ -3186,7 +3199,7 @@ async function createMembership(memberInfo){
       idnum: memberInfo[6],
       idstate: memberInfo[7],
       email: memberInfo[8]
-    });
+    })
     theClient.send('membership-success', docRef.id)
     let theID = 'Unknown ID'
     if (docRef.id) {
@@ -3739,12 +3752,12 @@ function createAccount(accountInfo){
       }).then(() => {
         sendPasswordResetEmail(auth, accountInfo[0])
           .then(() => {
-            setDoc(doc(db, "users", newUser.uid), {
+            firebaseSetDocument('users', newUser.uid, {
               access: getSystemAccess(),
               rank: accountInfo[2],
               displayName: accountInfo[1],
               email: accountInfo[0],
-            });
+            })
             notificationSystem('success', "Account created! New employee must check their email to 'reset' their password.")
             signInWithEmailAndPassword(auth, loginCreds[0], loginCreds[1])
             .then((userCredential) => {
@@ -4015,11 +4028,10 @@ function userLogout(){
 }
 
 async function getUserData(){
-  const docRef = doc(db, "users", user.uid);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('users', user.uid)
 
-  if (docSnap.exists()) {
-    userData = docSnap.data();    
+  if (docSnap) {
+    userData = docSnap;    
     darkMode = userData.darkMode
     theClient.send('recieve-dark-mode', darkMode)
     return true
@@ -4476,7 +4488,7 @@ ipcMain.on('account-delete-user', async (event, arg) => {
   theClient = event.sender;
   let theRank = await getRank();
   if (theRank == "1") {
-    await deleteDoc(doc(db, "users", arg[0]));
+    firebaseDeleteDocument('users', arg[0])
   } else {
     notificationSystem('warning', 'You do not have permission to do this.')
     return
@@ -5698,6 +5710,9 @@ ipcMain.on('print-last-register-receipt', (event, arg) => {
 })
 
 ipcMain.on('support-btn', (event, arg) => {
+  // TODO: Remove
+  testing()
+  // ^^
   theClient = event.sender
   shell.openExternal("https://www.clubentertainmentrms.com/support")
 })
