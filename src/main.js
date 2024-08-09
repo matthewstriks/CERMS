@@ -215,9 +215,12 @@ async function firebaseGetDocument(theCollection, theID){
   }  
 }
 
+// TODO: Need to test that everything works since all members and all activity is not loaded
+
 // FOV = Array(field, op, value)
 async function firebaseGetDocuments(theCollection, fov, includeAccess){
   // TODO: NEED TO REPLACE
+  // Add case for OR?
   let q = collection(db, theCollection);
   if (includeAccess) {
     q = query(q, where('access', '==', getSystemAccess()));
@@ -3269,7 +3272,7 @@ async function startGatherAllMembers(){
   }
   startGatherAllMembersA = true;
 
-  const q = query(collection(db, "members"), orderBy("creation_time"), where('access', '==', getSystemAccess()));
+  const q = query(collection(db, "members"), orderBy("creation_time"), where('access', '==', getSystemAccess(), limit(50)));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
@@ -3408,9 +3411,13 @@ async function startGatherAllActivity(){
     return
   }
   startGatherAllActivityA = true;
-  const q = query(collection(db, "activity"), where('access', '==', getSystemAccess()));
+  const q = query(collection(db, "activity"), where('active', '==', true), where('access', '==', getSystemAccess()));
+  let test = 1
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
+      console.log(test);
+      console.log(change.type);
+      test = test + 1
       if (change.type === "added") {
         if (!activitys.includes(change.doc.id)) {
           let theMemberInfo = false
@@ -3624,7 +3631,7 @@ async function startGatherAllOrders(){
     return
   }
   startGatherAllOrdersA = true;
-  const q = query(collection(db, "orders"), where('access', '==', getSystemAccess()));
+  const q = query(collection(db, "orders"), where('access', '==', getSystemAccess()), limit(50));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -4711,55 +4718,78 @@ ipcMain.on("order-search", async (event, arg) => {
     notificationSystem('success', 'Results found!')
   }
 })
-
-ipcMain.on('searchForMember', (event, arg) => {
+// HERE
+ipcMain.on('searchForMember', async (event, arg) => {
+  // TODO: Do the same for orders, history, activity, etc.
   theClient = event.sender;
   let wasFound = false
-  if (arg != "") {
-    for (i = 0; i < membersData.length; i++) {
-      let theName = membersData[i][1].name.toUpperCase()
-      let theID = Number(membersData[i][1].idnum)
-      let theMemID = Number(membersData[i][1].id_number)
-      let theDOB = membersData[i][1].dob
-      let stringDate = false
-      if (arg.includes('/') || arg.includes('-')) {
-        stringDate = format(new Date(arg), "yyyy-MM-dd");        
-      }
-      let theMembership = membersData[i][1].membership_type.toUpperCase()
-      let brokenArg = arg.split(" ");
-      if (theName.includes(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (theID == Number(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (theMemID == Number(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (stringDate && (theDOB == stringDate)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (theMembership.includes(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      }else{
-        /*
-        brokenArg.forEach((item, itemi) => {
-          if (theName.includes(item) && !wasFound) {
-            wasFound = true
-            theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-          }
-        });
-        */
-      }
+  if (arg[0] != "") {
+    if (arg[1] == 'name') {
+      let resultsFName = await firebaseGetDocuments('members', Array(
+        Array('fname', '==', arg[0] )
+      ), true)      
+      let resultsLName = await firebaseGetDocuments('members', Array(
+        Array('lname', '==', arg[0] )
+      ), true)      
+      let resultsFullName = await firebaseGetDocuments('members', Array(
+        Array('name', '==', arg[0] )
+      ), true)      
+      resultsFName.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))          
+        }
+      });
+      resultsLName.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))          
+        }
+      });
+      resultsFullName.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))          
+        }
+      });
+    } else if (arg[1] == 'dob') {
+      let resultsDOB = await firebaseGetDocuments('members', Array(
+        Array('dob', '==', arg[0])
+      ), true)      
+      resultsDOB.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))
+        }
+      });
+    } else if (arg[1] == 'id') {
+      let resultsID = await firebaseGetDocuments('members', Array(
+        Array('idnum', '==', arg[0])
+      ), true)
+      resultsID.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))
+        }
+      });
+    } else if (arg[1] == 'type') {
+      let resultsMT = await firebaseGetDocuments('members', Array(
+        Array('membership_type', '==', arg[0])
+      ), true)
+      resultsMT.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))
+        }
+      });
+    } else {
+      notificationSystem('warning', 'You must select a search filter')
+    }
+    if (!wasFound) {
+      notificationSystem('warning', 'No member was found by the search "' + arg[0] + '"')
     }
   } else{
     displayAllMembers()
-  }
-  if (!wasFound && (arg != "")) {
-    notificationSystem('warning', 'No member was found by the search "' + arg + '"')
-  } else {
-    notificationSystem('success', 'Results found!')
   }
 })
 

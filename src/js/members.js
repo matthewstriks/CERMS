@@ -3,6 +3,7 @@ let productsData = Array()
 let mandDNANotes = false
 let viewDNABtn = document.getElementById('viewDNABtn');
 let unViewDNABtn = document.getElementById('unViewDNABtn');
+let membershipSearchType = document.getElementById('membershipSearchType');
 let membershipSearch = document.getElementById('membershipSearch');
 let membershipTable = document.getElementById('membershipTable');
 let addLockerRoomWarning = document.getElementById('addLockerRoomWarning');
@@ -148,6 +149,7 @@ function scanIDFunction() {
   }
 
   membershipSearch.value = clientID
+  membershipSearchType.value = 'id'
   searchForMember(clientID)
 
   scanIDBtn.disabled = false
@@ -383,7 +385,7 @@ function formWasSubmitted(){
 
 function searchForMember(filter){
   removeAllRows()
-  ipcRenderer.send('searchForMember', filter);
+  ipcRenderer.send('searchForMember', Array(filter, membershipSearchType.value));
 }
 
 function updateExpireDate(){
@@ -434,7 +436,7 @@ if(membershipSearch){
     if (e.code == "Enter" || e.code == "Numpad Enter" || e.keyCode == 13) {
       enterPressed = true;
       var filter, tr, td, i, txtValue;
-      filter = membershipSearch.value.toUpperCase();
+      filter = membershipSearch.value;
       tr = membershipTable.getElementsByTagName("tr");
       searchForMember(filter)
       //for (i = 0; i < tr.length; i++) {

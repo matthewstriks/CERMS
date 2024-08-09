@@ -458,7 +458,27 @@
     </div>
     <br>
     <div class="container">
-      <input type="text" class="form-control" id="membershipSearch" onkeyup="membershipSearchFunct()" placeholder="Search for membership by name, membership ID, membership type, or DOB (MM-DD-YYYY) and press enter">
+      <div class="row">
+        <div class="col-md-2">
+          <select id="membershipSearchType" class="form-control">
+            <option value="">Search By...</option>
+            <option value="name">Name</option>
+            <option value="dob">DOB (yyyy-mm-dd)</option>
+            <option value="id">ID</option>
+            <option value="type">Type</option>
+          </select>
+        </div>
+        <div class="col-md-10">
+          <input type="text" class="form-control" id="membershipSearch" onkeyup="membershipSearchFunct()" placeholder="Choose your search filter and enter text here">
+        </div>
+      </div>
+<div class="row g-3 align-items-center">
+  <div class="col-auto">
+  </div>
+  <div class="col-auto">
+  </div>
+</div>
+
       <br>
       <table id="membershipTable" class="table table-striped table-hover">
         <thead>
