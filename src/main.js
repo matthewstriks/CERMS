@@ -218,6 +218,7 @@ async function firebaseGetDocument(theCollection, theID){
 // TODO: Need to test that everything works since all members and all activity is not loaded
 
 // FOV = Array(field, op, value)
+// Search firebase 
 async function firebaseGetDocuments(theCollection, fov, includeAccess){
   // TODO: NEED TO REPLACE
   // Add case for OR?
@@ -4611,114 +4612,91 @@ ipcMain.on('activity-edit', (event, arg) => {
   editActivity(arg)
 })
 
-ipcMain.on("history-search", async (event, arg) => {
+ipcMain.on('history-search', async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
-  if (arg != "") {
-    notificationSystem('warning', 'Searching... This may take a few seconds. You will be notified when the query is finished.')
-    for (i = 0; i < activitysData.length; i++) {
-      let theActivityData = activitysData[i][1]
-      let theMemberData = activitysData[i][2]
-      let theName = theActivityData.lockerRoomStatus[2] + " " + theActivityData.lockerRoomStatus[1]
-      let brokenArg = arg.split(" ");
-
-      let a = new Date(theActivityData.timeIn.seconds * 1000);
-      let year = a.getFullYear();
-      let month = a.getMonth() + 1;
-      let date = a.getDate();
-      let theStartTime = month + '/' + date + '/' + year
-      if (theMemberData && ((theMemberData.fname + ' ' + theMemberData.lname).toUpperCase() == arg.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (theMemberData && (theMemberData.fname.toUpperCase() == arg.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (theMemberData && (theMemberData.lname.toUpperCase() == arg.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (theActivityData.memberID == arg) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg.toUpperCase() == theName.toUpperCase()) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg.toUpperCase() == theActivityData.lockerRoomStatus[2].toUpperCase()) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg.toUpperCase() == theActivityData.lockerRoomStatus[1].toUpperCase()) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg == theStartTime) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else {
-        brokenArg.forEach((item, itemi) => {
-          if (theName.includes(item) && !wasFound) {
-            wasFound = true
-            theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-          }
-        });
-      }
+  if (arg[0] != "") {
+    if (arg[1] == 'id') {
+      let resultsID = await firebaseGetDocuments('activity', Array(
+        Array('memberID', '==', arg[0] )
+      ), true)      
+      resultsID.forEach(async result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          let theMemberData = await getMemberInfo(result[1].memberID)
+          theClient.send('history-request-return', Array(result[0], result[1], theMemberData))
+        }
+      });
+    } else if (arg[1] == 'rlName' || arg[1] == 'rlNumber') {      
+      let resultsrlName = await firebaseGetDocuments('activity', Array(
+        Array('lockerRoomStatus', 'array-contains', arg[0])
+      ), true)      
+      console.log(resultsrlName);
+      resultsrlName.forEach(async result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          let theMemberData = await getMemberInfo(result[1].memberID)
+          theClient.send('history-request-return', Array(result[0], result[1], theMemberData))
+        }
+      });
+    } else {
+      notificationSystem('warning', 'You must select a search filter')
+      return
     }
-  } else {
-    displayAllHistory()
-  }
-  if (!wasFound && (arg != "")) {
-    notificationSystem('warning', 'No activity was found by the search "' + arg + '"')
-  } else {
-    notificationSystem('success', 'Results found!')
+    if (!wasFound) {
+      notificationSystem('warning', 'No activity was found by the search "' + arg[0] + '"')
+      return
+    }
+  } else{
+    displayAllActivity()
   }
 })
 
-ipcMain.on("order-search", async (event, arg) => {
+ipcMain.on('order-search', async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
-  if (arg != "") {
-    notificationSystem('warning', 'Searching... This may take a few seconds. You will be notified when the query is finished.')
-    for (i = 0; i < ordersData.length; i++) {
-      let theOrderID = ordersData[i][0]
-      let theOrderData = ordersData[i][1]
-      let theOrderCustomerInfo = await getMemberInfo(theOrderData.customerID) || Array()        
-
-      let theCustomerFName = theOrderCustomerInfo.fname || ""
-      let theCustomerLName = theOrderCustomerInfo.lname || ""
-      let brokenArg = arg.split(" ");
-
-      let a = new Date(theOrderData.timestamp['seconds'] * 1000);
-      let year = a.getFullYear();
-      let month = a.getMonth() + 1;
-      let date = a.getDate();
-      let theStartTime = month + '/' + date + '/' + year
-      if (theOrderID.toUpperCase() == arg.toUpperCase()) {
+  if (arg[0] != "") {
+    if (arg[1] == 'id') {
+      let resultsID = await firebaseGetDocument('orders', arg[0])      
+      if (resultsID) {
         wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg == theStartTime) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg == theOrderData.total[2]) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg.toUpperCase() == theCustomerFName.toUpperCase()) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg.toUpperCase() == theCustomerLName.toUpperCase()) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg.toUpperCase() == (theCustomerFName.toUpperCase() + " " + theCustomerLName.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+        let theMemberData = await getMemberInfo(result[1].customerID)
+        theClient.send('history-order-request-return', Array(arg[0], resultsID, theMemberData))
       }
+    } else if (arg[1] == 'date') {      
+      const dateParts = arg[0].split("/"); // Split the date by "/"
+      const startDate = new Date(dateParts[2], dateParts[0] - 1, dateParts[1]);
+      startDate.setHours(0, 0, 0, 0); // Set time to 00:00:00
+
+      const endDate = new Date(dateParts[2], dateParts[0] - 1, dateParts[1]);
+      endDate.setHours(23, 59, 59, 999); // Set time to 23:59:59.999
+
+      const firestoreTimestampS = Timestamp.fromDate(startDate);
+      const firestoreTimestampE = Timestamp.fromDate(endDate);
+      let resultsrDate = await firebaseGetDocuments('orders', Array(
+        Array('timestamp', '>=', firestoreTimestampS),
+        Array('timestamp', '<=', firestoreTimestampE)
+      ), true)      
+      resultsrDate.forEach(async result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          let theMemberData = await getMemberInfo(result[1].customerID)
+          theClient.send('history-order-request-return', Array(result[0], result[1], theMemberData))
+        }
+      });
+    } else {
+      notificationSystem('warning', 'You must select a search filter')
+      return
     }
-  } else {
-    displayAllOrders()
-  }
-  if (!wasFound && (arg != "")) {
-    notificationSystem('warning', 'No order was found by the search "' + arg + '"')
-  } else {
-    notificationSystem('success', 'Results found!')
+    if (!wasFound) {
+      notificationSystem('warning', 'No order was found by the search "' + arg[0] + '"')
+      return
+    }
+  } else{
+    displayAllActivity()
   }
 })
-// HERE
+
 ipcMain.on('searchForMember', async (event, arg) => {
   // TODO: Do the same for orders, history, activity, etc.
   theClient = event.sender;

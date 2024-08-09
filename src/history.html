@@ -58,7 +58,26 @@
     </div>
     <br>
     <div class="container" id="activityDiv">
-      <input type="text" class="form-control" id="membershipSearch" onkeyup="membershipSearchFunct()" placeholder="Search for activity by member name, membership ID, room/locker name or number. Press enter to search father back">
+      <div class="row">
+        <div class="col-md-2">
+          <select id="membershipSearchType" class="form-control">
+            <option value="">Search By...</option>
+            <option value="id">Member ID</option>
+            <option value="rlName">Room/Locker Name</option>
+            <option value="rlNumber">Room/Locker Number</option>
+          </select>
+        </div>
+        <div class="col-md-10">
+          <input type="text" class="form-control" id="membershipSearch" onkeyup="membershipSearchFunct()"
+            placeholder="Search within the pass seven days or Choose your search filter and press enter to search farther back">
+        </div>
+      </div>
+      <div class="row g-3 align-items-center">
+        <div class="col-auto">
+        </div>
+        <div class="col-auto">
+        </div>
+      </div>
       <br>
       <table id="membershipTable" class="table table-striped table-hover">
         <thead>
@@ -83,9 +102,28 @@
       </table>
     </div>
 
+
+    
     <div class="container" id="ordersDiv">
-      <input type="text" class="form-control" id="orderSearch" onkeyup="orderSearchFunct()"
-        placeholder="Search for order by ID, Customer Name, or Date">
+      <div class="row">
+        <div class="col-md-2">
+          <select id="orderSearchType" class="form-control">
+            <option value="">Search By...</option>
+            <option value="id">Order ID</option>
+            <option value="date">Date</option>
+          </select>
+        </div>
+        <div class="col-md-10">
+          <input type="text" class="form-control" id="orderSearch" onkeyup="orderSearchFunct()"
+            placeholder="Search within the pass seven days or Choose your search filter and press enter to search farther back">
+        </div>
+      </div>
+      <div class="row g-3 align-items-center">
+        <div class="col-auto">
+        </div>
+        <div class="col-auto">
+        </div>
+      </div>
       <br>
       <table id="membershipOrderTable" class="table table-striped table-hover">
         <thead>
