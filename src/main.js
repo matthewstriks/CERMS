@@ -854,7 +854,38 @@ async function viewOrderReciept(theOrderNumber){
   }
 }
 
-//TODO: Create getTimestampString(date(date), time(bool)) function to clean some of the dates/timestamps up
+function getTimestampString(date, time){
+  let theTimestamp = new Date(Math.floor(date))
+  let theMonth = theTimestamp.getMonth() + 1
+  let theDate = theTimestamp.getDate()
+  let theFullYear = theTimestamp.getFullYear()
+  let theHours = theTimestamp.getHours()
+  let theMins = theTimestamp.getMinutes()
+  let theSecs = theTimestamp.getSeconds()
+  let ampm = 'AMPM'
+
+  if (theHours == 0) {
+    theHours = 12
+    ampm = 'AM'
+  } else if (theHours > 12) {
+    theHours = theHours - 12
+    ampm = 'PM'
+  } else {
+    ampm = "AM"
+  }
+
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear
+
+  if (time) {
+    theStringTime = theStringTime + ' ' + theHours + ':' + theMins + ':' + theSecs + ' ' + ampm
+  }
+  return theStringTime
+}
+let newtheStringTime = getTimestampString(Date.now(), true)
+console.log('HERE: ');
+console.log(newtheStringTime);
+// TODO: TEST THE TIME FUNCTION MAKE SURE IT WORKS EVERY TIME (ampm)
+// TODO: Replace timestamps around (NOTE: TIMESTAMP FUNCTION DOES NOT MULTIPLY OR DIVIDE TIMES)
 
 async function registerReciept(registerID, logoutTF){
   let theTimestamp = new Date(Math.floor(Date.now()))
@@ -5718,9 +5749,6 @@ ipcMain.on('print-last-register-receipt', (event, arg) => {
 })
 
 ipcMain.on('support-btn', (event, arg) => {
-  // TODO: Remove
-  testing()
-  // ^^
   theClient = event.sender
   shell.openExternal("https://www.clubentertainmentrms.com/support")
 })
