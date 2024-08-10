@@ -339,19 +339,21 @@ async function getMemberInfo(memberID){
   if ((memberID == -1) || (memberID == 0) || (Array.isArray(memberID))) {
     return false
   }
-
-  return await firebaseGetDocument('members', memberID)
+  let response = await firebaseGetDocument('members', memberID)
+  return response
 }
 
 async function getMemberEMail(memberID){
   if (!memberID || memberID <= 0) {
     return false
   }
-  return await firebaseGetDocument('members', memberID)
+  let response = await firebaseGetDocument('members', memberID)
+  return response
 }
 
 async function getMemberFromActivity(activityID){
-  return await firebaseGetDocument('activity', activityID).memberID
+  let response = await firebaseGetDocument('activity', activityID)  
+  return response.memberID
 }
 
 async function resetUserPassword(theEmailPass, theUserID){
@@ -3273,8 +3275,8 @@ async function startGatherAllMembers(){
   }
   startGatherAllMembersA = true;
 
-  const q = query(collection(db, "members"), orderBy("creation_time"), where('access', '==', getSystemAccess(), limit(50)));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
+  const q = query(collection(db, "members"), where('access', '==', getSystemAccess()), orderBy("creation_time"), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
         if (!members.includes(change.doc.id)) {
@@ -3416,9 +3418,6 @@ async function startGatherAllActivity(){
   let test = 1
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
-      console.log(test);
-      console.log(change.type);
-      test = test + 1
       if (change.type === "added") {
         if (!activitys.includes(change.doc.id)) {
           let theMemberInfo = false
@@ -4577,6 +4576,8 @@ ipcMain.on('open-reciept', async (event, arg) => {
 ipcMain.on('open-membership-activity', async (event, arg) => {
   theClient = event.sender;
   let theMember = await getMemberFromActivity(arg)
+  console.log(theMember);
+  
   openMembership(theMember)
 })
 
