@@ -4698,7 +4698,6 @@ ipcMain.on('order-search', async (event, arg) => {
 })
 
 ipcMain.on('searchForMember', async (event, arg) => {
-  // TODO: Do the same for orders, history, activity, etc.
   theClient = event.sender;
   let wasFound = false
   if (arg[0] != "") {
