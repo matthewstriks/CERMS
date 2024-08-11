@@ -196,11 +196,15 @@ async function firebaseAddDocument(theCollection, theData){
   return docRef
 }
 
-async function firebaseUpdateDocument(theCollection, theID, theData){
-  const docRef = doc(db, theCollection, theID);
-  // TODO: Update the rest (find updateDoc and replace with firebaseUpdateDocument)
-  await updateDoc(docRef, theData);
-  return true
+async function firebaseUpdateDocument(theCollection, theID, theData) {
+  try {
+    const docRef = doc(db, theCollection, theID);
+    await updateDoc(docRef, theData);
+    return true;
+  } catch (error) {
+    console.error("Error updating document " + theCollection + " " + theID + ":", error);
+    throw error;
+  }
 }
 
 async function firebaseDeleteDocument(theCollection, theID){
@@ -208,7 +212,7 @@ async function firebaseDeleteDocument(theCollection, theID){
   return true
 }
 
-async function firebaseGetDocument(theCollection, theID){
+async function firebaseGetDocument(theCollection, theID){  
   const docRef = doc(db, theCollection, theID);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
@@ -392,14 +396,7 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
   addLog('membership', 'Updating Membership ' + memberID)
   let idExpiration = "";
   let theCurrentTime = Math.floor(Date.now() / 1000);
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   let theProductInfo
@@ -427,14 +424,7 @@ async function memberDNA(memberInfo){
   }
 
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Added to the DNA List. '
   let theNotes = memberInfo[1]
@@ -454,14 +444,7 @@ async function memberUNDNA(memberInfo){
     return
   }
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Removed from the DNA List. '
   let theNotes = memberInfo[1]
@@ -482,14 +465,7 @@ async function memberTag(memberInfo){
   }
 
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Added to the Tag List. '
   let theNotes = memberInfo[1]
@@ -509,14 +485,7 @@ async function memberUNTag(memberInfo){
     return
   }
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Removed from the Tag List. '
   let theNotes = memberInfo[1]
@@ -857,88 +826,55 @@ async function viewOrderReciept(theOrderNumber){
   }
 }
 
-function getTimestampString(date, time){
-  let theTimestamp = new Date(Math.floor(date))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let ampm = 'AMPM'
+function getTimestampString(date, time) {
+  if (!date) {
+    date = Date.now()
+  }
+  let theTimestamp = new Date(Math.floor(date));
+  let theMonth = theTimestamp.getMonth() + 1;
+  let theDate = theTimestamp.getDate();
+  let theFullYear = theTimestamp.getFullYear();
+  let theHours = theTimestamp.getHours();
+  let theMins = theTimestamp.getMinutes();
+  let theSecs = theTimestamp.getSeconds();
+  let ampm = 'AM';
 
-  if (theHours == 0) {
-    theHours = 12
-    ampm = 'AM'
+  if (theHours === 0) {
+    theHours = 12;
   } else if (theHours > 12) {
-    theHours = theHours - 12
-    ampm = 'PM'
-  } else {
-    ampm = "AM"
+    theHours -= 12;
+    ampm = 'PM';
+  } else if (theHours === 12) {
+    ampm = 'PM';
   }
 
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear
+  // Add leading zeros to minutes and seconds if needed
+  theMins = theMins < 10 ? '0' + theMins : theMins;
+  theSecs = theSecs < 10 ? '0' + theSecs : theSecs;
+
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear;
 
   if (time) {
-    theStringTime = theStringTime + ' ' + theHours + ':' + theMins + ':' + theSecs + ' ' + ampm
+    theStringTime = theStringTime + ' ' + theHours + ':' + theMins + ':' + theSecs + ' ' + ampm;
   }
-  return theStringTime
+  return theStringTime;
 }
-let newtheStringTime = getTimestampString(Date.now(), true)
-console.log('HERE: ');
-console.log(newtheStringTime);
 // TODO: TEST THE TIME FUNCTION MAKE SURE IT WORKS EVERY TIME (ampm)
 // TODO: Replace timestamps around (NOTE: TIMESTAMP FUNCTION DOES NOT MULTIPLY OR DIVIDE TIMES)
 
-async function registerReciept(registerID, logoutTF){
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+async function registerReciept(registerID, logoutTF){  
+  let theStringTime = getTimestampString(false, true)
   let theDisplayName = await getDisplayName()
   let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
 
-  let docSnap = await firebaseGetDocument('registers', registerID)
-  let registerInfo = docSnap.data()
-
-
+  let registerInfo = await firebaseGetDocument('registers', registerID)
   let theDropsHTML = "<b>Drop Information</b><br><br>"
   docRef2 = query(collection(db, "drops"), where("registerID", "==", registerID), where('access', '==', getSystemAccess()));
   const docSnap2 = await getDocs(docRef2);
   docSnap2.forEach(async drop => {
     let dropData = drop.data()
     let theData = dropData.timestamp.toDate()
-    let day = theData.getDate();
-    let month = theData.getMonth() + 1;
-    let year = theData.getFullYear();
-    let hour = theData.getHours();
-    let min = theData.getMinutes();
-    let sec = theData.getSeconds();
-    let ampm = hour >= 12 ? 'PM' : 'AM';
-
-    if (day < 10) {
-      day = '0' + day
-    }
-    if (month < 10) {
-      month = '0' + month
-    }
-    if (min < 10) {
-      min = '0' + min
-    }
-    if (sec < 10) {
-      sec = '0' + sec
-    }
-    if (hour > 12) {
-      hour = hour - 12
-    }
-
-    let currentDate = `${month}/${day}/${year}`;
-    let currentTime = `${hour}:${min}:${sec} ${ampm}`;
-    let theTimeStamp = currentDate + ' ' + currentTime
+    let theTimeStamp = getTimestampString(theData, true)
     theDropsHTML = theDropsHTML + "<b>Drop Timestamp:</b> " + theTimeStamp + "<br><b>Drop Amount:</b> $" + dropData.dropAmt + "<br><b>Payout Slip #/Amount:</b> " + dropData.dropPSN + "<b>/</b>$" + dropData.dropPSA + "<br><b>Credit Cards #/Amount:</b> " + dropData.dropCCardAmtRan + "<b>/</b>$" + dropData.dropCCardAmt + "<br><br>" 
   });
 
@@ -1031,14 +967,7 @@ async function registerReciept(registerID, logoutTF){
 
 async function recieptProcess(orderInfo, theOrderNumber){
   let recieptStyle = orderInfo[6]
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let theDisplayName = await getDisplayName()
   let theEMail = orderInfo[7]
   let theCustomersEMail = await getMemberEMail(orderInfo[0])    
@@ -1164,7 +1093,6 @@ async function completeOrder(orderInfo){
     }, 1000);
     return
   }
-  let theTimestamp = new Date(Math.floor(Date.now() / 1000))
   let theCustomerID = orderInfo[0]
   if (!theCustomerID) {
     theCustomerID = 0
@@ -1511,7 +1439,9 @@ async function endRegister(registerInfo, logoutTF){
   if (!regStatus) {
     return
   }
-  firebaseUpdateDocument('register', regStatusID, {
+  let theAccess = getSystemAccess()
+  firebaseUpdateDocument('registers', regStatusID, {
+    access: theAccess,
     timestampEnd: serverTimestamp(),
     ending: Number(registerInfo[0]),
     input100: registerInfo[1],
@@ -1529,13 +1459,36 @@ async function endRegister(registerInfo, logoutTF){
     active: false
   })
 
+
+  /*
+  firebaseUpdateDocument('register', regStatusID, {
+    access: theAccess,
+    timestampEnd: serverTimestamp(),
+    ending: Number(registerInfo[0]),
+    input100: registerInfo[1],
+    input50: registerInfo[2],
+    input20: registerInfo[3],
+    input10: registerInfo[4],
+    input5: registerInfo[5],
+    input1: registerInfo[6],
+    input25c: registerInfo[7],
+    input10c: registerInfo[8],
+    input5c: registerInfo[9],
+    input1c: registerInfo[10],
+    PSN: registerInfo[12],
+    PSA: registerInfo[13],
+    active: false
+  })
+  */
   firebaseUpdateDocument('users', getUID(), {
     lastRegister: regStatusID,
   })
 
   getUserData()
   registerReciept(regStatusID, logoutTF)
-  startRegisterReport(regStatusID, false)
+  setTimeout(() => {
+    startRegisterReport(regStatusID, false)    
+  }, 1000);
   regStatus = false
   regStatusID = false
   regStatusShift = false
@@ -1627,9 +1580,13 @@ async function createMoneyDrop(registerInfo, dropInfo){
 }
 
 async function startRegisterReport(registerID, isFinal) {
+  let registerInfo
+  if (registerID) {
+    registerInfo = await firebaseGetDocument('registers', registerID)
+  }
+
   notificationSystem('warning', 'Generating register report... Do not shut down application.')
   getSystemData()
-  let registerInfo
   let startDateStr
   let theShift = false
   let reportType = 'Generated'
@@ -1757,14 +1714,13 @@ async function startRegisterReport(registerID, isFinal) {
   let currentTime = `${hour}:${min}:${sec} ${ampm}`;
   let currentTimeFile = `${hour}-${min}-${sec}-${ampm}`;
 
-  currentDateStr = currentDate + ' ' + currentTime
+  currentDateStr = getTimestampString(false, true)
   currentDateFileStr = currentDateFile + ' ' + currentTimeFile
 
   const ordersRef = collection(db, "orders");
 
   if (registerID) {
     reportType = 'Register'
-    let registerInfo = await firebaseGetDocument('registers', registerID)
     let theCID = registerInfo.uid
     cashName = registerInfo.uname
     theShift = registerInfo.shift
@@ -1815,7 +1771,7 @@ async function startRegisterReport(registerID, isFinal) {
     let startDateS = `${month}/${day}/${year}`;
     let startTime = `${hour}:${min}:${sec} ${ampm}`;
 
-    startDateStr = startDateS + ' ' + startTime
+    startDateStr = getTimestampString(startDate, true)
     startDates = new Date(registerInfo.timestampStart['seconds'] * 1000)
     endDates = new Date(registerInfo.timestampEnd['seconds'] * 1000)
     q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID), where("access", "==", getSystemAccess()));
@@ -1863,7 +1819,7 @@ async function startRegisterReport(registerID, isFinal) {
   let startDateS = `${month2}/${day2}/${year2}`;
   let startTime = `${hour2}:${min2}:${sec2} ${ampm2}`;
 
-  startDateStr = startDateS + ' ' + startTime
+  startDateStr = getTimestampString(startDate, true)
 
   const endDate = endDates;
   let day2E = endDate.getDate();
@@ -1897,7 +1853,7 @@ async function startRegisterReport(registerID, isFinal) {
   let endDateS = `${month2E}/${day2E}/${year2E}`;
   let endTime = `${hour2E}:${min2E}:${sec2E} ${ampm2E}`;
 
-  let endDateStr = endDateS + ' ' + endTime
+  let endDateStr = getTimestampString(endDate)
 
   let productsAndAmounts = Array()
   let discountsAndAmounts = Array()
@@ -1970,7 +1926,7 @@ async function startRegisterReport(registerID, isFinal) {
     let orderDateStr = `${month}/${day}/${year}`;
     let orderTime = `${hour}:${min}:${sec} ${ampm}`;
 
-    orderDateStrF = orderDateStr + ' ' + orderTime
+    orderDateStrF = getTimestampString(orderDate, true)
 
     let totalMoney = orderInfo.total[0]
     let totalTax = orderInfo.total[1]
@@ -2882,14 +2838,7 @@ async function editMembership(memberInfo){
   const timestampInMs = date.getTime();
   const unixTimestamp = Math.floor(date.getTime() / 1000);
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   if (!memberInfo[4]) {
@@ -3138,14 +3087,7 @@ async function createMembership(memberInfo){
   let update = false;
   let idExpiration;
   let theCurrentTime = Math.floor(Date.now() / 1000);
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   let theProductInfo
@@ -3704,7 +3646,6 @@ async function startSnapshotMessages(theChatID) {
   const q = query(collection(db, "chats", theChatID, "messages"), where('access', '==', getSystemAccess()));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach(async (change) => {
-      console.log('startSnapshotMessages: ' + change.type);
       if (change.type === "added") {
         chatsData.forEach(theChat => {
           if (theChat[0] == theChatID && !theChats.includes(change.doc.id)) {
@@ -3995,7 +3936,6 @@ async function startLoading(){
   goHome(true);
   await updateTLID();
   setTimeout(() => { 
-    notificationSystem('primary', 'Welcome to CERMS! The system will continue to gather data. This may take a couple minutes. You may see less information when you first log in.')
     updateUserVersion()
   }, 2000);
 }
@@ -4708,8 +4648,6 @@ ipcMain.on('open-reciept', async (event, arg) => {
 ipcMain.on('open-membership-activity', async (event, arg) => {
   theClient = event.sender;
   let theMember = await getMemberFromActivity(arg)
-  console.log(theMember);
-  
   openMembership(theMember)
 })
 
@@ -4764,7 +4702,6 @@ ipcMain.on('history-search', async (event, arg) => {
       let resultsrlName = await firebaseGetDocuments('activity', Array(
         Array('lockerRoomStatus', 'array-contains', arg[0])
       ), true)      
-      console.log(resultsrlName);
       resultsrlName.forEach(async result => {
         if (result[0] && result[1]) {
           wasFound = true
@@ -5872,5 +5809,4 @@ async function sendChat(chatID, theMessage){
     read: false,
     message: theMessage
   });
-  console.log("Document written with ID: ", docRef.id);
 }
