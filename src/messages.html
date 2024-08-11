@@ -14,8 +14,7 @@
     <title>CERMS - Messaging</title>
   <style>
     .chat-container {
-      max-width: 900px;
-      margin: 50px auto;
+      height: auto;
       display: flex;
       border-radius: 15px;
       box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
@@ -84,7 +83,7 @@
     }
 
     .message.received {
-      background-color: #e9ecef;
+      background-color: #858585;
     }
 
     .timestamp {
@@ -112,7 +111,7 @@
 
     .message-preview {
       font-size: 0.9rem;
-      color: #6c757d;
+      color: #929292;
     }
 
     .message-preview .time {
@@ -199,7 +198,6 @@
         <div class="d-flex justify-content-between align-items-center p-3">
           <h5>Chats</h5>
           <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newMessageModal">New</button>
-          <button class="btn btn-secondary btn-sm ms-2" id="toggleSidebarBtn">&#9776;</button>
         </div>
         <div id="chats">
           <!-- Chat list items will be added here -->
@@ -222,10 +220,6 @@
         <div class="chat-footer">
           <input type="text" id="messageInput" class="form-control" placeholder="Type a message..."
             aria-label="Type a message">
-          <div class="attachment-button">
-            <button class="btn btn-secondary ms-2" id="attachmentBtn">📎</button>
-            <input type="file" id="fileInput">
-          </div>
           <button class="btn btn-primary ms-2" id="sendMessageBtn">Send</button>
         </div>
       </div>

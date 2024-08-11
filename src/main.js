@@ -53,6 +53,8 @@ const discounts = Array();
 const discountsData = Array();
 const orders = Array();
 const ordersData = Array();
+const theChats = Array();
+const chatsData = Array();
 const users = Array();
 const usersData = Array();
 
@@ -77,6 +79,7 @@ let startGatherAllProductsA = false
 let startGatherAllDiscountsA = false
 let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
+let startGatherAllChatsA = false
 let darkMode = false
 let quickbooksIsConnected = false
 
@@ -3697,6 +3700,100 @@ async function startGatherAllOrders(){
   });
 }
 
+async function startSnapshotMessages(theChatID) {
+  const q = query(collection(db, "chats", theChatID, "messages"), where('access', '==', getSystemAccess()));
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach(async (change) => {
+      console.log('startSnapshotMessages: ' + change.type);
+      if (change.type === "added") {
+        chatsData.forEach(theChat => {
+          if (theChat[0] == theChatID && !theChats.includes(change.doc.id)) {
+            theChat[2].push(Array(change.doc.id, change.doc.data()))
+            theClient.send("add-chat-message", Array(getUID(), change.doc.data()))
+          }          
+        }) 
+      }
+      if (change.type === "modified") {
+        chatsData.forEach(theChat => {
+          if (theChat[0] == theChatID) {
+            theChat[2].forEach(theMessage => {
+              if (theMessage[0] == change.doc.id) {
+                theMessage[1] = change.doc.data()
+              }
+            })
+          }
+        })
+      }
+      if (change.type === "removed") {
+        chatsData.forEach(theChat => {
+          if (theChat[0] == theChatID) {
+            theChat[2].forEach((item, i) => {
+              if (item[0] == change.doc.id) {
+                item[1] = change.doc.data();
+                theChat[2].splice(i, 1)
+              }
+            });
+          }
+        })
+      }
+    });
+  });
+}
+
+async function startGatherAllChats() {
+  if (startGatherAllChatsA) {
+    return
+  }
+  startGatherAllChatsA = true;  
+  const q = query(collection(db, "chats"), where('participants', 'array-contains', getUID()), where('access', '==', getSystemAccess()));
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach(async (change) => {
+      if (change.type === "added") {
+        if (!theChats.includes(change.doc.id)) {
+          theChats.push(change.doc.id);
+          startSnapshotMessages(change.doc.id)
+          let chatMessages = Array()
+          let q2 = query(collection(db, "chats", change.doc.id, "messages"), where('access', '==', getSystemAccess()));
+          let querySnapshot = await getDocs(q2);
+          querySnapshot.forEach((doc2) => {
+            chatMessages.push(Array(doc2.id, doc2.data()))
+          });
+          chatsData.push(Array(change.doc.id, change.doc.data(), chatMessages));
+//          theClient.send('return-orders', Array(change.doc.id, change.doc.data()))
+        }
+      }
+      if (change.type === "modified") {
+        if (theChats.includes(change.doc.id)) {
+          chatsData.forEach(async (item, i) => {
+            if (item[0] == change.doc.id) {
+              item[1] = change.doc.data();
+              let chatMessages = Array()
+              let q2 = query(collection(db, "chats", change.doc.id, "messages"), where('access', '==', getSystemAccess()));
+              let querySnapshot = await getDocs(q2);
+              querySnapshot.forEach((doc2) => {
+                chatMessages.push(Array(doc2.id, doc2.data()))
+              });
+              item[2] = chatMessages
+//              theClient.send('return-orders-update', Array(change.doc.id, change.doc.data()))
+            }
+          });
+        }
+      }
+      if (change.type === "removed") {
+        if (theChats.includes(change.doc.id)) {
+          chatsData.forEach((item, i) => {
+            if (item[0] == change.doc.id) {
+              item[1] = change.doc.data();
+              chatsData.splice(i, 1)
+//              theClient.send('return-orders-remove', Array(change.doc.id))
+            }
+          });
+        }
+      }
+    });
+  });
+}
+
 async function displayAllActivity(){
   activitysData.forEach((activity) => {
     if (activity[1].active) {
@@ -3831,7 +3928,7 @@ function createAccount(accountInfo){
 
 async function startLoading(){
   loadingProgress = 0;
-  totalLoadingProccesses = 11 // CHANGE ME
+  totalLoadingProccesses = 12 // CHANGE ME
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading user data...'))
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading system modules... This may take a couple minutes.'))
@@ -3875,6 +3972,10 @@ async function startLoading(){
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading orders...'))
   await startGatherAllOrders();
+  loadingProgress = loadingProgress + 1
+
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading chats...'))
+  await startGatherAllChats();
   loadingProgress = loadingProgress + 1
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
@@ -5752,3 +5853,24 @@ ipcMain.on('support-btn', (event, arg) => {
   theClient = event.sender
   shell.openExternal("https://www.clubentertainmentrms.com/support")
 })
+
+ipcMain.on('send-chat', (event, arg) => {
+  theClient = event.sender
+  sendChat(arg[0], arg[1])
+})
+
+ipcMain.on('request-chats', async (event, arg) => {
+  theClient = event.sender
+  theClient.send('return-chats', Array(getUID(), chatsData))    
+})
+
+async function sendChat(chatID, theMessage){
+  const docRef = await addDoc(collection(db, "chats", chatID, "messages"), {
+    timestamp: serverTimestamp(),
+    sender: getUID(),
+    access: getSystemAccess(),
+    read: false,
+    message: theMessage
+  });
+  console.log("Document written with ID: ", docRef.id);
+}
