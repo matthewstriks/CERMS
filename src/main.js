@@ -15,8 +15,8 @@ const { address } = require('address');
 const os = require('os');
 const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
+const QuickBooks = require('node-quickbooks');
 const { compareAsc, format } = require("date-fns");
-//const QuickBooks = require('node-quickbooks')
 
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
@@ -59,6 +59,7 @@ const users = Array();
 const usersData = Array();
 
 let mainWin;
+let quickbooksWin;
 let uploadImgWin;
 let uploadFileWin;
 let swfWin;
@@ -82,6 +83,7 @@ let startGatherAllOrdersA = false
 let startGatherAllChatsA = false
 let darkMode = false
 let quickbooksIsConnected = false
+let qbo
 
 let pendingOrders = Array()
 let pendingOrderID;
@@ -159,10 +161,6 @@ async function getEMailByID(theUserID){
   } else {
     return false;
   }
-}
-
-function isQuickbooksConnected(){
-  return oauthClient.isAccessTokenValid()
 }
 
 function getDisplayName(){
@@ -965,7 +963,7 @@ async function registerReciept(registerID, logoutTF){
   }, 1000);
 }
 
-async function recieptProcess(orderInfo, theOrderNumber){
+async function recieptProcess(orderInfo, theOrderNumber){  
   let recieptStyle = orderInfo[6]
   let theStringTime = getTimestampString(false, true)
   let theDisplayName = await getDisplayName()
@@ -1133,7 +1131,7 @@ async function completeOrder(orderInfo){
 
   // paymentMethod: credit card, gift card, cash
   // total: Sub, Tax, Tot, OGTot
-  firebaseAddDocument("orders", {
+  let theNewOrder = await firebaseAddDocument("orders", {
     access: getSystemAccess(),
     customerID: theCustomerID,
     products: orderInfo[1],
@@ -1173,7 +1171,7 @@ async function completeOrder(orderInfo){
     await delay(1000)
   }
 
-  recieptProcess(orderInfo, docRef.id)
+  recieptProcess(orderInfo, theNewOrder.id)
 }
 
 async function createActivity(memberInfo){
@@ -1486,8 +1484,10 @@ async function endRegister(registerInfo, logoutTF){
 
   getUserData()
   registerReciept(regStatusID, logoutTF)
+  let theRegStatusID = regStatusID
   setTimeout(() => {
-    startRegisterReport(regStatusID, false)    
+    startQuickBooksReport(theRegStatusID, false)
+    startRegisterReport(theRegStatusID, false)    
   }, 1000);
   regStatus = false
   regStatusID = false
@@ -1577,6 +1577,288 @@ async function createMoneyDrop(registerInfo, dropInfo){
     dropCCardAmtRan: dropInfo[13],
     dropCCardAmt: dropInfo[14]
   })
+}
+
+async function startQuickBooksReport(registerID, isFinal){
+  await refreshTokenIfNeeded()
+  notificationSystem('warning', 'Generating register report for QuickBooks... Do not shut down application.')
+  let registerInfo
+  if (registerID) {
+    registerInfo = await firebaseGetDocument('registers', registerID)
+  }
+  getSystemData()
+  startDates = new Date(registerInfo.timestampStart['seconds'] * 1000)
+  endDates = new Date().getSeconds()
+  if (registerInfo.timestampEnd['seconds']) {
+    endDates = new Date(registerInfo.timestampEnd['seconds'] * 1000)    
+  }
+  let theOrders = await firebaseGetDocuments("orders", Array(
+    Array("timestamp", ">", registerInfo.timestampStart),
+    Array("timestamp", "<", registerInfo.timestampEnd),
+    Array("cashier", "==", registerInfo.uid)
+  ), true)
+  let theProductsData = Array()
+  let theCashReceived = 0
+  // paymentMethod: credit card, gift card, cash, change  
+  theOrders.forEach(order => {
+    if (order[1].paymentMethod[2]) {
+      theCashReceived = theCashReceived + order[1].paymentMethod[2]
+    }
+    order[1].products.forEach(product => {
+      productsData.forEach(async productData => {
+        if (productData[0] == product) {
+          findOrCreateItem(productData, function(itemId){
+            let wasFound = false
+            theProductsData.forEach(theProductsDataProduct => {
+              if (theProductsDataProduct[0] == itemId) {
+                wasFound = true
+                theProductsDataProduct[2] = theProductsDataProduct[2] + 1
+              }
+            });
+            if (!wasFound) {
+              theProductsData.push(Array(itemId, productData[1], 1))
+            }
+          })
+        }
+      });
+    });
+  });
+
+  setTimeout(() => {
+    findCustomerByBusinessName("CERMS", function (err, customerId) {
+      if (err) {
+        console.log('Not going to work!');
+      } else {
+        const invoice = {
+          "Line": theProductsData.map(product => ({
+            "Amount": product[1].price * product[2], // Example amount, you may need to adjust this
+            "DetailType": "SalesItemLineDetail",
+            "Description": "Invoice generated from CERMS based on register ID: " + registerID,
+            "SalesItemLineDetail": {
+              "ItemRef": {
+                "value": product[0]
+              },
+              "Qty": product[2],
+              "TaxCodeRef": product[1].taxable ? { "value": "TAX" } : { "value": "NON" } // Apply tax if product[1].tax is true
+            }
+          })),
+          "CustomerRef": {
+            "value": customerId
+          }
+        };
+
+        // Create the invoice
+        qbo.createInvoice(invoice, function (err, invoice) {
+          if (err) {
+            console.error('Error creating invoice:', err);
+          } else {
+            console.log('Invoice created:', invoice);
+            let invoiceId = invoice.Id
+            let realmId = systemData.quickBooksToken2
+            const invoiceLink = `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
+            console.log("INVOICE LINK: " + invoiceLink)
+            createPayment(customerId, invoiceId, registerInfo.ccard, "Credit", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3){
+              if (paymentUnappliedAmt2) {
+                addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3);
+              }
+              createPayment(customerId, invoiceId, registerInfo.gcard, "Gift Card", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3){
+                if (paymentUnappliedAmt2) {
+                  addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3);
+                }
+                createPayment(customerId, invoiceId, Number((registerInfo.ending - registerInfo.starting) + theCashReceived), "Cash", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3){
+                  if (paymentUnappliedAmt2) {
+                    addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3);                                      
+                  }
+                })              
+              })             
+            })
+          }
+        });
+      }
+    })
+  }, 5000);
+}
+
+async function findOrCreatePaymentMethod(paymentMethodName, callback) {
+  await refreshTokenIfNeeded()
+  qbo.findPaymentMethods({
+    Name: paymentMethodName
+  }, function (err, paymentMethods) {
+    if (err) {
+      console.error('Error finding payment method:', err);
+      callback(err, null);
+      return;
+    }
+
+    if (paymentMethods.QueryResponse.PaymentMethod && paymentMethods.QueryResponse.PaymentMethod.length > 0) {
+      // Payment method exists, return the ID
+      const paymentMethodId = paymentMethods.QueryResponse.PaymentMethod[0].Id;
+      console.log(`${paymentMethodName} Payment Method ID:`, paymentMethodId);
+      callback(null, paymentMethodId);
+    } else {
+      // Payment method doesn't exist, create it
+      createPaymentMethod(paymentMethodName, callback);
+    }
+  });
+}
+
+function createPaymentMethod(paymentMethodName, callback) {
+  const paymentMethod = {
+    Name: paymentMethodName,
+    Active: true // Set as active by default
+  };
+
+  qbo.createPaymentMethod(paymentMethod, function (err, createdPaymentMethod) {
+    if (err) {
+      console.error('Error creating payment method:', err);
+      setTimeout(() => {
+        createPaymentMethod(paymentMethod, callback)
+      }, 5000);
+      return;
+    }
+
+    const paymentMethodId = createdPaymentMethod.Id;
+    console.log(`Created ${paymentMethodName} Payment Method ID:`, paymentMethodId);
+    callback(null, paymentMethodId);
+  });
+}
+
+const paymentMethodsToCheck = ["Cash", "Credit", "Gift Card"];
+const paymentMethodIds = {};
+
+function processPaymentMethods(paymentMethodNameIndex) {
+  if (paymentMethodNameIndex >= paymentMethodsToCheck.length) {
+    console.log('All payment methods processed:', paymentMethodIds);    
+    return;
+  }
+
+  const paymentMethodName = paymentMethodsToCheck[paymentMethodNameIndex];
+  findOrCreatePaymentMethod(paymentMethodName, function (err, paymentMethodId) {
+    if (!err) {
+      paymentMethodIds[paymentMethodName] = paymentMethodId;
+    }
+    processPaymentMethods(paymentMethodNameIndex + 1);
+  });
+}
+
+async function createPayment(customerId, invoiceId, amount, paymentMethodName, callback) {
+  if (!amount || amount <= 0) {
+    callback()
+    return
+  }
+  await refreshTokenIfNeeded() 
+  const payment = {
+    CustomerRef: {
+      value: customerId
+    },
+    TotalAmt: amount,
+    Line: [{
+      Amount: amount,
+      LinkedTxn: [{
+        TxnId: invoiceId,
+        TxnType: "Invoice"
+      }]
+    }],
+    PaymentMethodRef: {
+      value: paymentMethodIds[paymentMethodName]
+    },
+    PrivateNote: "[CERMS] " + paymentMethodName + " from register report"
+  };
+
+  qbo.createPayment(payment, function (err, payment) {
+    if (err) {
+      console.error('Error creating payment:', err);
+      callback(false, false, false)
+    } else {
+      console.log('Payment created:', payment);
+      if (payment.UnappliedAmt >= 0) {
+        callback(invoiceId, payment.UnappliedAmt, paymentMethodName)
+      }
+    }
+  });
+}
+
+function addUnappliedAmountToInvoice(invoiceId, unappliedAmount, paymentMethodName) {
+  const extraProductName = `Extra ${paymentMethodName}`;
+  findOrCreateItem(extraProductName, function (itemId) {
+    // Add the unapplied amount to the invoice
+    qbo.getInvoice(invoiceId, function (err, invoice) {
+      if (err) {
+        console.error('Error retrieving invoice:', err);
+        return;
+      }
+
+      const newLineItem = {
+        Amount: unappliedAmount,
+        DetailType: "SalesItemLineDetail",
+        SalesItemLineDetail: {
+          ItemRef: {
+            value: itemId
+          }
+        },
+        Description: `Unapplied ${paymentMethodName} Payment`
+      };
+
+      invoice.Line.push(newLineItem);
+
+      qbo.updateInvoice(invoice, function (err, updatedInvoice) {
+        if (err) {
+          console.error('Error updating invoice with unapplied amount:', err);
+        } else {
+          console.log('Invoice updated with unapplied amount:', updatedInvoice);
+        }
+      });
+    });
+  });
+}
+
+// Helper function to find or create an item
+async function findOrCreateItem(itemName, callback) {
+  await refreshTokenIfNeeded()
+  let theItemName = ""
+  let theItemPrice = 0
+  let theItemDesc = "[CERMS] "
+  if (Array.isArray(itemName)) {
+    theItemName = itemName[1].name
+    theItemPrice = itemName[1].price    
+    theItemDesc = "[CERMS] " + itemName[1].desc
+  } else {
+    theItemName = itemName
+  }
+  // Search for the item in QuickBooks
+  qbo.findItems({
+    fetchAll: true,
+    Name: theItemName
+  }, function (err, items) {
+    if (err) {
+      console.error('Error finding item:', err);
+      callback(false)
+    } else if (items.QueryResponse.Item && items.QueryResponse.Item.length > 0) {
+      // Item found
+      const item = items.QueryResponse.Item[0];
+      callback(item.Id)
+    } else {
+      // Item not found, create a new item
+      const newItem = {
+        "Name": theItemName,
+        "Type": "Service", // or "Inventory" or "NonInventory" based on your needs
+        "UnitPrice": Number(theItemPrice),
+        "Description": theItemDesc,
+        "IncomeAccountRef": {
+          "value": "1" // The ID of the income account (Adjust as needed)
+        }
+      };
+      qbo.createItem(newItem, function (err, item) {
+        if (err) {
+          console.error('Error creating item:', err);
+          callback(false)
+        } else {
+          console.log('Item created:', item);
+          callback(item.Id)
+        }
+      });
+    }
+  });
 }
 
 async function startRegisterReport(registerID, isFinal) {
@@ -4260,6 +4542,68 @@ function emailReciept(theEMail){
     createMail(theEMail, 'Reciept!', data, data)              
   })
 }
+
+function createAuthWindow(authUrl) {
+  let authWindow = new BrowserWindow({
+    width: 600,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  authWindow.loadURL(authUrl);
+
+  authWindow.on('closed', () => {
+    authWindow = null;
+  });
+  
+  return authWindow;
+}
+
+async function getAuthUrl() {
+  try {
+    const authUri = await oauthClient.authorizeUri({
+      scope: ['com.intuit.quickbooks.accounting'],
+      state: 'testState',
+    });
+    return authUri;
+  } catch (error) {
+    console.error('Error generating auth URL:', error);
+    throw error;
+  }
+}
+
+async function quickBooksConnect() {
+  if (quickBooksCheckLogin()) {
+    return
+  }
+  const authUrl = await getAuthUrl();
+  const authWindow = createAuthWindow(authUrl);
+
+  let theInt = setInterval(() => {
+    let theURL = authWindow.webContents.getURL()
+    if (theURL.startsWith('http://clubentertainmentrms.com/resources/quickbooks')) {      
+      let urlParams = new URL(theURL).searchParams;
+      let code = urlParams.get('code');
+      let realmId = urlParams.get('realmId');
+
+      if (code && realmId) {
+        // Send data to the renderer process or handle it here
+        quickBooksLogin(theURL, realmId)
+        clearInterval(theInt);
+
+        // Close the OAuth window
+        authWindow.close();
+        quickBooksConnecting = false
+        // Exchange the authorization code for an access token
+        // Implement token exchange logic here
+      }
+    }    
+  }, 5000);
+};
+
 const createRecieptScreen = (shouldChoice, logoutTF) => {
   const recieptWindow = new BrowserWindow({
     width: 800,
@@ -4491,8 +4835,12 @@ ipcMain.on('request-account', (event, arg) => {
   theClient = event.sender;
   let displayName = getDisplayName();
   let rank = getRank();
-  theClient.send('recieve-account', Array(displayName, rank, systemData, oauthClient.isAccessTokenValid()))
-  theClient.send('recieve-account2', Array(userData, systemData, oauthClient.isAccessTokenValid(), importMembershipsMode, user.emailVerified, debugMode))
+  let quickBooksIsConnected = false
+  if (oauthClient.isAccessTokenValid()) {
+    quickBooksIsConnected = true
+  }
+  theClient.send('recieve-account', Array(displayName, rank, systemData, quickBooksCheckLogin()))
+  theClient.send('recieve-account2', Array(userData, systemData, quickBooksCheckLogin(), importMembershipsMode, user.emailVerified, debugMode))
 })
 
 ipcMain.on('account-create', (event, arg) => {
@@ -4725,6 +5073,7 @@ ipcMain.on('history-search', async (event, arg) => {
 ipcMain.on('order-search', async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
+  notificationSystem('warning', "Searching for " + arg[0] + '...')
   if (arg[0] != "") {
     if (arg[1] == 'id') {
       let resultsID = await firebaseGetDocument('orders', arg[0])      
@@ -5178,15 +5527,6 @@ ipcMain.on('reciept-choice-close', (event, arg) => {
   recieptWin.close()
 })
 
-function quickBooksConnect() {
-  // AuthorizationUri
-  const authUri = oauthClient.authorizeUri({
-    scope: [OAuthClient.scopes.Accounting, OAuthClient.scopes.OpenId],
-    state: 'testState',
-  }); // can be an array of multiple scopes ex : {scope:[OAuthClient.scopes.Accounting,OAuthClient.scopes.OpenId]}
-  shell.openExternal(authUri)
-}
-
 function quickBooksCheckLogin(){
   return oauthClient.isAccessTokenValid()
 }
@@ -5201,68 +5541,97 @@ const isValidUrl = urlString => {
   return !!urlPattern.test(urlString);
 }
 
-async function quickBooksLogin(parseRedirect) {
+async function refreshTokenIfNeeded() {
+  try {
+    let token = oauthClient.getToken();
+    if (!token || !token.refresh_token) {
+      token = systemData.quickBooksToken      
+    }
+    if (!token || !token.refresh_token) {
+      throw new Error("Refresh token is missing or invalid");
+    }
+
+    const newToken = await oauthClient.refreshUsingToken(token.refresh_token);
+    qbo = new QuickBooks(
+      oauthClient.clientId,
+      oauthClient.clientSecret,
+      oauthClient.getToken().access_token,
+      false, // no token secret for OAuth2, set to false
+      systemData.quickBooksToken2, // Pass the realmId correctly
+      true, // use the sandbox environment (true: sandbox, false: production)
+      true, // enable debugging
+      null, // request logging options, set to null if not used
+      '2.0', // minor version of the API
+      oauthClient.getToken().refresh_token // refresh token
+    );
+
+    // Set the new token for future use    
+    oauthClient.token.setToken(newToken.token);
+    return true;
+  } catch (error) {
+    console.error("Error refreshing token:", error);
+    quickBooksConnect()
+    return false;
+  }
+}
+
+async function quickBooksLogin(parseRedirect, theRealmID) {
   let authToken
   if (systemData.quickBooksToken) {
     authToken = systemData.quickBooksToken
   }
-  if (isValidUrl(parseRedirect)) {
+  if (parseRedirect) {
     notificationSystem('warning', 'Connecting to Quickbooks...')
     oauthClient.createToken(parseRedirect)
       .then(async function (authResponse) {
-        authToken = authResponse.getJson()
+        authToken = authResponse.body
       })
       .catch(function (e) {
+        console.log(e);        
         notificationSystem('danger', 'Something went wrong. (' + e.originalMessage + ')')
         console.log("The error message is :" + e.originalMessage);
         console.log(e.intuit_tid);
         return false
     });
   }
-
   oauthClient.setToken(authToken);
   setTimeout(async () => {
-    if (oauthClient.isAccessTokenValid()) {      
+    if (quickBooksCheckLogin()) {      
+      oauthClient.setToken(authToken);
       quickbooksIsConnected = true
       console.log('Quickbooks has been connected.')
       if (parseRedirect) {
         notificationSystem('success', 'Quickbooks has been connected!')        
       }
-      const docRef = doc(db, "system", getSystemAccess());
-      await updateDoc(docRef, {
+      if (!theRealmID) {
+        theRealmID = systemData.quickBooksToken2
+      }
+      await firebaseUpdateDocument('system', getSystemAccess(), {
         access: getSystemAccess(),
-        quickBooksToken: authToken
-      }).catch((error) => {
-        console.log(error);
-        if (error.code == "permission-denied") {
-          notificationSystem('danger', 'Access code NOT valid!')
-          updateDoc(doc(db, "users", getUID()), {
-            access: "",
-          });
-        }
-      });
-      /*
-      console.log('running');
-      let theAuthToken = oauthClient.token.getToken();
-      var qbo = new QuickBooks(quickbooksConfig.clientId,
-        quickbooksConfig.clientSecret,
-        theAuthToken,
-        theAuthToken,
-        false,
-        true, // don't use the sandbox (i.e. for testing)
-        true); // turn debugging on
-
-
-      qbo.updateCustomer({
-        Id: '42',
-        SyncToken: '1',
-        sparse: true,
-        PrimaryEmailAddr: { Address: 'customer@example.com' }
-      }, function (err, customer) {
-        if (err) console.log(err)
-        else console.log(customer)
+        quickBooksToken: authToken,
+        quickBooksToken2: theRealmID
       })
-      */
+      systemData.quickBooksToken2 = theRealmID
+
+      // Initialize QuickBooks with OAuth 2.0 tokens
+      qbo = new QuickBooks(
+        oauthClient.clientId,
+        oauthClient.clientSecret,
+        oauthClient.getToken().access_token,
+        false, // no token secret for OAuth2, set to false
+        systemData.quickBooksToken2, // Pass the realmId correctly
+        true, // use the sandbox environment (true: sandbox, false: production)
+        true, // enable debugging
+        null, // request logging options, set to null if not used
+        '2.0', // minor version of the API
+        oauthClient.getToken().refresh_token // refresh token
+      );
+      oauthClient.token.setToken(oauthClient.getToken());
+      refreshTokenIfNeeded()
+      setTimeout(() => {
+        // HERE
+        processPaymentMethods(0);
+      }, 3000);
       return true
     } else {
       quickbooksIsConnected = false
@@ -5272,105 +5641,42 @@ async function quickBooksLogin(parseRedirect) {
   }, 1000);  
 }
 
-function quickbooksGetAllProducts(){
-  console.log('HERE: ');
-  console.log(oauthClient.isAccessTokenValid());
-  console.log(oauthClient.getToken().access_token);
-  oauthClient
-    .makeApiCall({
-      url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/4620816365354134710/query',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: "select * from Item",
-    })
-    .then(function (response) {
-      console.log(response);
-      theClient.send('quickbooks-test-test', response)
-    })
-    .catch(function (e) {
-      console.log('The error is ' + JSON.stringify(e));
-    });
-}
-
-function quickBooksTest() {
-  let body = {
-    "Line": [
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 123.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Membership",
-            "value": "1"
-          }
-        }
-      },
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 123.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Membership",
-            "value": "1"
-          }
-        }
-      },
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 123.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Membership",
-            "value": "1"
-          }
-        }
-      },
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 100.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Product",
-            "value": "1"
-          }
-        }
-      }
-    ],
-    "CustomerRef": {
-      "value": "1"
+async function findCustomerByBusinessName(businessName, callback) {
+  await refreshTokenIfNeeded()
+  qbo.findCustomers({
+    fetchAll: true,
+    DisplayName: businessName // Use DisplayName for searching by business name
+  }, function (err, customers) {
+    if (err) {
+      console.error('Error finding customer:', err);
+      console.log(err.fault);
+      
+      callback(err);
+    } else if (customers.QueryResponse.Customer && customers.QueryResponse.Customer.length > 0) {
+      // Assuming the first matching customer is the desired one
+      const customer = customers.QueryResponse.Customer[0];
+      console.log('Customer found:', customer);
+      callback(null, customer.Id);
+    } else {
+      console.log('No customer found with the business name:', businessName);
+      callback(new Error('Customer not found'));
     }
-  }
-
-  oauthClient
-    .makeApiCall({
-      url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/4620816365354134710/invoice?minorversion=69',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-    .then(function (response) {
-      console.log(response);
-      console.log('\n\n');
-      console.log(arg['json']['Invoice']);
-      console.log('\n\n');
-      theClient.send('quickbooks-test-test', response)
-    })
-    .catch(function (e) {
-      console.log('The error is ' + JSON.stringify(e));
-    });
+  });
 }
-
-ipcMain.on('quickbooks-test', (event, arg) => {
-//  quickBooksTest()
-  quickbooksGetAllProducts()
-})
 
 ipcMain.on('quickbooks-connect', (event, arg) => {
   quickBooksConnect()
+})
+
+ipcMain.on('quickbooks-import-products', (event, arg) => {
+  theClient = event.sender;
+  let isConnected = quickBooksCheckLogin()
+  if (isConnected) {
+    productsData.forEach(product => {
+      findOrCreateItem(product, function(itemId){
+      })
+    });    
+  }
 })
 
 ipcMain.on('quickbooks-login', (event, arg) => {
@@ -5557,10 +5863,10 @@ ipcMain.on('settings-update-esign-enable', async (event, arg) => {
 
 ipcMain.on('settings-quickbooks-disconnect', async (event, arg) => {
   theClient = event.sender
-
-  const docRef = doc(db, "system", getSystemAccess());
-  await updateDoc(docRef, {
-    quickBooksToken: ""
+  oauthClient.setToken()
+  firebaseUpdateDocument("system", getSystemAccess(), {
+    quickBooksToken: "",
+    quickBooksToken2: ""
   })
   notificationSystem('success', "Quickbooks has been disconnected. Close the application and re-open to fully disconnect.")
   getSystemData()

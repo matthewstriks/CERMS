@@ -42,11 +42,10 @@ let theWaiverEdit = document.getElementById('theWaiverEdit')
 let saveBusinessWaiverSettingsBtn = document.getElementById('saveBusinessWaiverSettingsBtn')
 let cancelBusinessWaiverSettingsBtn = document.getElementById('cancelBusinessWaiverSettingsBtn')
 let enableSignatureSigningSwitch = document.getElementById('enableSignatureSigningSwitch')
-let quickbooksStep2 = document.getElementById('quickbooksStep2')
-let quickbooksURL = document.getElementById('quickbooksURL')
-let finishQuickbooks = document.getElementById('finishQuickbooks')
 let quickbooksConnect = document.getElementById('quickbooksConnect')
 let quickbooksDisConnect = document.getElementById('quickbooksDisConnect')
+let importProductsQB = document.getElementById('importProductsQB')
+let importProductsQBBtn = document.getElementById('importProductsQBBtn')
 let debugModeSwitch = document.getElementById('debugModeSwitch')
 let importMembershipModeSwitch = document.getElementById('importMembershipModeSwitch')
 let saveDirTxt = document.getElementById('saveDirTxt')
@@ -189,21 +188,13 @@ cancelBusinessWaiverSettingsBtn.addEventListener('click', function(){
     businessWaiverSettingsEdit.style.display = 'none'
 })
 
-if (quickbooksStep2) {
-    quickbooksStep2.style.display = 'none'
-    quickbooksDisConnect.style.display = 'none'
-}
-
 quickbooksConnect.addEventListener('click', function() {
     quickbooksConnect.style.display = 'none'
-    quickbooksStep2.style.display = ''
     ipcRenderer.send('quickbooks-connect')
 })
 
-finishQuickbooks.addEventListener('click', function(){
-    quickbooksConnect.style.display = ''
-    quickbooksStep2.style.display = 'none'
-    ipcRenderer.send('quickbooks-login', quickbooksURL.value)
+importProductsQBBtn.addEventListener('click', function() {
+    ipcRenderer.send('quickbooks-import-products')
 })
 
 quickbooksDisConnect.addEventListener("click", function(){
@@ -354,12 +345,18 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
 
     theWaiver.innerHTML = arg[1].theWaiver || "No Waiver Found"
     theWaiverEdit.innerHTML = arg[1].theWaiver || ""
-
+    console.log('running');
+    console.log(arg);
+    
     if (arg[2]) {
        quickbooksConnect.disabled = true 
        quickbooksConnect.innerHTML = "Quickbooks Connected" 
        quickbooksConnect.className = 'btn btn-success'
-        quickbooksDisConnect.style.display = ''
+       quickbooksDisConnect.style.display = ''
+       importProductsQB.style.display = ''
+    } else {
+        quickbooksDisConnect.disabled = true
+        importProductsQB.style.display = 'none'
     }
 
     debugModeSwitch.checked = arg[5]

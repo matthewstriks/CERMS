@@ -202,11 +202,6 @@
                 <br>
                 <div class="card">
                     <div class="card-body">
-                        <div id="quickbooksStep2">
-                            <input id="quickbooksURL" type="text" class="form-control" placeholder="URL from CERMS Website"></input>
-                            <br>
-                            <button id="finishQuickbooks" type="button" class="btn btn-success">Finish Connecting</button>
-                        </div>
                         <button class="btn btn-warning" id="quickbooksConnect" type="button">Connect to Quickbooks</button>
                         <button class="btn btn-danger" id="quickbooksDisConnect" type="button">Disconnect Quickbooks</button>
                     </div>
@@ -214,6 +209,22 @@
                         Click the button to sign in to your Quickbooks Online account. You will then be redirected to the CERMS website. Copy the URL of the CERMS website back here and click connect again.
                     </div>
                 </div>                
+                <br>
+                <div id="importProductsQB" class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <label class="form-check-label" for="debugModeSwitch">[QuickBooks] Import Products</label>
+                            </div>
+                            <div class="col-4">
+                                <button id="importProductsQBBtn" class="btn btn-primary">Import</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        Imports products to quickbooks. (NOTE: This should only be done once when you first setup quickbooks.)
+                    </div>
+                </div>
                 <br>
                 <div class="card">
                     <div class="card-body">
