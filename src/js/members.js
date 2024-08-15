@@ -682,37 +682,17 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   document.getElementById("viewinfo"+arg[0]).addEventListener('click', function(){
     memberCheckingIn = arg[0];
     memberCheckingInName = arg[1].name;
+    let theCreationTime
+    let isTimeExpired = false
     if (arg[1].creation_time.seconds) {
-      var a = new Date(arg[1].creation_time.seconds * 1000);
+      theCreationTime = getTimestampString(new Date(arg[1].creation_time.seconds * 1000), true)
     }else{
-      var a = new Date(arg[1].creation_time * 1000);
+      theCreationTime = getTimestampString(new Date(arg[1].creation_time * 1000), true)
     }
-    var a2 = new Date(arg[1].id_expiration * 1000);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var year = a.getFullYear();
-    var year2 = a2.getFullYear();
-    var month = months[a.getMonth()];
-    var month2 = months[a2.getMonth()];
-    var date = a.getDate();
-    var date2 = a2.getDate();
-    let hour = a.getHours();
-    let hour2 = a2.getHours();
-    let ampm = "AM"
-    let ampm2 = "AM"
-    if (hour > 12) {
-      ampm = "PM"
-      hour = hour - 12
+    let theExpireTime = getTimestampString(new Date(arg[1].id_expiration * 1000), true)
+    if (new Date(arg[1].id_expiration * 1000) < new Date()) {
+      isTimeExpired = true
     }
-    if (hour2 > 12) {
-      ampm2 = "PM"
-      hour2 = hour2 - 12
-    }
-    var min = a.getMinutes();
-    var min2 = a2.getMinutes();
-    var sec = a.getSeconds();
-    var sec2 = a2.getSeconds();
-    var time = month + ' ' + date + ' ' + ' ' + year + ' ' + hour + ':' + min + ':' + sec + ' ' + ampm;
-    var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2 + ' ' + hour2 + ':' + min2 + ':' + sec2 + ' ' + ampm2;
 
     if (arg[1].tag) {
       memberInfoTag.innerHTML = 'READ NOTES'
@@ -740,10 +720,13 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     memberInfoID.innerHTML = 'Membership ID: ' + (arg[1].id_number || 'N/A');
     memberInfoEMail.innerHTML = 'EMail: ' + (arg[1].email || 'N/A');
     memberInfoType.innerHTML = 'Membership Type: ' + arg[1].membership_type;
-    memberInfoExpires.innerHTML = 'Membership Expires: ' + time2;
+    memberInfoExpires.innerHTML = 'Membership Expires: ' + theExpireTime;
+    if (isTimeExpired) {
+      memberInfoExpires.style = 'color:red'
+    }
     memberInfoIDNum2.innerHTML = 'State ID Number: ' + arg[1].idnum;
     memberInfoIDNum3.innerHTML = 'ID State: ' + arg[1].idstate;
-    memberInfoCT.innerHTML = 'Creation Time: ' + time;
+    memberInfoCT.innerHTML = 'Creation Time: ' + theCreationTime;
     memberInfoWS.innerHTML = 'Waiver Status: ' + arg[1].waiver_status;
     if (Array.isArray(arg[1].notes)) {
       let theNotesString = ""
