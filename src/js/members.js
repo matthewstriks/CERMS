@@ -96,7 +96,6 @@ let fileTrashingList
 let esignRemoving
 let esignRemovingList
 
-
 if (scanIDBtn) {
   scanIDTxt.style.display = 'none'
   scanIDBtn.addEventListener('click', function () {
@@ -1176,34 +1175,36 @@ ipcRenderer.on('member-order-history-request-return', (event, arg) => {
   var cell2 = row.insertCell(1);
   cell2.id = 'datecell' + arg[0];
   var cell3 = row.insertCell(2);
-  cell3.id = 'amountcell' + arg[0];
+  cell3.id = 'amountcccell' + arg[0];
   var cell4 = row.insertCell(3);
-  cell4.id = 'actioncell' + arg[0];
+  cell4.id = 'amountgccell' + arg[0];
+  var cell5 = row.insertCell(4);
+  cell5.id = 'amountccell' + arg[0];
+  var cell6 = row.insertCell(5);
+  cell6.id = 'totalcell' + arg[0];
+  var cell7 = row.insertCell(6);
+  cell7.id = 'actioncell' + arg[0];
 
-  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  var a = new Date(arg[1].timestamp * 1000);
-  var year = a.getFullYear();
-  var month = a.getMonth() + 1;
-  var fancyMonth = months[a.getMonth()];
-  var date = a.getDate();
-  let hour = String(a.getHours()).padStart(2, '0');
-  let ampm = "AM"
-  if (Number(hour) > 12) {
-    ampm = "PM"
-    hour = Number(hour) - 12
-  }
-  var min = String(a.getMinutes()).padStart(2, '0');
-  var sec = a.getSeconds();
-  var time = month + '/' + date + '/' + year + ' ' + hour + ':' + min + ':' + sec + ' ' + ampm;
-
+  let time = getTimestampString((arg[1].timestamp.seconds * 1000), true);
+  
+  // paymentMethod: credit card, gift card, cash
+  // total: Sub, Tax, Tot, OGTot
+  let theTotalCC = formatter.format(arg[1].paymentMethod[0])
+  let theTotalGC = formatter.format(arg[1].paymentMethod[1])
+  let theTotalC = formatter.format(arg[1].paymentMethod[2])
+  let theTotal = formatter.format(arg[1].total[2])
+  
   cell1.innerHTML = arg[0]
   cell2.innerHTML = time;
-  cell3.innerHTML = arg[1].total;
-  cell4.innerHTML = "<button data-bs-toggle='modal' data-bs-target='#myModal7' id='viewinfo" + arg[0] + "' type='button' class='btn btn-success'>View Info</button>";
+  cell3.innerHTML = theTotalCC;
+  cell4.innerHTML = theTotalGC;
+  cell5.innerHTML = theTotalC;
+  cell6.innerHTML = theTotal;
+  cell7.innerHTML = "<button id='viewinfo" + arg[0] + "' type='button' class='btn btn-success'>View Info</button>";
 
   document.getElementById('viewinfo' + arg[0]).addEventListener('click', function () {
-    viwingMore = true;
+    ipcRenderer.send('open-reciept', arg[0])
+//    viwingMore = true;
     // All order info  
     //    document.getElementById('memberHistoryInfoNameTotal').innerHTML = memberCheckingInName
     //    document.getElementById('memberHistoryInfoNotes').value = arg[1].notes

@@ -2,6 +2,11 @@ const { ipcRenderer } = require('electron')
 let darkMode = false
 let fileName = location.href.split("/").slice(-1)
 
+const formatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+});
+
 // ADD PAGES TO NAV BAR HERE
 let navBarPages = Array(
   Array('Home', 'home.html'),
@@ -22,6 +27,40 @@ let navBarPagesOptions = Array(
 function openMembership() {
   let memID = document.getElementById('lastCreatedID').innerHTML
   ipcRenderer.send('open-membership', memID)
+}
+
+function getTimestampString(date, time) {
+  if (!date) {
+    date = Date.now()
+  }
+  let theTimestamp = new Date(Math.floor(date));
+  let theMonth = theTimestamp.getMonth() + 1;
+  let theDate = theTimestamp.getDate();
+  let theFullYear = theTimestamp.getFullYear();
+  let theHours = theTimestamp.getHours();
+  let theMins = theTimestamp.getMinutes();
+  let theSecs = theTimestamp.getSeconds();
+  let ampm = 'AM';
+
+  if (theHours === 0) {
+    theHours = 12;
+  } else if (theHours > 12) {
+    theHours -= 12;
+    ampm = 'PM';
+  } else if (theHours === 12) {
+    ampm = 'PM';
+  }
+
+  // Add leading zeros to minutes and seconds if needed
+  theMins = theMins < 10 ? '0' + theMins : theMins;
+  theSecs = theSecs < 10 ? '0' + theSecs : theSecs;
+
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear;
+
+  if (time) {
+    theStringTime = theStringTime + ' ' + theHours + ':' + theMins + ':' + theSecs + ' ' + ampm;
+  }
+  return theStringTime;
 }
 
 ipcRenderer.on('recieve-dark-mode', (event, arg) => {

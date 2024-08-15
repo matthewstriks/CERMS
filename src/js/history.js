@@ -15,11 +15,6 @@ let theEditingOrderID;
 
 let enterPressed = false;
 
-const formatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-});
-
 if (document.getElementById('testTable')) {
   document.getElementById('testTable').style.display = 'none'
 }

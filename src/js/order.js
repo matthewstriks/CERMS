@@ -439,11 +439,6 @@ if (checkoutBtn) {
   })
 }
 
-const formatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-});
-
 document.getElementById('myModal5Close').addEventListener('click', function () {
   // Get the backdrop so we can remove it from the body
   const backdrop = document.querySelector(".modal-backdrop.fade.show");
