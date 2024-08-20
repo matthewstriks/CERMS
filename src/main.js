@@ -17,7 +17,14 @@ const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
 const QuickBooks = require('node-quickbooks');
 const { compareAsc, format } = require("date-fns");
+const isPackaged = process.env.NODE_ENV === 'production';
 
+if (!isPackaged) {
+  let { devConfig } = require('./assets/dev.js');
+  setTimeout(() => {
+    attemptLogin(Array(devConfig.email, devConfig.password))
+  }, 1000);
+}
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
   .then((url) => {
@@ -1333,6 +1340,7 @@ async function registerStatus(){
   regStatusID = false
   regStatusShift = false
   let userAllowed = canUser('permissionEditRegisters')
+  let userAllowed2 = canUser('permissionEditQBConnect') 
   let noAction = true
 
   docSnap.forEach((doc) => {
@@ -1341,27 +1349,40 @@ async function registerStatus(){
       regStatusID = doc.id
       regStatusShift = doc.data().shift
       noAction = false
-      theClient.send('register-status-change', Array(true, userAllowed, doc.data()))
+      theClient.send('register-status-change', Array(true, Array(userAllowed, userAllowed2), doc.data()))
     }else{
       regStatus = false
       regStatusID = false
       regStatusShift = false
       noAction = false
-      theClient.send('register-status-change', Array(false, userAllowed, false))
+      theClient.send('register-status-change', Array(false, Array(userAllowed, userAllowed2), false))
     }
   })
   if (noAction) {
-    theClient.send('register-status-change', Array(false, userAllowed, false))    
+    theClient.send('register-status-change', Array(false, Array(userAllowed, userAllowed2), false))    
   }
 
   theClient.send('register-shift-times-return', Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC))
 }
 
 async function gatherAllRegisters(){
-  const q = query(collection(db, "registers"), where("active", "==", true), where('uid', '!=', getUID()), where('access', '==', getSystemAccess()));
-  const querySnapshot = await getDocs(q);
-  querySnapshot.forEach(async (doc) => {
-    theClient.send('register-all-request-return', Array(doc.id, doc.data(), Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC)))    
+  let theRegs = await firebaseGetDocuments('registers', Array(
+    Array('active', '==', true),
+    Array('uid', '!=', getUID())
+  ), true)
+
+  theRegs.forEach(register => {
+    theClient.send('register-all-request-return', Array(register[0], register[1], Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC)))        
+  });
+}
+
+async function gatherAllQBRegisters(){
+  let theRegs = await firebaseGetDocuments('registers', Array(
+    Array('active', '==', false),
+    Array('qbinvoice', '==', false)
+  ), true)  
+  theRegs.forEach(register => {
+    theClient.send('register-qb-request-return', Array(register[0], register[1], Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC)))
   });
 }
 
@@ -1409,6 +1430,7 @@ async function startRegister(registerInfo, redirect){
     PSN: 0,
     PSA: 0,
     CCardAmtRan: 0,
+    qbinvoice: false
   })
 
   if (redirect) {
@@ -1486,7 +1508,7 @@ async function endRegister(registerInfo, logoutTF){
   registerReciept(regStatusID, logoutTF)
   let theRegStatusID = regStatusID
   setTimeout(() => {
-    startQuickBooksReport(theRegStatusID, false)
+    //startQuickBooksReport(theRegStatusID, false)
     startRegisterReport(theRegStatusID, false)    
   }, 1000);
   regStatus = false
@@ -1579,103 +1601,138 @@ async function createMoneyDrop(registerInfo, dropInfo){
   })
 }
 
-async function startQuickBooksReport(registerID, isFinal){
+async function startQuickBooksReportGroup(registersID, isFinal){
   await refreshTokenIfNeeded()
   notificationSystem('warning', 'Generating register report for QuickBooks... Do not shut down application.')
-  let registerInfo
-  if (registerID) {
-    registerInfo = await firebaseGetDocument('registers', registerID)
-  }
+  let registersInfo = Array()
+  let registerIDs = ""
+  let theTxnDate = ""
+  let theFirstTime = false
+  registersID.forEach(async registerID => {
+    registerIDs = registerIDs + registerID + " "
+    let registerInfo = await firebaseGetDocument('registers', registerID)
+    registersInfo.push(Array(registerID, registerInfo))
+    if (!theFirstTime) {
+      theFirstTime = registerInfo.timestampStart.seconds
+    } else if (theFirstTime && (theFirstTime > registerInfo.timestampStart.seconds)) {
+      theFirstTime = registerInfo.timestampStart.seconds
+    }
+  });
   getSystemData()
-  startDates = new Date(registerInfo.timestampStart['seconds'] * 1000)
-  endDates = new Date().getSeconds()
-  if (registerInfo.timestampEnd['seconds']) {
-    endDates = new Date(registerInfo.timestampEnd['seconds'] * 1000)    
-  }
-  let theOrders = await firebaseGetDocuments("orders", Array(
-    Array("timestamp", ">", registerInfo.timestampStart),
-    Array("timestamp", "<", registerInfo.timestampEnd),
-    Array("cashier", "==", registerInfo.uid)
-  ), true)
   let theProductsData = Array()
   let theCashReceived = 0
-  // paymentMethod: credit card, gift card, cash, change  
-  theOrders.forEach(order => {
-    if (order[1].paymentMethod[2]) {
-      theCashReceived = theCashReceived + order[1].paymentMethod[2]
+  setTimeout(() => {
+    let theFirstTimeDate = new Date(theFirstTime * 1000)
+    let theFirstTimeDateYear = theFirstTimeDate.getFullYear()
+    let theFirstTimeDateMonth = (theFirstTimeDate.getMonth() + 1)
+    let theFirstTimeDateDay = theFirstTimeDate.getDate()
+    if (theFirstTimeDateMonth < 10) {
+      theFirstTimeDateMonth = '0' + theFirstTimeDateMonth
     }
-    order[1].products.forEach(product => {
-      productsData.forEach(async productData => {
-        if (productData[0] == product) {
-          findOrCreateItem(productData, function(itemId){
-            let wasFound = false
-            theProductsData.forEach(theProductsDataProduct => {
-              if (theProductsDataProduct[0] == itemId) {
-                wasFound = true
-                theProductsDataProduct[2] = theProductsDataProduct[2] + 1
-              }
-            });
-            if (!wasFound) {
-              theProductsData.push(Array(itemId, productData[1], 1))
-            }
-          })
+    if (theFirstTimeDateDay < 10) {
+      theFirstTimeDateDay = '0' + theFirstTimeDateDay
+    }
+    theTxnDate = theFirstTimeDateYear + '-' + theFirstTimeDateMonth + '-' + theFirstTimeDateDay
+    registersInfo.forEach(async registerInfo => {
+      orderStartDate = new Date(registerInfo[1].timestampStart['seconds'] * 1000)
+      orderEndDate = new Date().getSeconds()
+      if (registerInfo[1].timestampEnd) {
+        orderEndDate = new Date(registerInfo[1].timestampEnd['seconds'] * 1000)
+      }
+      let theOrders = await firebaseGetDocuments('orders', Array(
+        Array("timestamp", ">", registerInfo[1].timestampStart),
+        Array("timestamp", "<", registerInfo[1].timestampEnd),
+        Array("cashier", "==", registerInfo[1].uid)
+      ), true)
+      theOrders.forEach(order => {
+        if (order[1].paymentMethod[2]) {
+          theCashReceived = theCashReceived + order[1].paymentMethod[2]
         }
+        order[1].products.forEach(product => {
+          productsData.forEach(async productData => {
+            if (productData[0] == product) {
+              findOrCreateItem(productData, function (itemId) {
+                let wasFound = false
+                theProductsData.forEach(theProductsDataProduct => {
+                  if (theProductsDataProduct[0] == itemId) {
+                    wasFound = true
+                    theProductsDataProduct[2] = theProductsDataProduct[2] + 1
+                  }
+                });
+                if (!wasFound) {
+                  theProductsData.push(Array(itemId, productData[1], 1))
+                }
+              })
+            }
+          });
+        });
       });
     });
-  });
 
-  setTimeout(() => {
-    findCustomerByBusinessName("CERMS", function (err, customerId) {
-      if (err) {
-        console.log('Not going to work!');
-      } else {
-        const invoice = {
-          "Line": theProductsData.map(product => ({
-            "Amount": product[1].price * product[2], // Example amount, you may need to adjust this
-            "DetailType": "SalesItemLineDetail",
-            "Description": "Invoice generated from CERMS based on register ID: " + registerID,
-            "SalesItemLineDetail": {
-              "ItemRef": {
-                "value": product[0]
-              },
-              "Qty": product[2],
-              "TaxCodeRef": product[1].taxable ? { "value": "TAX" } : { "value": "NON" } // Apply tax if product[1].tax is true
-            }
-          })),
-          "CustomerRef": {
-            "value": customerId
-          }
-        };
-
-        // Create the invoice
-        qbo.createInvoice(invoice, function (err, invoice) {
-          if (err) {
-            console.error('Error creating invoice:', err);
-          } else {
-            console.log('Invoice created:', invoice);
-            let invoiceId = invoice.Id
-            let realmId = systemData.quickBooksToken2
-            const invoiceLink = `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
-            console.log("INVOICE LINK: " + invoiceLink)
-            createPayment(customerId, invoiceId, registerInfo.ccard, "Credit", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3){
-              if (paymentUnappliedAmt2) {
-                addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3);
+    setTimeout(() => {
+      findCustomerByBusinessName("CERMS", function (err, customerId) {
+        if (err) {
+          notificationSystem('danger', '[QuickBooks] Error gathering business name... You may need to log out of quickbooks and log back in (from account settings)')
+          console.log(err);          
+        } else {
+          const invoice = {
+            "Line": theProductsData.map(product => ({
+              "Amount": product[1].price * product[2], // Example amount, you may need to adjust this
+              "DetailType": "SalesItemLineDetail",
+              "SalesItemLineDetail": {
+                "ItemRef": {
+                  "value": product[0]
+                },
+                "Qty": product[2],
+                "TaxCodeRef": product[1].taxable ? { "value": "TAX" } : { "value": "NON" } // Apply tax if product[1].tax is true
               }
-              createPayment(customerId, invoiceId, registerInfo.gcard, "Gift Card", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3){
-                if (paymentUnappliedAmt2) {
-                  addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3);
-                }
-                createPayment(customerId, invoiceId, Number((registerInfo.ending - registerInfo.starting) + theCashReceived), "Cash", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3){
-                  if (paymentUnappliedAmt2) {
-                    addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3);                                      
+            })),
+            "CustomerRef": {
+              "value": customerId
+            },
+            "PrivateNote": "Invoice generated from CERMS based on register IDs: " + registerIDs,
+            "TxnDate": theTxnDate
+          };
+
+          // Create the invoice
+          qbo.createInvoice(invoice, function (err, invoice) {
+            if (err) {
+              notificationSystem('danger', '[QuickBooks] Error creating invoice... You may need to log out of quickbooks and log back in (from account settings).')
+              console.error('Error creating invoice:', err);
+            } else {
+              let invoiceId = invoice.Id
+              let realmId = systemData.quickBooksToken2
+              const invoiceLink = `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
+              notificationSystem('success', "QuickBook Invoice created successfully! Click <a href='#' id='linkToExternal' theLink='" + invoiceLink + "'>here</a> to view!")
+              registersID.forEach(async register => {
+                firebaseUpdateDocument('registers', register, {
+                  qbinvoice: invoiceLink,
+                  qbinvoiceID: invoiceId
+                })
+                let theRegisterInfo = false
+                registersInfo.forEach(registerr => {
+                  if (registerr[0] == register) {
+                    theRegisterInfo = registerr[1]                    
                   }
-                })              
-              })             
-            })
-          }
-        });
-      }
-    })
+                });
+                createPayment(customerId, invoiceId, theRegisterInfo.ccard || 0, "Credit", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {                  
+                  addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                    createPayment(customerId, invoiceId, theRegisterInfo.gcard || 0, "Gift Card", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
+                      addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                        createPayment(customerId, invoiceId, Number((theRegisterInfo.ending - theRegisterInfo.starting) + theCashReceived), "Cash", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
+                          addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                          });
+                        })
+                      });
+                    })
+                  });
+                })
+              });
+            }
+          });
+        }
+      })
+    }, 5000);    
   }, 5000);
 }
 
@@ -1693,7 +1750,6 @@ async function findOrCreatePaymentMethod(paymentMethodName, callback) {
     if (paymentMethods.QueryResponse.PaymentMethod && paymentMethods.QueryResponse.PaymentMethod.length > 0) {
       // Payment method exists, return the ID
       const paymentMethodId = paymentMethods.QueryResponse.PaymentMethod[0].Id;
-      console.log(`${paymentMethodName} Payment Method ID:`, paymentMethodId);
       callback(null, paymentMethodId);
     } else {
       // Payment method doesn't exist, create it
@@ -1728,7 +1784,6 @@ const paymentMethodIds = {};
 
 function processPaymentMethods(paymentMethodNameIndex) {
   if (paymentMethodNameIndex >= paymentMethodsToCheck.length) {
-    console.log('All payment methods processed:', paymentMethodIds);    
     return;
   }
 
@@ -1767,6 +1822,7 @@ async function createPayment(customerId, invoiceId, amount, paymentMethodName, c
 
   qbo.createPayment(payment, function (err, payment) {
     if (err) {
+      notificationSystem('danger', '[QuickBooks] Error creating payment... You may need to log out of quickbooks and log back in (from account settings).')
       console.error('Error creating payment:', err);
       callback(false, false, false)
     } else {
@@ -1778,7 +1834,11 @@ async function createPayment(customerId, invoiceId, amount, paymentMethodName, c
   });
 }
 
-function addUnappliedAmountToInvoice(invoiceId, unappliedAmount, paymentMethodName) {
+function addUnappliedAmountToInvoice(invoiceId, unappliedAmount, paymentMethodName, callback) {
+  if (!unappliedAmount) {
+    callback(false)
+    return
+  }
   const extraProductName = `Extra ${paymentMethodName}`;
   findOrCreateItem(extraProductName, function (itemId) {
     // Add the unapplied amount to the invoice
@@ -1803,9 +1863,11 @@ function addUnappliedAmountToInvoice(invoiceId, unappliedAmount, paymentMethodNa
 
       qbo.updateInvoice(invoice, function (err, updatedInvoice) {
         if (err) {
+          notificationSystem('danger', '[QuickBooks] Error creating payment (unapplied amount)... You may need to log out of quickbooks and log back in (from account settings).')
           console.error('Error updating invoice with unapplied amount:', err);
+          callback(false)
         } else {
-          console.log('Invoice updated with unapplied amount:', updatedInvoice);
+          callback(true)
         }
       });
     });
@@ -4576,6 +4638,10 @@ async function getAuthUrl() {
 }
 
 async function quickBooksConnect() {
+  if (!canUser('permissionEditQBConnect')) {
+    notificationSystem('warning', 'You do not have permission to do this!')
+    return
+  }
   if (quickBooksCheckLogin()) {
     return
   }
@@ -4883,7 +4949,8 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditMemberFiles: arg[18],
     permissionDeleteMembers: arg[19],
     permissionEditAnalytics: arg[20],
-    permissionEditVDTransactions: arg[21]
+    permissionEditVDTransactions: arg[21],
+    permissionEditQBConnect: arg[22]
   });
 
   if (arg[0] == getUID()) {
@@ -5280,6 +5347,11 @@ ipcMain.on('register-all-request', (event, arg) => {
   gatherAllRegisters()
 })
 
+ipcMain.on('register-qb-request', (event, arg) => {
+  theClient = event.sender;
+  gatherAllQBRegisters()
+})
+
 ipcMain.on('starting-register', (event, arg) => {
   theClient = event.sender;
   startRegister(arg, true)
@@ -5576,6 +5648,10 @@ async function refreshTokenIfNeeded() {
 }
 
 async function quickBooksLogin(parseRedirect, theRealmID) {
+  if (!canUser('permissionEditQBConnect')) {
+//    notificationSystem('warning', 'You do not have permission to do this!')
+    return
+  }
   let authToken
   if (systemData.quickBooksToken) {
     authToken = systemData.quickBooksToken
@@ -5629,7 +5705,6 @@ async function quickBooksLogin(parseRedirect, theRealmID) {
       oauthClient.token.setToken(oauthClient.getToken());
       refreshTokenIfNeeded()
       setTimeout(() => {
-        // HERE
         processPaymentMethods(0);
       }, 3000);
       return true
@@ -6116,3 +6191,13 @@ async function sendChat(chatID, theMessage){
     message: theMessage
   });
 }
+
+ipcMain.on('create-invoice-reg', (event, arg) => {
+  theClient = event.sender
+  startQuickBooksReportGroup(Array(arg), false)
+})
+
+ipcMain.on('create-invoice-regs', (event, arg) => {
+  theClient = event.sender
+  startQuickBooksReportGroup(arg, false)
+})

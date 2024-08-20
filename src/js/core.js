@@ -98,13 +98,19 @@ function notificationSystem(notificationType, notificationMsg, theNotSecs, theNo
     ipcRenderer.send('notification-system-remove-id', theNotificationID)
   })
 
+  let linkToExternal = document.getElementById('linkToExternal')
+  if (linkToExternal) {
+    linkToExternal.addEventListener('click', function () {
+      ipcRenderer.send('open-link', linkToExternal.getAttribute('theLink'))
+    })
+  }
+
   if (theNotSecs) {
     setTimeout(() => {
       document.querySelector('[notificationID="' + theNotificationID + '"]').remove();          
     }, theNotSecs * 1000);
   }
 }
-
 
 if (fileName[0] != 'login.html' && fileName[0] != 'index.html' && fileName[0] != 'access.html') {
   // Create NavBar for every page (except above)

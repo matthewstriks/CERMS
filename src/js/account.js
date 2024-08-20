@@ -93,6 +93,7 @@ let permissionEditMemberFiles = document.getElementById('permissionEditMemberFil
 let permissionDeleteMembers = document.getElementById('permissionDeleteMembers')
 let permissionEditAnalytics = document.getElementById('permissionEditAnalytics')
 let permissionEditVDTransactions = document.getElementById('permissionEditVDTransactions')
+let permissionEditQBConnect = document.getElementById('permissionEditQBConnect')
 let editAccountSave = document.getElementById('editAccountSave')
 let editAccountCancel = document.getElementById('editAccountCancel')
 let addAccountBtn = document.getElementById('addAccountBtn')
@@ -284,7 +285,7 @@ editAccountSave.addEventListener('click', function(){
         editingAccessCode.style.display = ''
         ipcRenderer.send('account-create', Array(editingEMail.value, editingDisplayName.value, editingRank.value))
     } else {
-        ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionDeleteMembers.checked, permissionEditAnalytics.checked, permissionEditVDTransactions.checked))    
+        ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionDeleteMembers.checked, permissionEditAnalytics.checked, permissionEditVDTransactions.checked, permissionEditQBConnect.checked))    
         document.getElementById('row' + editingID).remove()
     }
 })
@@ -452,6 +453,7 @@ ipcRenderer.on('recieve-users', (event, arg) => {
         permissionDeleteMembers.checked = arg[1].permissionDeleteMembers
         permissionEditAnalytics.checked = arg[1].permissionEditAnalytics
         permissionEditVDTransactions.checked = arg[1].permissionEditVDTransactions
+        permissionEditQBConnect.checked = arg[1].permissionEditQBConnect
     })
 
     document.getElementById('delete'+arg[0]).addEventListener('click', function(){
