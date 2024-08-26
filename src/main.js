@@ -133,7 +133,12 @@ function goOrder(){
   mainWin.maximize()
 }
 
-function goRegister(){
+async function goRegister(){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    goHome()
+    return
+  }
   mainWin.loadFile(path.join(__dirname, 'register.html'));
   mainWin.maximize()
 }
@@ -180,6 +185,10 @@ function getRank(){
 
 function canUser(theFunction){
   return userData[theFunction];
+}
+
+function canSystem(theFunction){
+  return systemData[theFunction];
 }
 
 function getUID(){
@@ -718,7 +727,8 @@ async function voidOrder(orderNumber){
 }
 
 async function createOrder(memberInfo, orderType, thePendingOrder){
-  if (!regStatus) {
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (registerSystemEnabled && !regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
       theClient.send('no-register-active')
@@ -870,6 +880,10 @@ function getTimestampString(date, time) {
 // TODO: Replace timestamps around (NOTE: TIMESTAMP FUNCTION DOES NOT MULTIPLY OR DIVIDE TIMES)
 
 async function registerReciept(registerID, logoutTF){  
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   let theStringTime = getTimestampString(false, true)
   let theDisplayName = await getDisplayName()
   let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
@@ -1093,7 +1107,8 @@ async function recieptProcess(orderInfo, theOrderNumber){
 }
 
 async function completeOrder(orderInfo){
-  if (!regStatus) {
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (registerSystemEnabled && !regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
       theClient.send('no-register-active')
@@ -1330,10 +1345,19 @@ async function removeDiscount(discountInfo){
 }
 
 async function getActiveRegister(){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
+
   return await firebaseGetDocument('registers', regStatusID)
 }
 
 async function registerStatus(){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   let theUserID = getUID()
   docRef = query(collection(db, "registers"), where("active", "==", true), where("uid", "==", theUserID), where('access', '==', getSystemAccess()));
   const docSnap = await getDocs(docRef);
@@ -1389,6 +1413,10 @@ async function gatherAllQBRegisters(){
 }
 
 async function startRegister(registerInfo, redirect){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   registerStatus()
   if (regStatus) {
     return
@@ -1445,6 +1473,10 @@ async function manageEndRegister(registerInfo){
   if (!userAllowed) {
     return
   }
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   firebaseUpdateDocument('registers', registerInfo[0], {
     timestampEnd: serverTimestamp(),
     ending: Number(registerInfo[1]),
@@ -1458,6 +1490,10 @@ async function manageEndRegister(registerInfo){
 }
 
 async function endRegister(registerInfo, logoutTF){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   if (!regStatus) {
     return
   }
@@ -1604,6 +1640,10 @@ async function createMoneyDrop(registerInfo, dropInfo){
 }
 
 async function startQuickBooksReportGroup(registersID, isFinal){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   await refreshTokenIfNeeded()
   notificationSystem('warning', 'Generating register report for QuickBooks... Do not shut down application.')
   let registersInfo = Array()
@@ -1926,6 +1966,10 @@ async function findOrCreateItem(itemName, callback) {
 }
 
 async function startRegisterReport(registerID, isFinal) {
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   let registerInfo
   if (registerID) {
     registerInfo = await firebaseGetDocument('registers', registerID)
@@ -4832,8 +4876,8 @@ ipcMain.on('membership-create', async (event, arg) => {
   if (alreadyExists) {
     return false
   }
-
-  if (importMembershipsMode) {
+  let registerSystemEnabled = canSystem('registerSystem')
+  if (importMembershipsMode || !registerSystemEnabled) {
     createMembership(arg)
   } else {
     goOrder()
@@ -4986,16 +5030,27 @@ ipcMain.on('account-delete-user', async (event, arg) => {
   theClient.send('account-edit-success')
 })
 
-ipcMain.on('activity-create', (event, arg) => {
+ipcMain.on('activity-create', async (event, arg) => {
   theClient = event.sender;
-  goOrder()
-  createOrder(arg, 'activity', arg)
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    createActivity(arg)
+    goHome()
+  } else {
+    goOrder()
+    createOrder(arg, 'activity', arg)    
+  }
 })
 
-ipcMain.on('activity-renew', (event, arg) => {
+ipcMain.on('activity-renew', async (event, arg) => {
   theClient = event.sender;
-  goOrder()
-  createOrder(Array(arg[2], arg[1][2], arg[1][1]), 'renew', arg)
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    renewActivity(arg)
+  } else {
+    goOrder()
+    createOrder(Array(arg[2], arg[1][2], arg[1][1]), 'renew', arg)
+  }
 })
 
 ipcMain.on('activity-close', (event, arg) => {
@@ -5331,18 +5386,32 @@ ipcMain.on('remove-discount', (event, arg) => {
   removeDiscount(arg)
 })
 
-ipcMain.on('register-status-request', (event, arg) => {
+ipcMain.on('register-status-request', async (event, arg) => {
   theClient = event.sender;
-  registerStatus()
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    goHome()
+    notificationSystem('warning', 'Register system is not enabled. Admins can enable in system settings.')
+  } else {
+    registerStatus()
+  }
 })
 
-ipcMain.on('register-all-request', (event, arg) => {
+ipcMain.on('register-all-request', async (event, arg) => {
   theClient = event.sender;
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   gatherAllRegisters()
 })
 
-ipcMain.on('register-qb-request', (event, arg) => {
+ipcMain.on('register-qb-request', async (event, arg) => {
   theClient = event.sender;
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   gatherAllQBRegisters()
 })
 
@@ -5448,10 +5517,15 @@ ipcMain.on('resume-order', (event, arg) => {
   resumeOrder()
 })
 
-ipcMain.on('member-create-order', (event, arg) => {
+ipcMain.on('member-create-order', async (event, arg) => {
   theClient = event.sender;
-  goOrder()
-  createOrder(Array(arg, false, false), 'order', false)
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    createMembership(arg)
+  } else {
+    goOrder()
+    createOrder(Array(arg, false, false), 'order', false)
+  }
 })
 
 ipcMain.on('edit-save-dir', (event, arg) => {
@@ -6014,6 +6088,22 @@ ipcMain.on('settings-mandatory-DNANotes-toggle', async (event, arg) => {
   await getSystemData()
 })
 
+ipcMain.on('settings-register-system-toggle', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+
+  const docRef = doc(db, "system", userData.access);
+  await updateDoc(docRef, {
+    registerSystem: arg
+  });
+  await getSystemData()
+  goAccount()
+})
+
 ipcMain.on('settings-update-notification-seconds', async (event, arg) => {
   theClient = event.sender;
   const docRef = doc(db, "users", getUID());
@@ -6150,8 +6240,12 @@ ipcMain.on('void-delete-order', async (event, arg) => {
   voidOrder(arg)
 }) 
 
-ipcMain.on('print-last-register-receipt', (event, arg) => {
+ipcMain.on('print-last-register-receipt', async (event, arg) => {
   theClient = event.sender
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   let lastRID = getLastRegister()
   notificationSystem('warning', 'Gathering last register receipt...')
   if (lastRID) {

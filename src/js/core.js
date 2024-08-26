@@ -15,8 +15,8 @@ let navBarPages = Array(
   Array('Register', 'register.html'),
   Array('History', 'history.html'),
   Array('Analytics', 'analytics.html'),
-  Array('Messages', 'messages.html'),
-  Array('Events', 'events.html')
+  //Array('Messages', 'messages.html'),
+  //Array('Events', 'events.html')
 )
 // TO OPTIONS DROPDOWN
 let navBarPagesOptions = Array(
