@@ -22,9 +22,6 @@
     "type": "git",
     "url": "https://github.com/matthewstriks/CERMS.git"
   },
-  "build": {
-    "icon": "./src/assets/cerms-icon.ico"
-  },
   "license": "MIT",
   "dependencies": {
     "@electron/remote": "^2.0.8",
