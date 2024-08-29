@@ -199,7 +199,6 @@ function getLastRegister(){
   return userData.lastRegister;
 }
 
-// TODO: Firebase Functions
 async function firebaseSetDocument(theCollection, theID, theData){
   const docRef = await setDoc(doc(db, theCollection, theID), theData);
   return docRef
@@ -236,13 +235,10 @@ async function firebaseGetDocument(theCollection, theID){
   }  
 }
 
-// TODO: Need to test that everything works since all members and all activity is not loaded
-
 // FOV = Array(field, op, value)
 // Search firebase 
 async function firebaseGetDocuments(theCollection, fov, includeAccess){
-  // TODO: NEED TO REPLACE
-  // Add case for OR?
+  // TODO: Add case for OR?
   let q = collection(db, theCollection);
   if (includeAccess) {
     q = query(q, where('access', '==', getSystemAccess()));
@@ -269,7 +265,6 @@ async function firebaseGetDocuments(theCollection, fov, includeAccess){
 }
 
 async function firebaseGetAllDocuments(theCollection){
-  // TODO: NEED TO REPLACE
   const querySnapshot = await getDocs(collection(db, theCollection));
   let results = Array()
   querySnapshot.forEach((doc) => {
@@ -876,7 +871,6 @@ function getTimestampString(date, time) {
   }
   return theStringTime;
 }
-// TODO: TEST THE TIME FUNCTION MAKE SURE IT WORKS EVERY TIME (ampm)
 // TODO: Replace timestamps around (NOTE: TIMESTAMP FUNCTION DOES NOT MULTIPLY OR DIVIDE TIMES)
 
 async function registerReciept(registerID, logoutTF){  
@@ -890,8 +884,9 @@ async function registerReciept(registerID, logoutTF){
 
   let registerInfo = await firebaseGetDocument('registers', registerID)
   let theDropsHTML = "<b>Drop Information</b><br><br>"
-  docRef2 = query(collection(db, "drops"), where("registerID", "==", registerID), where('access', '==', getSystemAccess()));
-  const docSnap2 = await getDocs(docRef2);
+  let docSnap2 = await firebaseGetDocuments('drops', Array(
+    Array('registerID', '==', registerID)
+  ), true)
   docSnap2.forEach(async drop => {
     let dropData = drop.data()
     let theData = dropData.timestamp.toDate()
@@ -978,7 +973,6 @@ async function registerReciept(registerID, logoutTF){
         }
         createRecieptScreen(false, logoutTF)
       });
-
       await updateDoc(docRef, {
         reciept: withChargeTotal
       });    
@@ -1305,8 +1299,9 @@ async function deleteMember(memberInfo){
   let userAllowed = canUser("permissionDeleteMembers");
   if (userAllowed) {
     firebaseDeleteDocument('members', memberInfo)
-    docRef = query(collection(db, "activity"), where("memberID", "==", memberInfo), where('access', '==', getSystemAccess()));
-    const docSnap = await getDocs(docRef);
+    let docSnap = await firebaseGetDocuments('activity', Array(
+      Array('memberID', '==', memberInfo)
+    ), true)
     docSnap.forEach(async activity => {
       firebaseUpdateDocument('activity', activity.id, {
         removed: true
@@ -1359,8 +1354,10 @@ async function registerStatus(){
     return
   }
   let theUserID = getUID()
-  docRef = query(collection(db, "registers"), where("active", "==", true), where("uid", "==", theUserID), where('access', '==', getSystemAccess()));
-  const docSnap = await getDocs(docRef);
+  let docSnap = await firebaseGetDocuments('registers', Array(
+    Array('active', '==', true),
+    Array('uid', '==', theUserID)
+  ), true)
 
   regStatus = false
   regStatusID = false
@@ -1370,12 +1367,12 @@ async function registerStatus(){
   let noAction = true
 
   docSnap.forEach((doc) => {
-    if (doc.data()) {
+    if (doc[1]) {
       regStatus = true
-      regStatusID = doc.id
-      regStatusShift = doc.data().shift
+      regStatusID = doc[0]
+      regStatusShift = doc[1].shift
       noAction = false
-      theClient.send('register-status-change', Array(true, Array(userAllowed, userAllowed2), doc.data()))
+      theClient.send('register-status-change', Array(true, Array(userAllowed, userAllowed2), doc[1]))
     }else{
       regStatus = false
       regStatusID = false
@@ -1423,9 +1420,10 @@ async function startRegister(registerInfo, redirect){
   }
 
   if (registerInfo[1] == 'B') {
-    const q = query(collection(db, "registers"), where("active", "==", true), where("shift", '!=', 'd'), where('access', '==', getSystemAccess()));
-    let stillOpen = false
-    const querySnapshot = await getDocs(q);
+    let querySnapshot = await firebaseGetDocuments('registers', Array(
+      Array('active', '==', true),
+      Array('shift', '!=', 'd')
+    ), true)
     querySnapshot.forEach((doc) => {
       stillOpen = true
     });
@@ -1641,7 +1639,8 @@ async function createMoneyDrop(registerInfo, dropInfo){
 
 async function startQuickBooksReportGroup(registersID, isFinal){
   let registerSystemEnabled = await canSystem('registerSystem')
-  if (!registerSystemEnabled) {
+  let quickbooksSystemEnabled = await canSystem('quickbooksSystem')
+  if (!registerSystemEnabled || !quickbooksSystemEnabled) {
     return
   }
   await refreshTokenIfNeeded()
@@ -3413,12 +3412,10 @@ async function editProductInventory(productInfo) {
     if (currInv <= 0) {
       isActive = false
     }
-    const docRef = doc(db, "products", productInfo);
-
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('products', productInfo, {
       inventory: currInv,
       active: isActive
-    });
+    })
     if (currInv <= docSnap.invWarning) {
       let theMsg = "Be advised... You are recieving this alert because the product '" + docSnap.name + "' is running low. Inventory is currently " + currInv;
       createMail(systemData.invWarnEMail, "Inventory Warning", theMsg, theMsg)
@@ -3436,9 +3433,8 @@ async function editDiscount(discountInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  const docRef = doc(db, "discounts", discountInfo[0]);
   let d = new Date(discountInfo[5]).getTime();
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('discounts', discountInfo[0], {
     code: discountInfo[1],
     dollar: discountInfo[2],
     percent: discountInfo[3],
@@ -3450,14 +3446,15 @@ async function editDiscount(discountInfo){
     typeOrder: discountInfo[8],
     limit: Number(discountInfo[10]),
     used: Number(discountInfo[11])
-  });
+  })
   notificationSystem('success', 'Discount Edited!')
   goProducts()
 }
 
 async function updateTLID(){
-  const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('members', Array(
+    Array('id_number', '==', systemData.lid + 1)
+  ), true)
   querySnapshot1.forEach((doc) => {
     updateLID()
     getSystemData();
@@ -3489,8 +3486,9 @@ async function createMembership(memberInfo){
 
   idExpiration = Number(theCurrentTime) + Number(theProductInfo[1].membershipLength)
 
-  const q1 = query(collection(db, "members"), where("id_number", "==", theNewID), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('members', Array(
+    Array('id_number', '==', theNewID)
+  ), true)
   querySnapshot1.forEach((doc) => {
     update = true;
     theClient.send('membership-pending-waiting-for-id')
@@ -3499,23 +3497,26 @@ async function createMembership(memberInfo){
     setTimeout(function(){createMembership(memberInfo)}, 1000);
   });
   if (!update){
-    const q2 = query(collection(db, "members"), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]), where('access', '==', getSystemAccess()));
-    const querySnapshot2 = await getDocs(q2);
+    let querySnapshot2 = await firebaseGetDocuments('members', Array(
+      Array('dob', '==', memberInfo[2]),
+      Array('idnum', '==', memberInfo[6])
+    ), true)
     querySnapshot2.forEach( async (doc) => {
       update = true;
-      updateMembership(doc.id, doc.data(), memberInfo);
-      updateOrderCustomerID(pendingOrderID, doc.id)
+      updateMembership(doc[0], doc[1], memberInfo);
+      updateOrderCustomerID(pendingOrderID, doc[0])
     });
   }
   if (!update && memberInfo[13]) {
-    const q3 = query(collection(db, "members"), where("id_number", "==", memberInfo[13]), where('access', '==', getSystemAccess()));
-    const querySnapshot3 = await getDocs(q3);
+    let querySnapshot = await firebaseGetDocuments('members', Array(
+      Array('id_number', '==', memberInfo[13])
+    ), true)
     querySnapshot3.forEach(async (doc) => {
       update = true;
       let theID = ""
-      if (doc.id) {
+      if (doc[0]) {
         theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc.id + "</a>"
-      }
+      }      
       let theMsg = "This member already exists! ID: " + theID
       notificationSystem('warning', theMsg)
     });
@@ -3620,18 +3621,20 @@ async function gatherAllUsers(){
 }
 
 async function gatherMemberHistory(memberID){
-  const q1 = query(collection(db, "activity"), where("memberID", "==", memberID), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('activity', Array(
+    Array('memberID', '==', memberID)
+  ), true)
   querySnapshot1.forEach((doc) => {
-    theClient.send('member-history-request-return', Array(doc.id, doc.data()))
+    theClient.send('member-history-request-return', Array(doc[0], doc[1]))
   });
 }
 
 async function gatherOrderHistory(memberID){
-  const q1 = query(collection(db, "orders"), where("customerID", "==", memberID), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('orders', Array(
+    Array('customerID', '==', memberID)
+  ), true)
   querySnapshot1.forEach((doc) => {
-    theClient.send('member-order-history-request-return', Array(doc.id, doc.data()))
+    theClient.send('member-order-history-request-return', Array(doc[0], doc[1]))
   });
 }
 
@@ -3751,12 +3754,13 @@ async function displayAllHistory(){
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeP24 = theCurrentTime - 604800
   let theCurrentTimeP24Date = new Date(theCurrentTimeP24 * 1000);
-  const q = query(collection(db, "activity"), where("active", "==", false), where("timeOut", ">=", theCurrentTimeP24Date), where('access', '==', getSystemAccess()));
-
-  const querySnapshot = await getDocs(q);
+  let querySnapshot = await firebaseGetDocuments('activity', Array(
+    Array('active', '==', false),
+    Array('timeOut', '>=', theCurrentTimeP24Date)
+  ), true)
   querySnapshot.forEach( async (doc) => {
-    let theMemberInfo = await getMemberInfo(doc.data().memberID);
-    theClient.send('history-request-return', Array(doc.id, doc.data(), theMemberInfo))
+    let theMemberInfo = await getMemberInfo(doc[1].memberID);
+    theClient.send('history-request-return', Array(doc[0], doc[1], theMemberInfo))
   });
 }
 
@@ -3764,14 +3768,15 @@ async function displayAllOrders(){
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeP24 = theCurrentTime - 604800
   let theCurrentTimeP24Date = new Date(theCurrentTimeP24 * 1000);
-  const q = query(collection(db, "orders"), where("timestamp", ">=", theCurrentTimeP24Date), where('access', '==', getSystemAccess()));
-  const querySnapshot = await getDocs(q)
+  let querySnapshot = await firebaseGetDocuments('orders', Array(
+    Array('timestamp', '>=', theCurrentTimeP24Date)
+  ), true)
   querySnapshot.forEach(async (doc) => {
     let theMemberInfo = false
-    if (doc.data().customerID) {
-      theMemberInfo = await getMemberInfo(doc.data().customerID);
+    if (doc[1].customerID) {
+      theMemberInfo = await getMemberInfo(doc[1].customerID);
     }
-    theClient.send('history-order-request-return', Array(doc.id, doc.data(), theMemberInfo))
+    theClient.send('history-order-request-return', Array(doc[0], doc[1], theMemberInfo))
   });
 }
 
@@ -4184,19 +4189,18 @@ async function attemptLogin(details){
 
 async function addAccess(code){
   notificationSystem('warning', 'Checking access code...')
-  updateDoc(doc(db, "users", getUID()), {
-    access: code,
-  }); 
-
+  firebaseUpdateDocument('users', getUID(), {
+    access: code
+  })
   setTimeout(async () => {
     const docRef = doc(db, "system", code);
     const docSnap = await getDoc(docRef).catch((error) => {
       console.log(error);
       if (error.code == "permission-denied") {
         notificationSystem('danger', 'Access code NOT valid!')
-        updateDoc(doc(db, "users", getUID()), {
-          access: "",
-        });        
+        firebaseUpdateDocument('users', getUID(), {
+          access: ''
+        })
       }
     })
 
@@ -4309,9 +4313,12 @@ async function startLoading(){
   await startGatherAllChats();
   loadingProgress = loadingProgress + 1
 
-  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
-  await quickBooksLogin();
-  loadingProgress = loadingProgress + 1
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (quickbooksSystemEnabled) {
+    theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
+    await quickBooksLogin();
+    loadingProgress = loadingProgress + 1    
+  }
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Finished loading!'))
 
@@ -4332,9 +4339,9 @@ async function startLoading(){
 
 function updateUserVersion(){
   if (userData.version != app.getVersion()) {
-    updateDoc(doc(db, "users", getUID()), {
-      version: app.getVersion(),
-    });
+    firebaseUpdateDocument('users', getUID(), {
+      version: app.getVersion()
+    })
     openChangelog()
   }
 }
@@ -4377,9 +4384,9 @@ async function getSystemData(){
     console.log(error);
     if (error.code == "permission-denied") {
       notificationSystem('danger', 'Access code NOT valid!')
-      updateDoc(doc(db, "users", getUID()), {
-        access: "",
-      });
+      firebaseUpdateDocument('users', getUID(), {
+        access: ''
+      })
       setTimeout(() => {
         userLogout()
       }, 2000);
@@ -4438,10 +4445,9 @@ async function updateFileDir(){
       }
       theDirsArray.push(theNewDirSingle)      
       systemData.fileSaveSystemDir = theNewDirSingle
-      const docRef = doc(db, "system", userData.access);
-      await updateDoc(docRef, {
+      firebaseUpdateDocument('system', userData.access, {
         fileSaveSystem: theDirsArray
-      });
+      })
       await getSystemData()
       goHome()      
     }
@@ -4468,27 +4474,28 @@ ipcMain.on('remove-dir', async (event, arg) => {
   });
   if (systemData.fileSaveSystemDir == arg) {
   }
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     fileSaveSystem: theDirsArray
-  });
+  })
   await getSystemData()
   goAccount()
 })
 
 async function updateLID(){
-  const docRef = doc(db, "system", userData.access);
   systemData.lid = Number(systemData.lid) + 1
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     lid: Number(systemData.lid)
-  });
+  })
 }
 
 async function updateOrderCustomerID(orderID, theCustomerID){
-  const docRef = doc(db, "orders", orderID);
-  await updateDoc(docRef, {
+  let registerSystemEnabled = canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return 
+  }
+  firebaseUpdateDocument('orders', orderID, {
     customerID: theCustomerID
-  });  
+  })
 }
 
 function userLogout(){
@@ -4684,8 +4691,9 @@ async function getAuthUrl() {
 }
 
 async function quickBooksConnect() {
-  if (!canUser('permissionEditQBConnect')) {
-    notificationSystem('warning', 'You do not have permission to do this!')
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!canUser('permissionEditQBConnect') || !quickbooksSystemEnabled) {
+    notificationSystem('warning', 'You do not have permission to do this! Or, Quickbooks is not enabled. Admins can enable in settings.')
     return
   }
   if (quickBooksCheckLogin()) {
@@ -4860,12 +4868,14 @@ ipcMain.on('account-logout', (event, arg) => {
 ipcMain.on('membership-create', async (event, arg) => {
   theClient = event.sender;
   let alreadyExists = false
-  const q2 = query(collection(db, "members"), where("dob", "==", arg[2]), where('idnum', "==", arg[6]), where('access', '==', getSystemAccess()));
-  const querySnapshot2 = await getDocs(q2);
-  querySnapshot2.forEach(async (doc) => {
-    let theID = ""
-    if (doc.id) {
-      theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc.id + "</a>"
+  let querySnapshot2 = await firebaseGetDocuments('members', Array(
+    Array('dob', '==', arg[2]),
+    Array('idnum', '==', arg[6])
+  ), true)  
+  querySnapshot2.forEach(async (doc) => {    
+    let theID = "Unknown"
+    if (doc[0]) {
+      theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc[0] + "</a>"
     }
     let theMsg = "This member already exists! ID: " + theID
     notificationSystem('warning', theMsg)
@@ -4965,8 +4975,7 @@ ipcMain.on('account-edit', async (event, arg) => {
     notificationSystem('warning', 'You do not have permisison to do this.')
     return
   }
-  const docRef = doc(db, "users", arg[0]);
-  updateDoc(docRef, {
+  firebaseUpdateDocument('users', arg[0], {
     displayName: arg[1],
     rank: arg[2],
     access: arg[3],
@@ -4989,7 +4998,7 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditAnalytics: arg[20],
     permissionEditVDTransactions: arg[21],
     permissionEditQBConnect: arg[22]
-  });
+  })
 
   if (arg[0] == getUID()) {
     getUserData()
@@ -5519,13 +5528,8 @@ ipcMain.on('resume-order', (event, arg) => {
 
 ipcMain.on('member-create-order', async (event, arg) => {
   theClient = event.sender;
-  let registerSystemEnabled = await canSystem('registerSystem')
-  if (!registerSystemEnabled) {
-    createMembership(arg)
-  } else {
-    goOrder()
-    createOrder(Array(arg, false, false), 'order', false)
-  }
+  goOrder()
+  createOrder(Array(arg, false, false), 'order', false)
 })
 
 ipcMain.on('edit-save-dir', (event, arg) => {
@@ -5540,10 +5544,9 @@ ipcMain.on('edit-reciept', async (event, arg) => {
   theClient = event.sender;
   let userAllowed = canUser("permissionEditSystemSettings");
   if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('system', userData.access, {
       reciept: arg
-    });
+    })
     await getSystemData()
     goHome()      
   }
@@ -5553,10 +5556,9 @@ ipcMain.on('edit-register-reciept', async (event, arg) => {
   theClient = event.sender;
   let userAllowed = canUser("permissionEditSystemSettings");
   if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('system', userData.access, {
       registerReciept: arg
-    });
+    })
     await getSystemData()
     goHome()      
   }
@@ -5595,10 +5597,9 @@ ipcMain.on('uploadProductFile', (event, arg) => {
 ipcMain.on('uploadProductImg-complete', async (event, arg) => {
   theClient2 = event.sender;
 
-  const docRef = doc(db, "products", arg[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('products', arg[0], {
     image: arg[1]
-  });
+  })
   uploadImgWin.close()
 })
 
@@ -5609,12 +5610,11 @@ ipcMain.on('uploadProductFile-complete', async (event, arg) => {
     return
   }
 
-  const docRef = doc(db, "members", arg[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', arg[0], {
     files: arrayUnion(arg[1]),
     filesNames: arrayUnion(arg[2]),
     filesNamesRaw: arrayUnion(arg[3])
-  });
+  })
   uploadFileWin.close()
 })
 
@@ -5636,10 +5636,9 @@ ipcMain.on('edit-product-img', (event, arg) => {
 
 ipcMain.on('edit-product-img-remove', async (event, arg) => {
   theClient = event.sender;
-  const docRef = doc(db, "products", arg);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('products', arg[0], {
     image: false
-  });
+  })
   goProducts()
 })
 
@@ -5716,7 +5715,8 @@ async function refreshTokenIfNeeded() {
 }
 
 async function quickBooksLogin(parseRedirect, theRealmID) {
-  if (!canUser('permissionEditQBConnect')) {
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!canUser('permissionEditQBConnect') || !quickbooksSystemEnabled) {
 //    notificationSystem('warning', 'You do not have permission to do this!')
     return
   }
@@ -5808,11 +5808,21 @@ async function findCustomerByBusinessName(businessName, callback) {
 }
 
 ipcMain.on('quickbooks-connect', (event, arg) => {
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', 'Quickbooks is not enabled. Admins can enable this in the settings.')
+    return
+  }
   quickBooksConnect()
 })
 
 ipcMain.on('quickbooks-import-products', (event, arg) => {
   theClient = event.sender;
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', 'Quickbooks is not enabled. Admins can enable this in the settings.')
+    return
+  }
   let isConnected = quickBooksCheckLogin()
   if (isConnected) {
     productsData.forEach(product => {
@@ -5823,6 +5833,11 @@ ipcMain.on('quickbooks-import-products', (event, arg) => {
 })
 
 ipcMain.on('quickbooks-login', (event, arg) => {
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', 'Quickbooks is not enabled. Admins can enable this in the settings.')
+    return
+  }
   quickBooksLogin(arg)
 })
 
@@ -5856,8 +5871,7 @@ ipcMain.on('change-dark-mode', (event, arg) => {
   theClient = event.sender;
   darkMode = arg
   userData.darkMode = arg
-  const docRef = doc(db, "users", user.uid);
-  updateDoc(docRef, {
+  firebaseUpdateDocument('users', user.uid, {
     darkMode: arg,
   })
 })
@@ -5871,8 +5885,7 @@ ipcMain.on('trash-note', async (event, arg) => {
 
   let memberInfo = await getMemberInfo(arg[0])
   if (Array.isArray(memberInfo.notes)) {
-    const docRef = doc(db, "members", arg[0]);
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', arg[0], {
       notes: arrayRemove(memberInfo.notes[arg[1]]),
     })
   }
@@ -5889,9 +5902,7 @@ ipcMain.on('trash-member-file', async (event, arg) => {
     notificationSystem('warning', 'You do not have permisison to remove member files.')
     return
   }
-
-  const docRef = doc(db, "members", arg[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', arg[0], {
     files: arrayRemove(arg[1]),
     filesNames: arrayRemove(arg[2]),
     filesNamesRaw: arrayRemove(arg[3]),
@@ -5912,8 +5923,7 @@ ipcMain.on('settings-update-Account', async (event, arg) => {
 
   let currName = await getDisplayName()
   if (currName != arg[0]) {
-    const docRef = doc(db, "users", getUID());
-    updateDoc(docRef, {
+    firebaseUpdateDocument('users', getUID(), {
       displayName: arg[0]
     })    
     notificationSystem('success', 'Display Name has been updated!')
@@ -5922,8 +5932,7 @@ ipcMain.on('settings-update-Account', async (event, arg) => {
   let currEMail = await getEMail()
   if (currEMail != arg[1]) {
     updateEmail(auth.currentUser, arg[1]).then(() => {
-      const docRef = doc(db, "users", getUID());
-      updateDoc(docRef, {
+      firebaseUpdateDocument('users', getUID(), {
         email: arg[1]
       })    
       notificationSystem('success', 'EMail has been updated!')
@@ -5958,8 +5967,7 @@ ipcMain.on('settings-update-business-info', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-  const docRef = doc(db, "system", getSystemAccess());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('system', getSystemAccess(), {
     businessName: arg[0],
     businessAddress: arg[1],
     businessAddress2: arg[2],
@@ -5977,8 +5985,7 @@ ipcMain.on('settings-update-business-waiver-info', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-  const docRef = doc(db, "system", getSystemAccess());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('system', getSystemAccess(), {
     theWaiver: arg,
   })
   getSystemData()
@@ -5992,8 +5999,7 @@ ipcMain.on('settings-update-esign-enable', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-  const docRef = doc(db, "system", getSystemAccess());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('system', getSystemAccess(), {
     useESigning: arg,
   })
   getSystemData()
@@ -6050,9 +6056,7 @@ ipcMain.on('settings-hide-npp-toggle', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     hideNPPSwitch: arg
   });
   await getSystemData()
@@ -6065,9 +6069,7 @@ ipcMain.on('settings-include-expire-time-renew-toggle', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     includeExpireTimeRenew: arg
   });
   await getSystemData()
@@ -6080,9 +6082,7 @@ ipcMain.on('settings-mandatory-DNANotes-toggle', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     mandatoryDNANotes: arg
   });
   await getSystemData()
@@ -6095,9 +6095,7 @@ ipcMain.on('settings-register-system-toggle', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     registerSystem: arg
   });
   await getSystemData()
@@ -6106,8 +6104,7 @@ ipcMain.on('settings-register-system-toggle', async (event, arg) => {
 
 ipcMain.on('settings-update-notification-seconds', async (event, arg) => {
   theClient = event.sender;
-  const docRef = doc(db, "users", getUID());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('users', getUID(), {
     notificationSecs: Number(arg)
   })    
   getUserData()
@@ -6120,9 +6117,7 @@ ipcMain.on('settings-update-invwarnemail', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     invWarnEMail: arg
   });
   await getSystemData()
@@ -6135,9 +6130,7 @@ ipcMain.on('settings-update-checkoutmsg', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     checkoutMsg: arg
   });
   await getSystemData()
@@ -6150,9 +6143,7 @@ ipcMain.on('settings-update-shifttimes', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     shiftTimeA: arg[0],
     shiftTimeB: arg[1],
     shiftTimeC: arg[2]
@@ -6194,8 +6185,7 @@ ipcMain.on('uploadSignature', async (event, arg) => {
 ipcMain.on('uploadSignatureComplete', async (event, arg) => {
   theClient2 = event.sender;
   let theURL = arg;
-  const docRef = doc(db, "members", lastMemberCreated);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', lastMemberCreated, {
     signature: theURL,
     waiver_status: true
   });
@@ -6229,7 +6219,7 @@ ipcMain.on('esign-delete', async (event, arg) => {
     console.log(error);
   });  
   const docRef = doc(db, "members", arg);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', arg, {
     signature: "",
     waiver_status: false
   });
@@ -6271,6 +6261,7 @@ ipcMain.on('request-chats', async (event, arg) => {
 })
 
 async function sendChat(chatID, theMessage){
+  // TODO: Add deep doc function
   const docRef = await addDoc(collection(db, "chats", chatID, "messages"), {
     timestamp: serverTimestamp(),
     sender: getUID(),
@@ -6282,10 +6273,20 @@ async function sendChat(chatID, theMessage){
 
 ipcMain.on('create-invoice-reg', (event, arg) => {
   theClient = event.sender
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', "Quickbooks is not enabled. Admins can enable this in the settings.")
+    return
+  }
   startQuickBooksReportGroup(Array(arg), false)
 })
 
 ipcMain.on('create-invoice-regs', (event, arg) => {
   theClient = event.sender
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', "Quickbooks is not enabled. Admins can enable this in the settings.")
+    return
+  }
   startQuickBooksReportGroup(arg, false)
 })
