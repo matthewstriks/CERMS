@@ -17,14 +17,6 @@ const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
 const QuickBooks = require('node-quickbooks');
 const { compareAsc, format } = require("date-fns");
-const isPackaged = process.env.NODE_ENV === 'production';
-
-if (!isPackaged) {
-  let { devConfig } = require('./assets/dev.js');
-  setTimeout(() => {
-    attemptLogin(Array(devConfig.email, devConfig.password))
-  }, 1000);
-}
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
   .then((url) => {
