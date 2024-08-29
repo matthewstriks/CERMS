@@ -15,12 +15,15 @@
   },
   "keywords": [],
   "author": {
-    "name": "Matthew Striks",
+    "name": "RocMTSSolutions LLC.",
     "email": "developer@clubentertainmentrms.com"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/matthewstriks/CERMS.git"
+  },
+  "build": {
+    "icon": "./src/assets/cerms-icon.ico"
   },
   "license": "MIT",
   "dependencies": {
