@@ -4,7 +4,9 @@ let ordersBtn = document.getElementById('ordersBtn');
 let activityDiv = document.getElementById('activityDiv');
 let ordersDiv = document.getElementById('ordersDiv');
 let membershipSearch = document.getElementById('membershipSearch');
+let membershipSearchType = document.getElementById('membershipSearchType');
 let orderSearch = document.getElementById('orderSearch');
+let orderSearchType = document.getElementById('orderSearchType');
 let membershipTable = document.getElementById('membershipTable');
 let membershipOrderTable = document.getElementById('membershipOrderTable');
 let vdOrderConfirm = document.getElementById('vdOrderConfirm');
@@ -12,11 +14,6 @@ let vdOrderConfirm = document.getElementById('vdOrderConfirm');
 let theEditingOrderID;
 
 let enterPressed = false;
-
-const formatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-});
 
 if (document.getElementById('testTable')) {
   document.getElementById('testTable').style.display = 'none'
@@ -57,7 +54,7 @@ if(membershipSearch){
       var filter, tr, td, i, txtValue;
       filter = membershipSearch.value.toUpperCase();
       tr = membershipTable.getElementsByTagName("tr");
-      ipcRenderer.send('history-search', membershipSearch.value)
+      ipcRenderer.send('history-search', Array(membershipSearch.value, membershipSearchType.value))
       let theRows = 1;
       var table = document.getElementById("membershipTable");
       var rowCount = table.rows.length;
@@ -86,7 +83,7 @@ if (orderSearch){
       var filter, tr, td, i, txtValue;
       filter = orderSearch.value.toUpperCase();
       tr = membershipOrderTable.getElementsByTagName("tr");
-      ipcRenderer.send('order-search', orderSearch.value)
+      ipcRenderer.send('order-search', Array(orderSearch.value, orderSearchType.value))
       let theRows = 1;
       var table = document.getElementById("membershipOrderTable");
       var rowCount = table.rows.length;

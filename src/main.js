@@ -13,12 +13,18 @@ const { log } = require('console');
 const delay = require('delay');
 const { address } = require('address');
 const os = require('os');
-const { getSystemMemoryInfo } = require('process');
 const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
+const QuickBooks = require('node-quickbooks');
 const { compareAsc, format } = require("date-fns");
-//const QuickBooks = require('node-quickbooks')
+const isPackaged = process.env.NODE_ENV === 'production';
 
+if (!isPackaged) {
+  let { devConfig } = require('./assets/dev.js');
+  setTimeout(() => {
+    attemptLogin(Array(devConfig.email, devConfig.password))
+  }, 1000);
+}
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
   .then((url) => {
@@ -54,10 +60,13 @@ const discounts = Array();
 const discountsData = Array();
 const orders = Array();
 const ordersData = Array();
+const theChats = Array();
+const chatsData = Array();
 const users = Array();
 const usersData = Array();
 
 let mainWin;
+let quickbooksWin;
 let uploadImgWin;
 let uploadFileWin;
 let swfWin;
@@ -78,8 +87,10 @@ let startGatherAllProductsA = false
 let startGatherAllDiscountsA = false
 let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
+let startGatherAllChatsA = false
 let darkMode = false
 let quickbooksIsConnected = false
+let qbo
 
 let pendingOrders = Array()
 let pendingOrderID;
@@ -122,7 +133,12 @@ function goOrder(){
   mainWin.maximize()
 }
 
-function goRegister(){
+async function goRegister(){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    goHome()
+    return
+  }
   mainWin.loadFile(path.join(__dirname, 'register.html'));
   mainWin.maximize()
 }
@@ -150,20 +166,13 @@ function getSystemAccess(){
 }
 
 async function getEMailByID(theUserID){
-  const docRef = doc(db, "users", theUserID);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('users', theUserID);
 
-  if (docSnap.exists()) {
-    return docSnap.data().email;
+  if (docSnap) {
+    return docSnap.email;
   } else {
     return false;
   }
-
-  return userData.email;
-}
-
-function isQuickbooksConnected(){
-  return oauthClient.isAccessTokenValid()
 }
 
 function getDisplayName(){
@@ -178,12 +187,90 @@ function canUser(theFunction){
   return userData[theFunction];
 }
 
+function canSystem(theFunction){
+  return systemData[theFunction];
+}
+
 function getUID(){
   return user.uid;
 }
 
 function getLastRegister(){
   return userData.lastRegister;
+}
+
+async function firebaseSetDocument(theCollection, theID, theData){
+  const docRef = await setDoc(doc(db, theCollection, theID), theData);
+  return docRef
+}
+
+async function firebaseAddDocument(theCollection, theData){
+  const docRef = await addDoc(collection(db, theCollection), theData);
+  return docRef
+}
+
+async function firebaseUpdateDocument(theCollection, theID, theData) {
+  try {
+    const docRef = doc(db, theCollection, theID);
+    await updateDoc(docRef, theData);
+    return true;
+  } catch (error) {
+    console.error("Error updating document " + theCollection + " " + theID + ":", error);
+    throw error;
+  }
+}
+
+async function firebaseDeleteDocument(theCollection, theID){
+  await deleteDoc(doc(db, theCollection, theID));
+  return true
+}
+
+async function firebaseGetDocument(theCollection, theID){  
+  const docRef = doc(db, theCollection, theID);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return docSnap.data()
+  } else {
+    return false
+  }  
+}
+
+// FOV = Array(field, op, value)
+// Search firebase 
+async function firebaseGetDocuments(theCollection, fov, includeAccess){
+  // TODO: Add case for OR?
+  let q = collection(db, theCollection);
+  if (includeAccess) {
+    q = query(q, where('access', '==', getSystemAccess()));
+  }
+  fov.forEach(condition => {
+    if (Array.isArray(condition) && condition.length === 3) {
+      let field = condition[0]
+      let operator = condition[1]
+      let value = condition[2]
+      q = query(q, where(field, operator, value));
+    } else {
+      console.log('Incorrect formatting for FOV (firebaseGetDocuments)');
+      return false
+    }
+  });
+
+  const querySnapshot = await getDocs(q);
+
+  const results = Array();
+  querySnapshot.forEach((doc) => {
+    results.push(Array(doc.id, doc.data()));
+  });
+  return results
+}
+
+async function firebaseGetAllDocuments(theCollection){
+  const querySnapshot = await getDocs(collection(db, theCollection));
+  let results = Array()
+  querySnapshot.forEach((doc) => {
+    results.push(Array(doc.id, doc.data()))
+  });
+  return results
 }
 
 function notificationSystem(notificationType, notificationMsg){
@@ -233,56 +320,58 @@ function removeNotification(theNotificationID){
 
 async function addLog(type, message){
   if (debugMode) {
-    console.log('Logging: ' + type + '(' + message + ')');
-    const docRef = await addDoc(collection(db, "logs"), {
-      access: getSystemAccess(),
-      type: type,
-      message: message,
-      timestamp: serverTimestamp(),
-      user: getUID()
-    });
+    console.log('Trying to log (' + type + ') ' + message);
+    const filePath = path.join(app.getPath('userData'), '.', 'devLog.txt');
+    let theDateTime = getTimestampString(new Date(), true)
+    const logMessage = `${theDateTime} ${type}: ${message}\n`;
 
+    fs.appendFile(filePath, logMessage, (err) => {
+      if (err) {
+        console.error(`Failed to write to log file: ${err.message}`);
+      }
+    });
   }
+}
+
+async function gapLogFile(){
+  const filePath = path.join(app.getPath('userData'), '.', 'devLog.txt');
+  const logMessage = `\n`;
+
+  fs.appendFile(filePath, logMessage, (err) => {
+    if (err) {
+      console.error(`Failed to write to log file: ${err.message}`);
+    }
+  });
+}
+
+async function destroyLogFile(){
+  const filePath = path.join(app.getPath('userData'), '.', 'devLog.txt');
+  fs.writeFile(filePath, "", (err) => {
+    if (err) {
+      console.error(`Failed to write to log file: ${err.message}`);
+    }
+  })
 }
 
 async function getMemberInfo(memberID){
   if ((memberID == -1) || (memberID == 0) || (Array.isArray(memberID))) {
     return false
   }
-
-  const docRef = doc(db, "members", memberID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data();
-  } else {
-    return false;
-  }
+  let response = await firebaseGetDocument('members', memberID)
+  return response
 }
 
 async function getMemberEMail(memberID){
   if (!memberID || memberID <= 0) {
     return false
   }
-  const docRef = doc(db, "members", memberID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data().email;
-  } else {
-    return false;
-  }
+  let response = await firebaseGetDocument('members', memberID)
+  return response
 }
 
 async function getMemberFromActivity(activityID){
-  const docRef = doc(db, "activity", activityID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data().memberID;
-  } else {
-    return false;
-  }
+  let response = await firebaseGetDocument('activity', activityID)  
+  return response.memberID
 }
 
 async function resetUserPassword(theEmailPass, theUserID){
@@ -309,24 +398,16 @@ async function resetUserPassword(theEmailPass, theUserID){
 }
 
 async function updateMembershipEMail(memberID, newEMail){
-  const docRef = doc(db, "members", memberID);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberID, {
     email: newEMail
-  });
+  })
 }
 
 async function updateMembership(memberID, theOldDoc, memberInfo){
   addLog('membership', 'Updating Membership ' + memberID)
   let idExpiration = "";
   let theCurrentTime = Math.floor(Date.now() / 1000);
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   let theProductInfo
@@ -338,13 +419,12 @@ async function updateMembership(memberID, theOldDoc, memberInfo){
 
   idExpiration = theCurrentTime + theProductInfo[1].membershipLength
 
-  const docRef = doc(db, "members", memberID);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberID, {
     notes: arrayUnion(stringStarter + memberInfo[4]),
     dna: false,
     id_expiration: idExpiration,
     membership_type: memberInfo[3]
-  });
+  })
   theClient.send('membership-success', memberID)
 }
 
@@ -355,25 +435,17 @@ async function memberDNA(memberInfo){
   }
 
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Added to the DNA List. '
   let theNotes = memberInfo[1]
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     dna: true,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member added to the DNA list')
 }
 
@@ -383,25 +455,17 @@ async function memberUNDNA(memberInfo){
     return
   }
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Removed from the DNA List. '
   let theNotes = memberInfo[1]
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     dna: false,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member removed from the DNA list')
 }
 
@@ -412,25 +476,17 @@ async function memberTag(memberInfo){
   }
 
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Added to the Tag List. '
   let theNotes = memberInfo[1]
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     tag: true,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member added to the Tag list')
 }
 
@@ -440,25 +496,17 @@ async function memberUNTag(memberInfo){
     return
   }
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
   let stringEnd = 'Removed from the Tag List. '
   let theNotes = memberInfo[1]
   if (theNotes) {
     stringEnd = stringEnd + '(' + theNotes + ')'
   }
-  const docRef = doc(db, "members", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', memberInfo[0], {
     tag: false,
     notes: arrayUnion(stringStarter + stringEnd),
-  });
+  })
   notificationSystem('success', 'Member removed from the Tag list')
 }
 
@@ -498,8 +546,7 @@ async function renewActivity(memberInfo){
     theTimeExpire = timestampInSeconds + theTimeToAdd;    
   }
 
-  const docRef = doc(db, "activity", memberInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('activity', memberInfo[0], {
     lockerRoomStatus: Array(
       memberInfo[1][0],
       memberInfo[1][1],
@@ -508,12 +555,12 @@ async function renewActivity(memberInfo){
       theCurrentTime,
       theTimeExpire
     )
-  });
+  })
   notificationSystem('success', 'Time renewed!')
 }
 
 async function createMail(toWho, theSubject, theText, theHTML, attachmentFile){
-  const docRef = await addDoc(collection(db, "mail"), {
+  firebaseAddDocument('mail', {
     access: getSystemAccess(),
     to: toWho,
     message: {
@@ -521,7 +568,7 @@ async function createMail(toWho, theSubject, theText, theHTML, attachmentFile){
       text: theText,
       html: theHTML,
     }
-  });
+  })
 }
 
 async function createCategory(catName, catDesc, catColor){
@@ -531,12 +578,12 @@ async function createCategory(catName, catDesc, catColor){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  const docRef = await addDoc(collection(db, 'categories'), {
+  firebaseAddDocument('categories', {
     access: getSystemAccess(),
     name: catName,
     desc: catDesc,
     color: catColor
-  });
+  })
   notificationSystem('success', 'Category created!')
   goProducts()
 }
@@ -594,7 +641,7 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     proAskForPrice = false
   }
 
-  const docRef = await addDoc(collection(db, 'products'), {
+  firebaseAddDocument('products', {
     access: getSystemAccess(),
     cat: proCat,
     name: proName,
@@ -621,7 +668,7 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
     restrictedUsers: proRestrictedUsers,
     payout: proPayout,
     askforprice: proAskForPrice
-  });
+  })
   notificationSystem('success', 'Product Added!')
   goProducts()
 
@@ -646,7 +693,7 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
     theDiscLimit = false
   }
 
-  const docRef = await addDoc(collection(db, 'discounts'), {
+  firebaseAddDocument('discounts', {
     access: getSystemAccess(),
     code: discCode,
     dollar: discDollar,
@@ -659,7 +706,7 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
     typeOrder: discTypeO,
     limit: theDiscLimit,
     used: discUsed
-  });
+  })
   notificationSystem('success', 'Discount Added!')
   goProducts()
 }
@@ -669,13 +716,14 @@ async function voidOrder(orderNumber){
     notificationSystem('warning', 'You do not have permission to do this!')
     return
   }
-  await deleteDoc(doc(db, "orders", orderNumber));
+  firebaseDeleteDocument('orders', orderNumber)
   notificationSystem('success', 'Order #' + orderNumber + ' has been deleted.')
   theClient.send('history-request-remove', orderNumber)
 }
 
 async function createOrder(memberInfo, orderType, thePendingOrder){
-  if (!regStatus) {
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (registerSystemEnabled && !regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
       theClient.send('no-register-active')
@@ -776,12 +824,9 @@ async function resumeOrder(){
 async function viewOrderReciept(theOrderNumber){
   let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
   let theReciept = ""
-
-  const docRef = doc(db, "orders", theOrderNumber);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    theReciept = docSnap.data().reciept
+  let docSnap = await firebaseGetDocument('orders', theOrderNumber)
+  if (docSnap) {
+    theReciept = docSnap.reciept
     fs.writeFile(p2, theReciept, err => {
       if (err) {
         console.error(err);
@@ -789,62 +834,63 @@ async function viewOrderReciept(theOrderNumber){
       createRecieptScreen(true)
     });
   } else {
-    return false;
+    return false
   }
 }
 
-//TODO: Create getTimestampString(date(date), time(bool)) function to clean some of the dates/timestamps up
+function getTimestampString(date, time) {
+  if (!date) {
+    date = Date.now()
+  }
+  let theTimestamp = new Date(Math.floor(date));
+  let theMonth = theTimestamp.getMonth() + 1;
+  let theDate = theTimestamp.getDate();
+  let theFullYear = theTimestamp.getFullYear();
+  let theHours = theTimestamp.getHours();
+  let theMins = theTimestamp.getMinutes();
+  let theSecs = theTimestamp.getSeconds();
+  let ampm = 'AM';
 
-async function registerReciept(registerID, logoutTF){
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  if (theHours === 0) {
+    theHours = 12;
+  } else if (theHours > 12) {
+    theHours -= 12;
+    ampm = 'PM';
+  } else if (theHours === 12) {
+    ampm = 'PM';
+  }
+
+  // Add leading zeros to minutes and seconds if needed
+  theMins = theMins < 10 ? '0' + theMins : theMins;
+  theSecs = theSecs < 10 ? '0' + theSecs : theSecs;
+
+  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear;
+
+  if (time) {
+    theStringTime = theStringTime + ' ' + theHours + ':' + theMins + ':' + theSecs + ' ' + ampm;
+  }
+  return theStringTime;
+}
+// TODO: Replace timestamps around (NOTE: TIMESTAMP FUNCTION DOES NOT MULTIPLY OR DIVIDE TIMES)
+
+async function registerReciept(registerID, logoutTF){  
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
+  let theStringTime = getTimestampString(false, true)
   let theDisplayName = await getDisplayName()
   let p2 = path.join(app.getPath('userData'), '.', 'last-reciept.html');
 
-  const docRef = doc(db, "registers", registerID);
-  const docSnap = await getDoc(docRef);
-  let registerInfo = docSnap.data()
-
-
+  let registerInfo = await firebaseGetDocument('registers', registerID)
   let theDropsHTML = "<b>Drop Information</b><br><br>"
-  docRef2 = query(collection(db, "drops"), where("registerID", "==", registerID), where('access', '==', getSystemAccess()));
-  const docSnap2 = await getDocs(docRef2);
+  let docSnap2 = await firebaseGetDocuments('drops', Array(
+    Array('registerID', '==', registerID)
+  ), true)
   docSnap2.forEach(async drop => {
     let dropData = drop.data()
     let theData = dropData.timestamp.toDate()
-    let day = theData.getDate();
-    let month = theData.getMonth() + 1;
-    let year = theData.getFullYear();
-    let hour = theData.getHours();
-    let min = theData.getMinutes();
-    let sec = theData.getSeconds();
-    let ampm = hour >= 12 ? 'PM' : 'AM';
-
-    if (day < 10) {
-      day = '0' + day
-    }
-    if (month < 10) {
-      month = '0' + month
-    }
-    if (min < 10) {
-      min = '0' + min
-    }
-    if (sec < 10) {
-      sec = '0' + sec
-    }
-    if (hour > 12) {
-      hour = hour - 12
-    }
-
-    let currentDate = `${month}/${day}/${year}`;
-    let currentTime = `${hour}:${min}:${sec} ${ampm}`;
-    let theTimeStamp = currentDate + ' ' + currentTime
+    let theTimeStamp = getTimestampString(theData, true)
     theDropsHTML = theDropsHTML + "<b>Drop Timestamp:</b> " + theTimeStamp + "<br><b>Drop Amount:</b> $" + dropData.dropAmt + "<br><b>Payout Slip #/Amount:</b> " + dropData.dropPSN + "<b>/</b>$" + dropData.dropPSA + "<br><b>Credit Cards #/Amount:</b> " + dropData.dropCCardAmtRan + "<b>/</b>$" + dropData.dropCCardAmt + "<br><br>" 
   });
 
@@ -927,7 +973,6 @@ async function registerReciept(registerID, logoutTF){
         }
         createRecieptScreen(false, logoutTF)
       });
-
       await updateDoc(docRef, {
         reciept: withChargeTotal
       });    
@@ -935,16 +980,9 @@ async function registerReciept(registerID, logoutTF){
   }, 1000);
 }
 
-async function recieptProcess(orderInfo, theOrderNumber){
+async function recieptProcess(orderInfo, theOrderNumber){  
   let recieptStyle = orderInfo[6]
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let theDisplayName = await getDisplayName()
   let theEMail = orderInfo[7]
   let theCustomersEMail = await getMemberEMail(orderInfo[0])    
@@ -1038,10 +1076,9 @@ async function recieptProcess(orderInfo, theOrderNumber){
               withDiscountsTxt = ""
             }
             withDiscounts = withProducts.replace('TheDiscountsApplied', withDiscountsTxt)
-            const orderRef = doc(db, "orders", theOrderNumber);
-            await updateDoc(orderRef, {
+            firebaseUpdateDocument('orders', theOrderNumber, {
               reciept: withDiscounts
-            });
+            })
             fs.writeFile(p2, withDiscounts, err => {
               if (err) {
                 console.error(err);
@@ -1064,25 +1101,23 @@ async function recieptProcess(orderInfo, theOrderNumber){
 }
 
 async function completeOrder(orderInfo){
-  if (!regStatus) {
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (registerSystemEnabled && !regStatus) {
     setTimeout(() => {
       notificationSystem('warning', 'There is no register currently active. You must activate a register to create an order.')
       theClient.send('no-register-active')
     }, 1000);
     return
   }
-  let theTimestamp = new Date(Math.floor(Date.now() / 1000))
   let theCustomerID = orderInfo[0]
   if (!theCustomerID) {
     theCustomerID = 0
   }
 
   if (orderInfo[2] && (orderInfo[2][0] != 0) && (orderInfo[2][0] != 'return')) {
-    const discountRef = doc(db, "discounts", orderInfo[2][0]);
-
-    await updateDoc(discountRef, {
+    firebaseUpdateDocument('discounts', orderInfo[2][0], {
       used: increment(1)
-    });
+    })
   }
   let registerInfo = await getActiveRegister()
   let discountsInformation = orderInfo[2]
@@ -1090,12 +1125,11 @@ async function completeOrder(orderInfo){
   if (orderInfo[2][0] == 'return') {
     isReturn = true
     discountsInformation = 'return'
-    let registerRef = doc(db, "registers", regStatusID)
     let theReturns = registerInfo.returns || Array()
     orderInfo[1].forEach(products => {
       theReturns.push(products)       
     });
-    await updateDoc(registerRef, {
+    firebaseUpdateDocument('registers', regStatusID, {
       returns: theReturns
     })
   }
@@ -1115,7 +1149,7 @@ async function completeOrder(orderInfo){
 
   // paymentMethod: credit card, gift card, cash
   // total: Sub, Tax, Tot, OGTot
-  const docRef = await addDoc(collection(db, "orders"), {
+  let theNewOrder = await firebaseAddDocument("orders", {
     access: getSystemAccess(),
     customerID: theCustomerID,
     products: orderInfo[1],
@@ -1126,7 +1160,7 @@ async function completeOrder(orderInfo){
     timestamp: serverTimestamp(),
     shift: theShift,
     return: isReturn
-  });
+  })
 
   updateRegisterSub(registerInfo, orderInfo[4], orderInfo[3], false)
 
@@ -1155,7 +1189,7 @@ async function completeOrder(orderInfo){
     await delay(1000)
   }
 
-  recieptProcess(orderInfo, docRef.id)
+  recieptProcess(orderInfo, theNewOrder.id)
 }
 
 async function createActivity(memberInfo){
@@ -1183,7 +1217,7 @@ async function createActivity(memberInfo){
       if (theMemberID == 0) {
         theMemberID = lastMemberCreated
       }
-      const docRef = await addDoc(collection(db, "activity"), {
+      firebaseAddDocument('activity', {
         access: getSystemAccess(),
         active: true,
         goingInactive: false,
@@ -1201,14 +1235,13 @@ async function createActivity(memberInfo){
         notes: useTheLockerRoomInput2,
         timeIn: serverTimestamp(),
         timeOut: null
-      });
+      })
       notificationSystem('success', 'Customer checked in!')
 
       if (memberInfo[5]) {
-        const memberRef = doc(db, "members", theMemberID);
-        await updateDoc(memberRef, {
+        firebaseUpdateDocument('members', theMemberID, {
           waiver_status: true
-        });
+        })
       }
     }
   });
@@ -1216,7 +1249,7 @@ async function createActivity(memberInfo){
 
 async function editActivity(activityInfo){
   const activityRef = doc(db, "activity", activityInfo[0]);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', activityInfo[0], {
     'lockerRoomStatus.0': activityInfo[4][0],
     'lockerRoomStatus.1': activityInfo[2],
     'lockerRoomStatus.2': activityInfo[1],
@@ -1224,58 +1257,53 @@ async function editActivity(activityInfo){
     'lockerRoomStatus.4': activityInfo[4][4],
     'lockerRoomStatus.5': activityInfo[4][5],
     notes: activityInfo[3]
-  });
+  })
   goHome()
 }
 
 
 async function changeInOut(activityInfo){
-  const activityRef = doc(db, "activity", activityInfo[0]);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', activityInfo[0], {
     currIn: activityInfo[1]
-  });
+  })
 }
 
 async function changeWaitlist(activityInfo){
-  const activityRef = doc(db, "activity", activityInfo[0]);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', activityInfo[0], {
     waitlist: activityInfo[1]
-  });
+  })
 }
 
 async function closeActivity(memberInfo) {
-  const activityRef = doc(db, "activity", memberInfo);
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', memberInfo, {
     timeOut: serverTimestamp(),
     goingInactive: true
-  });
+  })
   setTimeout(async () => {
-    const activityRef = doc(db, "activity", memberInfo);
-    await updateDoc(activityRef, {
+    firebaseUpdateDocument('activity', memberInfo, {
       active: false
-    });
+    })
   }, 1000);
 }
 
 async function addLockerRoom(lockerRoomInfo){
-  const activityRef = doc(db, "activity", lockerRoomInfo[0]);
   let userAdding = getUID();
   let theTimestamp = Math. round((new Date()). getTime() / 1000);
   let theTimestamp2 = Math. round((new Date()). getTime() / 1000); + 10000
-  await updateDoc(activityRef, {
+  firebaseUpdateDocument('activity', lockerRoomInfo[0], {
     lockerRoomStatus: Array(true, lockerRoomInfo[2], lockerRoomInfo[1], userAdding, theTimestamp, theTimestamp2)
-  });
+  })
 }
 
 async function deleteMember(memberInfo){
   let userAllowed = canUser("permissionDeleteMembers");
   if (userAllowed) {
-    await deleteDoc(doc(db, "members", memberInfo));
-    docRef = query(collection(db, "activity"), where("memberID", "==", memberInfo), where('access', '==', getSystemAccess()));
-    const docSnap = await getDocs(docRef);
+    firebaseDeleteDocument('members', memberInfo)
+    let docSnap = await firebaseGetDocuments('activity', Array(
+      Array('memberID', '==', memberInfo)
+    ), true)
     docSnap.forEach(async activity => {
-      const activityRef = doc(db, 'activity', activity.id)
-      await updateDoc(activityRef, {
+      firebaseUpdateDocument('activity', activity.id, {
         removed: true
       })
     });
@@ -1290,7 +1318,7 @@ async function removeCategory(categoryInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  await deleteDoc(doc(db, "categories", categoryInfo));
+  firebaseDeleteDocument('categories', categoryInfo)
 }
 
 async function removeProduct(productInfo){
@@ -1299,7 +1327,7 @@ async function removeProduct(productInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  await deleteDoc(doc(db, "products", productInfo));
+  firebaseDeleteDocument('products', productInfo)
 }
 
 async function removeDiscount(discountInfo){
@@ -1308,71 +1336,94 @@ async function removeDiscount(discountInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  await deleteDoc(doc(db, "discounts", discountInfo));
+  firebaseDeleteDocument('discounts', discountInfo)
 }
 
 async function getActiveRegister(){
-  const docRef = doc(db, "registers", regStatusID);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    return docSnap.data();
-  } else {
-    return false;
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
   }
+
+  return await firebaseGetDocument('registers', regStatusID)
 }
 
 async function registerStatus(){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   let theUserID = getUID()
-  docRef = query(collection(db, "registers"), where("active", "==", true), where("uid", "==", theUserID), where('access', '==', getSystemAccess()));
-  const docSnap = await getDocs(docRef);
+  let docSnap = await firebaseGetDocuments('registers', Array(
+    Array('active', '==', true),
+    Array('uid', '==', theUserID)
+  ), true)
 
   regStatus = false
   regStatusID = false
   regStatusShift = false
   let userAllowed = canUser('permissionEditRegisters')
+  let userAllowed2 = canUser('permissionEditQBConnect') 
   let noAction = true
 
   docSnap.forEach((doc) => {
-    if (doc.data()) {
+    if (doc[1]) {
       regStatus = true
-      regStatusID = doc.id
-      regStatusShift = doc.data().shift
+      regStatusID = doc[0]
+      regStatusShift = doc[1].shift
       noAction = false
-      theClient.send('register-status-change', Array(true, userAllowed, doc.data()))
+      theClient.send('register-status-change', Array(true, Array(userAllowed, userAllowed2), doc[1]))
     }else{
       regStatus = false
       regStatusID = false
       regStatusShift = false
       noAction = false
-      theClient.send('register-status-change', Array(false, userAllowed, false))
+      theClient.send('register-status-change', Array(false, Array(userAllowed, userAllowed2), false))
     }
   })
   if (noAction) {
-    theClient.send('register-status-change', Array(false, userAllowed, false))    
+    theClient.send('register-status-change', Array(false, Array(userAllowed, userAllowed2), false))    
   }
 
   theClient.send('register-shift-times-return', Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC))
 }
 
 async function gatherAllRegisters(){
-  const q = query(collection(db, "registers"), where("active", "==", true), where('uid', '!=', getUID()), where('access', '==', getSystemAccess()));
-  const querySnapshot = await getDocs(q);
-  querySnapshot.forEach(async (doc) => {
-    theClient.send('register-all-request-return', Array(doc.id, doc.data(), Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC)))    
+  let theRegs = await firebaseGetDocuments('registers', Array(
+    Array('active', '==', true),
+    Array('uid', '!=', getUID())
+  ), true)
+
+  theRegs.forEach(register => {
+    theClient.send('register-all-request-return', Array(register[0], register[1], Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC)))        
+  });
+}
+
+async function gatherAllQBRegisters(){
+  let theRegs = await firebaseGetDocuments('registers', Array(
+    Array('active', '==', false),
+    Array('qbinvoice', '==', false)
+  ), true)  
+  theRegs.forEach(register => {
+    theClient.send('register-qb-request-return', Array(register[0], register[1], Array(systemData.shiftTimeA, systemData.shiftTimeB, systemData.shiftTimeC)))
   });
 }
 
 async function startRegister(registerInfo, redirect){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   registerStatus()
   if (regStatus) {
     return
   }
 
   if (registerInfo[1] == 'B') {
-    const q = query(collection(db, "registers"), where("active", "==", true), where("shift", '!=', 'd'), where('access', '==', getSystemAccess()));
-    let stillOpen = false
-    const querySnapshot = await getDocs(q);
+    let querySnapshot = await firebaseGetDocuments('registers', Array(
+      Array('active', '==', true),
+      Array('shift', '!=', 'd')
+    ), true)
     querySnapshot.forEach((doc) => {
       stillOpen = true
     });
@@ -1388,7 +1439,7 @@ async function startRegister(registerInfo, redirect){
 
   theClient.send('register-started')
 
-  const docRef = await addDoc(collection(db, "registers"), {
+  firebaseAddDocument('registers', {
     access: getSystemAccess(),
     active: true,
     timestampStart: serverTimestamp(),
@@ -1407,7 +1458,8 @@ async function startRegister(registerInfo, redirect){
     PSN: 0,
     PSA: 0,
     CCardAmtRan: 0,
-  });
+    qbinvoice: false
+  })
 
   if (redirect) {
     goRegister()    
@@ -1419,12 +1471,15 @@ async function manageEndRegister(registerInfo){
   if (!userAllowed) {
     return
   }
-  const registerRef = doc(db, "registers", registerInfo[0]);
-  await updateDoc(registerRef, {
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
+  firebaseUpdateDocument('registers', registerInfo[0], {
     timestampEnd: serverTimestamp(),
     ending: Number(registerInfo[1]),
     active: false
-  });
+  })
 
   goRegister()
   registerReciept(registerInfo[0], false)
@@ -1433,11 +1488,16 @@ async function manageEndRegister(registerInfo){
 }
 
 async function endRegister(registerInfo, logoutTF){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   if (!regStatus) {
     return
   }
-  const registerRef = doc(db, "registers", regStatusID);
-  await updateDoc(registerRef, {
+  let theAccess = getSystemAccess()
+  firebaseUpdateDocument('registers', regStatusID, {
+    access: theAccess,
     timestampEnd: serverTimestamp(),
     ending: Number(registerInfo[0]),
     input100: registerInfo[1],
@@ -1453,16 +1513,40 @@ async function endRegister(registerInfo, logoutTF){
     PSN: registerInfo[12],
     PSA: registerInfo[13],
     active: false
-  });
+  })
 
-  const userRef = doc(db, "users", getUID());
-  await updateDoc(userRef, {
+
+  /*
+  firebaseUpdateDocument('register', regStatusID, {
+    access: theAccess,
+    timestampEnd: serverTimestamp(),
+    ending: Number(registerInfo[0]),
+    input100: registerInfo[1],
+    input50: registerInfo[2],
+    input20: registerInfo[3],
+    input10: registerInfo[4],
+    input5: registerInfo[5],
+    input1: registerInfo[6],
+    input25c: registerInfo[7],
+    input10c: registerInfo[8],
+    input5c: registerInfo[9],
+    input1c: registerInfo[10],
+    PSN: registerInfo[12],
+    PSA: registerInfo[13],
+    active: false
+  })
+  */
+  firebaseUpdateDocument('users', getUID(), {
     lastRegister: regStatusID,
-  });
+  })
 
   getUserData()
   registerReciept(regStatusID, logoutTF)
-  startRegisterReport(regStatusID, false)
+  let theRegStatusID = regStatusID
+  setTimeout(() => {
+    //startQuickBooksReport(theRegStatusID, false)
+    startRegisterReport(theRegStatusID, false)    
+  }, 1000);
   regStatus = false
   regStatusID = false
   regStatusShift = false
@@ -1508,8 +1592,7 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
 
     //Number(dropPSN.value), Number(dropPSA.value), Number(dropCCardAmtRan.value), Number(dropCCardAmt.value)
   }
-  const registerRef = doc(db, "registers", regStatusID);
-  await updateDoc(registerRef, {
+  firebaseUpdateDocument('registers', regStatusID, {
     starting: Number(registerAmount),
     gcard: Number(gCardAmt),
     ccard: Number(cCardAmt),
@@ -1518,7 +1601,7 @@ async function updateRegisterSub(registerInfo, amount, total, drop) {
     dropPSA: Number(dropPSAAmt),
     dropCCardAmtRan: Number(dropCCardAmtRan),
     dropCCardAmt: Number(dropCCardAmt)
-  });   
+  })
   if (drop) {
     goRegister()
     registerStatus()   
@@ -1531,7 +1614,7 @@ async function createMoneyDrop(registerInfo, dropInfo){
     return
   }
 
-  const docRef = await addDoc(collection(db, "drops"), {
+  firebaseAddDocument('drops', {
     access: getSystemAccess(),
     registerID: regStatusID,
     timestamp: serverTimestamp(),
@@ -1551,13 +1634,348 @@ async function createMoneyDrop(registerInfo, dropInfo){
     dropPSA: dropInfo[12],
     dropCCardAmtRan: dropInfo[13],
     dropCCardAmt: dropInfo[14]
+  })
+}
+
+async function startQuickBooksReportGroup(registersID, isFinal){
+  let registerSystemEnabled = await canSystem('registerSystem')
+  let quickbooksSystemEnabled = await canSystem('quickbooksSystem')
+  if (!registerSystemEnabled || !quickbooksSystemEnabled) {
+    return
+  }
+  await refreshTokenIfNeeded()
+  notificationSystem('warning', 'Generating register report for QuickBooks... Do not shut down application.')
+  let registersInfo = Array()
+  let registerIDs = ""
+  let theTxnDate = ""
+  let theFirstTime = false
+  registersID.forEach(async registerID => {
+    registerIDs = registerIDs + registerID + " "
+    let registerInfo = await firebaseGetDocument('registers', registerID)
+    registersInfo.push(Array(registerID, registerInfo))
+    if (!theFirstTime) {
+      theFirstTime = registerInfo.timestampStart.seconds
+    } else if (theFirstTime && (theFirstTime > registerInfo.timestampStart.seconds)) {
+      theFirstTime = registerInfo.timestampStart.seconds
+    }
+  });
+  getSystemData()
+  let theProductsData = Array()
+  let theCashReceived = 0
+  setTimeout(() => {
+    let theFirstTimeDate = new Date(theFirstTime * 1000)
+    let theFirstTimeDateYear = theFirstTimeDate.getFullYear()
+    let theFirstTimeDateMonth = (theFirstTimeDate.getMonth() + 1)
+    let theFirstTimeDateDay = theFirstTimeDate.getDate()
+    if (theFirstTimeDateMonth < 10) {
+      theFirstTimeDateMonth = '0' + theFirstTimeDateMonth
+    }
+    if (theFirstTimeDateDay < 10) {
+      theFirstTimeDateDay = '0' + theFirstTimeDateDay
+    }
+    theTxnDate = theFirstTimeDateYear + '-' + theFirstTimeDateMonth + '-' + theFirstTimeDateDay
+    registersInfo.forEach(async registerInfo => {
+      orderStartDate = new Date(registerInfo[1].timestampStart['seconds'] * 1000)
+      orderEndDate = new Date().getSeconds()
+      if (registerInfo[1].timestampEnd) {
+        orderEndDate = new Date(registerInfo[1].timestampEnd['seconds'] * 1000)
+      }
+      let theOrders = await firebaseGetDocuments('orders', Array(
+        Array("timestamp", ">", registerInfo[1].timestampStart),
+        Array("timestamp", "<", registerInfo[1].timestampEnd),
+        Array("cashier", "==", registerInfo[1].uid)
+      ), true)
+      theOrders.forEach(order => {
+        if (order[1].paymentMethod[2]) {
+          theCashReceived = theCashReceived + order[1].paymentMethod[2]
+        }
+        order[1].products.forEach(product => {
+          productsData.forEach(async productData => {
+            if (productData[0] == product) {
+              findOrCreateItem(productData, function (itemId) {
+                let wasFound = false
+                theProductsData.forEach(theProductsDataProduct => {
+                  if (theProductsDataProduct[0] == itemId) {
+                    wasFound = true
+                    theProductsDataProduct[2] = theProductsDataProduct[2] + 1
+                  }
+                });
+                if (!wasFound) {
+                  theProductsData.push(Array(itemId, productData[1], 1))
+                }
+              })
+            }
+          });
+        });
+      });
+    });
+
+    setTimeout(() => {
+      findCustomerByBusinessName("CERMS", function (err, customerId) {
+        if (err) {
+          notificationSystem('danger', '[QuickBooks] Error gathering business name... You may need to log out of quickbooks and log back in (from account settings)')
+          console.log(err);          
+        } else {
+          const invoice = {
+            "Line": theProductsData.map(product => ({
+              "Amount": product[1].price * product[2], // Example amount, you may need to adjust this
+              "DetailType": "SalesItemLineDetail",
+              "SalesItemLineDetail": {
+                "ItemRef": {
+                  "value": product[0]
+                },
+                "Qty": product[2],
+                "TaxCodeRef": product[1].taxable ? { "value": "TAX" } : { "value": "NON" } // Apply tax if product[1].tax is true
+              }
+            })),
+            "CustomerRef": {
+              "value": customerId
+            },
+            "PrivateNote": "Invoice generated from CERMS based on register IDs: " + registerIDs,
+            "TxnDate": theTxnDate
+          };
+
+          // Create the invoice
+          qbo.createInvoice(invoice, function (err, invoice) {
+            if (err) {
+              notificationSystem('danger', '[QuickBooks] Error creating invoice... You may need to log out of quickbooks and log back in (from account settings).')
+              console.error('Error creating invoice:', err);
+            } else {
+              let invoiceId = invoice.Id
+              let realmId = systemData.quickBooksToken2
+              const invoiceLink = `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
+              notificationSystem('success', "QuickBook Invoice created successfully! Click <a href='#' id='linkToExternal' theLink='" + invoiceLink + "'>here</a> to view!")
+              registersID.forEach(async register => {
+                firebaseUpdateDocument('registers', register, {
+                  qbinvoice: invoiceLink,
+                  qbinvoiceID: invoiceId
+                })
+                let theRegisterInfo = false
+                registersInfo.forEach(registerr => {
+                  if (registerr[0] == register) {
+                    theRegisterInfo = registerr[1]                    
+                  }
+                });
+                createPayment(customerId, invoiceId, theRegisterInfo.ccard || 0, "Credit", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {                  
+                  addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                    createPayment(customerId, invoiceId, theRegisterInfo.gcard || 0, "Gift Card", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
+                      addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                        createPayment(customerId, invoiceId, Number((theRegisterInfo.ending - theRegisterInfo.starting) + theCashReceived), "Cash", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
+                          addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                          });
+                        })
+                      });
+                    })
+                  });
+                })
+              });
+            }
+          });
+        }
+      })
+    }, 5000);    
+  }, 5000);
+}
+
+async function findOrCreatePaymentMethod(paymentMethodName, callback) {
+  await refreshTokenIfNeeded()
+  qbo.findPaymentMethods({
+    Name: paymentMethodName
+  }, function (err, paymentMethods) {
+    if (err) {
+      console.error('Error finding payment method:', err);
+      callback(err, null);
+      return;
+    }
+
+    if (paymentMethods.QueryResponse.PaymentMethod && paymentMethods.QueryResponse.PaymentMethod.length > 0) {
+      // Payment method exists, return the ID
+      const paymentMethodId = paymentMethods.QueryResponse.PaymentMethod[0].Id;
+      callback(null, paymentMethodId);
+    } else {
+      // Payment method doesn't exist, create it
+      createPaymentMethod(paymentMethodName, callback);
+    }
+  });
+}
+
+function createPaymentMethod(paymentMethodName, callback) {
+  const paymentMethod = {
+    Name: paymentMethodName,
+    Active: true // Set as active by default
+  };
+
+  qbo.createPaymentMethod(paymentMethod, function (err, createdPaymentMethod) {
+    if (err) {
+      console.error('Error creating payment method:', err);
+      setTimeout(() => {
+        createPaymentMethod(paymentMethod, callback)
+      }, 5000);
+      return;
+    }
+
+    const paymentMethodId = createdPaymentMethod.Id;
+    console.log(`Created ${paymentMethodName} Payment Method ID:`, paymentMethodId);
+    callback(null, paymentMethodId);
+  });
+}
+
+const paymentMethodsToCheck = ["Cash", "Credit", "Gift Card"];
+const paymentMethodIds = {};
+
+function processPaymentMethods(paymentMethodNameIndex) {
+  if (paymentMethodNameIndex >= paymentMethodsToCheck.length) {
+    return;
+  }
+
+  const paymentMethodName = paymentMethodsToCheck[paymentMethodNameIndex];
+  findOrCreatePaymentMethod(paymentMethodName, function (err, paymentMethodId) {
+    if (!err) {
+      paymentMethodIds[paymentMethodName] = paymentMethodId;
+    }
+    processPaymentMethods(paymentMethodNameIndex + 1);
+  });
+}
+
+async function createPayment(customerId, invoiceId, amount, paymentMethodName, callback) {
+  if (!amount || amount <= 0) {
+    callback()
+    return
+  }
+  await refreshTokenIfNeeded() 
+  const payment = {
+    CustomerRef: {
+      value: customerId
+    },
+    TotalAmt: amount,
+    Line: [{
+      Amount: amount,
+      LinkedTxn: [{
+        TxnId: invoiceId,
+        TxnType: "Invoice"
+      }]
+    }],
+    PaymentMethodRef: {
+      value: paymentMethodIds[paymentMethodName]
+    },
+    PrivateNote: "[CERMS] " + paymentMethodName + " from register report"
+  };
+
+  qbo.createPayment(payment, function (err, payment) {
+    if (err) {
+      notificationSystem('danger', '[QuickBooks] Error creating payment... You may need to log out of quickbooks and log back in (from account settings).')
+      console.error('Error creating payment:', err);
+      callback(false, false, false)
+    } else {
+      console.log('Payment created:', payment);
+      if (payment.UnappliedAmt >= 0) {
+        callback(invoiceId, payment.UnappliedAmt, paymentMethodName)
+      }
+    }
+  });
+}
+
+function addUnappliedAmountToInvoice(invoiceId, unappliedAmount, paymentMethodName, callback) {
+  if (!unappliedAmount) {
+    callback(false)
+    return
+  }
+  const extraProductName = `Extra ${paymentMethodName}`;
+  findOrCreateItem(extraProductName, function (itemId) {
+    // Add the unapplied amount to the invoice
+    qbo.getInvoice(invoiceId, function (err, invoice) {
+      if (err) {
+        console.error('Error retrieving invoice:', err);
+        return;
+      }
+
+      const newLineItem = {
+        Amount: unappliedAmount,
+        DetailType: "SalesItemLineDetail",
+        SalesItemLineDetail: {
+          ItemRef: {
+            value: itemId
+          }
+        },
+        Description: `Unapplied ${paymentMethodName} Payment`
+      };
+
+      invoice.Line.push(newLineItem);
+
+      qbo.updateInvoice(invoice, function (err, updatedInvoice) {
+        if (err) {
+          notificationSystem('danger', '[QuickBooks] Error creating payment (unapplied amount)... You may need to log out of quickbooks and log back in (from account settings).')
+          console.error('Error updating invoice with unapplied amount:', err);
+          callback(false)
+        } else {
+          callback(true)
+        }
+      });
+    });
+  });
+}
+
+// Helper function to find or create an item
+async function findOrCreateItem(itemName, callback) {
+  await refreshTokenIfNeeded()
+  let theItemName = ""
+  let theItemPrice = 0
+  let theItemDesc = "[CERMS] "
+  if (Array.isArray(itemName)) {
+    theItemName = itemName[1].name
+    theItemPrice = itemName[1].price    
+    theItemDesc = "[CERMS] " + itemName[1].desc
+  } else {
+    theItemName = itemName
+  }
+  // Search for the item in QuickBooks
+  qbo.findItems({
+    fetchAll: true,
+    Name: theItemName
+  }, function (err, items) {
+    if (err) {
+      console.error('Error finding item:', err);
+      callback(false)
+    } else if (items.QueryResponse.Item && items.QueryResponse.Item.length > 0) {
+      // Item found
+      const item = items.QueryResponse.Item[0];
+      callback(item.Id)
+    } else {
+      // Item not found, create a new item
+      const newItem = {
+        "Name": theItemName,
+        "Type": "Service", // or "Inventory" or "NonInventory" based on your needs
+        "UnitPrice": Number(theItemPrice),
+        "Description": theItemDesc,
+        "IncomeAccountRef": {
+          "value": "1" // The ID of the income account (Adjust as needed)
+        }
+      };
+      qbo.createItem(newItem, function (err, item) {
+        if (err) {
+          console.error('Error creating item:', err);
+          callback(false)
+        } else {
+          console.log('Item created:', item);
+          callback(item.Id)
+        }
+      });
+    }
   });
 }
 
 async function startRegisterReport(registerID, isFinal) {
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
+  let registerInfo
+  if (registerID) {
+    registerInfo = await firebaseGetDocument('registers', registerID)
+  }
+
   notificationSystem('warning', 'Generating register report... Do not shut down application.')
   getSystemData()
-  let registerInfo
   let startDateStr
   let theShift = false
   let reportType = 'Generated'
@@ -1685,16 +2103,13 @@ async function startRegisterReport(registerID, isFinal) {
   let currentTime = `${hour}:${min}:${sec} ${ampm}`;
   let currentTimeFile = `${hour}-${min}-${sec}-${ampm}`;
 
-  currentDateStr = currentDate + ' ' + currentTime
+  currentDateStr = getTimestampString(false, true)
   currentDateFileStr = currentDateFile + ' ' + currentTimeFile
 
   const ordersRef = collection(db, "orders");
 
   if (registerID) {
     reportType = 'Register'
-    const docRef = doc(db, "registers", registerID);
-    const docSnap = await getDoc(docRef);
-    registerInfo = docSnap.data()
     let theCID = registerInfo.uid
     cashName = registerInfo.uname
     theShift = registerInfo.shift
@@ -1745,7 +2160,7 @@ async function startRegisterReport(registerID, isFinal) {
     let startDateS = `${month}/${day}/${year}`;
     let startTime = `${hour}:${min}:${sec} ${ampm}`;
 
-    startDateStr = startDateS + ' ' + startTime
+    startDateStr = getTimestampString(startDate, true)
     startDates = new Date(registerInfo.timestampStart['seconds'] * 1000)
     endDates = new Date(registerInfo.timestampEnd['seconds'] * 1000)
     q1 = query(ordersRef, where("timestamp", ">", registerInfo.timestampStart), where("timestamp", "<", registerInfo.timestampEnd), where("cashier", "==", theCID), where("access", "==", getSystemAccess()));
@@ -1793,7 +2208,7 @@ async function startRegisterReport(registerID, isFinal) {
   let startDateS = `${month2}/${day2}/${year2}`;
   let startTime = `${hour2}:${min2}:${sec2} ${ampm2}`;
 
-  startDateStr = startDateS + ' ' + startTime
+  startDateStr = getTimestampString(startDate, true)
 
   const endDate = endDates;
   let day2E = endDate.getDate();
@@ -1827,7 +2242,7 @@ async function startRegisterReport(registerID, isFinal) {
   let endDateS = `${month2E}/${day2E}/${year2E}`;
   let endTime = `${hour2E}:${min2E}:${sec2E} ${ampm2E}`;
 
-  let endDateStr = endDateS + ' ' + endTime
+  let endDateStr = getTimestampString(endDate)
 
   let productsAndAmounts = Array()
   let discountsAndAmounts = Array()
@@ -1900,7 +2315,7 @@ async function startRegisterReport(registerID, isFinal) {
     let orderDateStr = `${month}/${day}/${year}`;
     let orderTime = `${hour}:${min}:${sec} ${ampm}`;
 
-    orderDateStrF = orderDateStr + ' ' + orderTime
+    orderDateStrF = getTimestampString(orderDate, true)
 
     let totalMoney = orderInfo.total[0]
     let totalTax = orderInfo.total[1]
@@ -2795,17 +3210,10 @@ async function startRegisterReport(registerID, isFinal) {
 async function updateMemberNotes(memberID){
   let currMemberInfo = await getMemberInfo(memberID)
   let currNotes = currMemberInfo['notes']
-  const docRef = doc(db, "members", memberID);
   if (!Array.isArray(currNotes)) {
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', memberID, {
       notes: Array('(old system): ' + currNotes),
-    }).catch((error) => {
-      const errorCode = error.code;
-      const errorMessage = error.message;
-      console.log(error);
-      notificationSystem('danger', errorMessage + ' (' + errorCode + ') [updateMemberNotes]')
-    });
-
+    })
     return true
   }else{
     return true
@@ -2818,20 +3226,12 @@ async function editMembership(memberInfo){
   const date = new Date(dateStr);
   const timestampInMs = date.getTime();
   const unixTimestamp = Math.floor(date.getTime() / 1000);
-  const docRef = doc(db, "members", memberInfo[0]);
   await updateMemberNotes(memberInfo[0])
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   if (!memberInfo[4]) {
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', memberInfo[0], {
       fname: memberInfo[1],
       mname: memberInfo[12],
       lname: memberInfo[2],
@@ -2843,9 +3243,9 @@ async function editMembership(memberInfo){
       waiver_status: memberInfo[9],
       name: memberInfo[1] + ' ' + memberInfo[2],
       email: memberInfo[10]
-    });
+    })
   } else {
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', memberInfo[0], {
       fname: memberInfo[1],
       mname: memberInfo[12],
       lname: memberInfo[2],
@@ -2859,7 +3259,7 @@ async function editMembership(memberInfo){
       waiver_status: memberInfo[9],
       name: memberInfo[1] + ' ' + memberInfo[2],
       email: memberInfo[10]
-    });
+    })
   }
   notificationSystem('success', 'Member updated!')
 }
@@ -2871,44 +3271,39 @@ async function editCategory(categoryInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  const docRef = doc(db, "categories", categoryInfo[0]);
-
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('categories', categoryInfo[0], {
     name: categoryInfo[1],
     desc: categoryInfo[2],
     color: categoryInfo[3],
-  });
+  })
   notificationSystem('success', 'Category edited!')
 }
 
-async function productIsCore(productID){
-  const docRef = doc(db, "products", productID);
-  const docSnap = await getDoc(docRef);
+async function productIsCore(productID){  
+  let docSnap = await firebaseGetDocument('products', productID)
 
-  if (docSnap.exists()) {
-    return docSnap.data().core;
+  if (docSnap) {
+    return docSnap.core;
   } else {
     return false;
   }
 }
 
 async function getProductInfo(productID){
-  const docRef = doc(db, "products", productID);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('products', productID);
 
-  if (docSnap.exists()) {
-    return docSnap.data();
+  if (docSnap) {
+    return docSnap;
   } else {
     return false;
   }
 }
 
 async function getDiscountInfo(discountID){
-  const docRef = doc(db, "discounts", discountID);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('discounts', discountID)
 
-  if (docSnap.exists()) {
-    return docSnap.data();
+  if (docSnap) {
+    return docSnap;
   } else {
     return false;
   }
@@ -2974,9 +3369,7 @@ async function editProduct(productInfo){
   if (Number(productInfo[3]) > 0 && proAskForPrice) {
     proAskForPrice = false
   }
-
-  const docRef = doc(db, "products", productInfo[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('products', productInfo[0], {
     cat: productInfo[1],
     name: productInfo[2],
     price: productInfo[3],
@@ -3001,18 +3394,16 @@ async function editProduct(productInfo){
     restrictedUsers: productInfo[20],
     payout: productInfo[21],
     askforprice: proAskForPrice
-  });
+  })
   notificationSystem('success', 'Product Edited!')
-//  goProducts()
 }
 
 async function editProductInventory(productInfo) {
   let currInv = false;
-  const docRef = doc(db, "products", productInfo);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('products', productInfo)
 
-  if (docSnap.exists()) {
-    currInv = docSnap.data().inventory
+  if (docSnap) {
+    currInv = docSnap.inventory
   }
 
   if (currInv > 0) {
@@ -3021,14 +3412,12 @@ async function editProductInventory(productInfo) {
     if (currInv <= 0) {
       isActive = false
     }
-    const docRef = doc(db, "products", productInfo);
-
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('products', productInfo, {
       inventory: currInv,
       active: isActive
-    });
-    if (currInv <= docSnap.data().invWarning) {
-      let theMsg = "Be advised... You are recieving this alert because the product '" + docSnap.data().name + "' is running low. Inventory is currently " + currInv;
+    })
+    if (currInv <= docSnap.invWarning) {
+      let theMsg = "Be advised... You are recieving this alert because the product '" + docSnap.name + "' is running low. Inventory is currently " + currInv;
       createMail(systemData.invWarnEMail, "Inventory Warning", theMsg, theMsg)
     }
     return true
@@ -3044,9 +3433,8 @@ async function editDiscount(discountInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  const docRef = doc(db, "discounts", discountInfo[0]);
   let d = new Date(discountInfo[5]).getTime();
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('discounts', discountInfo[0], {
     code: discountInfo[1],
     dollar: discountInfo[2],
     percent: discountInfo[3],
@@ -3058,14 +3446,15 @@ async function editDiscount(discountInfo){
     typeOrder: discountInfo[8],
     limit: Number(discountInfo[10]),
     used: Number(discountInfo[11])
-  });
+  })
   notificationSystem('success', 'Discount Edited!')
   goProducts()
 }
 
 async function updateTLID(){
-  const q1 = query(collection(db, "members"), where("id_number", "==", systemData.lid + 1), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('members', Array(
+    Array('id_number', '==', systemData.lid + 1)
+  ), true)
   querySnapshot1.forEach((doc) => {
     updateLID()
     getSystemData();
@@ -3085,14 +3474,7 @@ async function createMembership(memberInfo){
   let update = false;
   let idExpiration;
   let theCurrentTime = Math.floor(Date.now() / 1000);
-  let theTimestamp = new Date(Math.floor(Date.now()))
-  let theMonth = theTimestamp.getMonth() + 1
-  let theDate = theTimestamp.getDate()
-  let theFullYear = theTimestamp.getFullYear()
-  let theHours = theTimestamp.getHours()
-  let theMins = theTimestamp.getMinutes()
-  let theSecs = theTimestamp.getSeconds()
-  let theStringTime = theMonth + '/' + theDate + '/' + theFullYear + ' ' + theHours + ':' + theMins + ':' + theSecs
+  let theStringTime = getTimestampString(false, true)
   let stringStarter = getDisplayName() + ' [' + theStringTime + ']: '
 
   let theProductInfo
@@ -3104,8 +3486,9 @@ async function createMembership(memberInfo){
 
   idExpiration = Number(theCurrentTime) + Number(theProductInfo[1].membershipLength)
 
-  const q1 = query(collection(db, "members"), where("id_number", "==", theNewID), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('members', Array(
+    Array('id_number', '==', theNewID)
+  ), true)
   querySnapshot1.forEach((doc) => {
     update = true;
     theClient.send('membership-pending-waiting-for-id')
@@ -3114,23 +3497,26 @@ async function createMembership(memberInfo){
     setTimeout(function(){createMembership(memberInfo)}, 1000);
   });
   if (!update){
-    const q2 = query(collection(db, "members"), where("dob", "==", memberInfo[2]), where('idnum', "==", memberInfo[6]), where('access', '==', getSystemAccess()));
-    const querySnapshot2 = await getDocs(q2);
+    let querySnapshot2 = await firebaseGetDocuments('members', Array(
+      Array('dob', '==', memberInfo[2]),
+      Array('idnum', '==', memberInfo[6])
+    ), true)
     querySnapshot2.forEach( async (doc) => {
       update = true;
-      updateMembership(doc.id, doc.data(), memberInfo);
-      updateOrderCustomerID(pendingOrderID, doc.id)
+      updateMembership(doc[0], doc[1], memberInfo);
+      updateOrderCustomerID(pendingOrderID, doc[0])
     });
   }
   if (!update && memberInfo[13]) {
-    const q3 = query(collection(db, "members"), where("id_number", "==", memberInfo[13]), where('access', '==', getSystemAccess()));
-    const querySnapshot3 = await getDocs(q3);
+    let querySnapshot = await firebaseGetDocuments('members', Array(
+      Array('id_number', '==', memberInfo[13])
+    ), true)
     querySnapshot3.forEach(async (doc) => {
       update = true;
       let theID = ""
-      if (doc.id) {
+      if (doc[0]) {
         theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc.id + "</a>"
-      }
+      }      
       let theMsg = "This member already exists! ID: " + theID
       notificationSystem('warning', theMsg)
     });
@@ -3167,7 +3553,7 @@ async function createMembership(memberInfo){
       waiverStatus = memberInfo[14]
     }
 
-    const docRef = await addDoc(collection(db, "members"), {
+    const docRef = await firebaseAddDocument('members', {
       access: getSystemAccess(),
       notes: theNotes,
       name: memberInfo[0] + " " + memberInfo[1],
@@ -3186,7 +3572,7 @@ async function createMembership(memberInfo){
       idnum: memberInfo[6],
       idstate: memberInfo[7],
       email: memberInfo[8]
-    });
+    })
     theClient.send('membership-success', docRef.id)
     let theID = 'Unknown ID'
     if (docRef.id) {
@@ -3235,18 +3621,20 @@ async function gatherAllUsers(){
 }
 
 async function gatherMemberHistory(memberID){
-  const q1 = query(collection(db, "activity"), where("memberID", "==", memberID), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('activity', Array(
+    Array('memberID', '==', memberID)
+  ), true)
   querySnapshot1.forEach((doc) => {
-    theClient.send('member-history-request-return', Array(doc.id, doc.data()))
+    theClient.send('member-history-request-return', Array(doc[0], doc[1]))
   });
 }
 
 async function gatherOrderHistory(memberID){
-  const q1 = query(collection(db, "orders"), where("customerID", "==", memberID), where('access', '==', getSystemAccess()));
-  const querySnapshot1 = await getDocs(q1);
+  let querySnapshot1 = await firebaseGetDocuments('orders', Array(
+    Array('customerID', '==', memberID)
+  ), true)
   querySnapshot1.forEach((doc) => {
-    theClient.send('member-order-history-request-return', Array(doc.id, doc.data()))
+    theClient.send('member-order-history-request-return', Array(doc[0], doc[1]))
   });
 }
 
@@ -3256,8 +3644,8 @@ async function startGatherAllMembers(){
   }
   startGatherAllMembersA = true;
 
-  const q = query(collection(db, "members"), orderBy("creation_time"), where('access', '==', getSystemAccess()));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
+  const q = query(collection(db, "members"), where('access', '==', getSystemAccess()), orderBy("creation_time"), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
         if (!members.includes(change.doc.id)) {
@@ -3366,12 +3754,13 @@ async function displayAllHistory(){
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeP24 = theCurrentTime - 604800
   let theCurrentTimeP24Date = new Date(theCurrentTimeP24 * 1000);
-  const q = query(collection(db, "activity"), where("active", "==", false), where("timeOut", ">=", theCurrentTimeP24Date), where('access', '==', getSystemAccess()));
-
-  const querySnapshot = await getDocs(q);
+  let querySnapshot = await firebaseGetDocuments('activity', Array(
+    Array('active', '==', false),
+    Array('timeOut', '>=', theCurrentTimeP24Date)
+  ), true)
   querySnapshot.forEach( async (doc) => {
-    let theMemberInfo = await getMemberInfo(doc.data().memberID);
-    theClient.send('history-request-return', Array(doc.id, doc.data(), theMemberInfo))
+    let theMemberInfo = await getMemberInfo(doc[1].memberID);
+    theClient.send('history-request-return', Array(doc[0], doc[1], theMemberInfo))
   });
 }
 
@@ -3379,14 +3768,15 @@ async function displayAllOrders(){
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeP24 = theCurrentTime - 604800
   let theCurrentTimeP24Date = new Date(theCurrentTimeP24 * 1000);
-  const q = query(collection(db, "orders"), where("timestamp", ">=", theCurrentTimeP24Date), where('access', '==', getSystemAccess()));
-  const querySnapshot = await getDocs(q)
+  let querySnapshot = await firebaseGetDocuments('orders', Array(
+    Array('timestamp', '>=', theCurrentTimeP24Date)
+  ), true)
   querySnapshot.forEach(async (doc) => {
     let theMemberInfo = false
-    if (doc.data().customerID) {
-      theMemberInfo = await getMemberInfo(doc.data().customerID);
+    if (doc[1].customerID) {
+      theMemberInfo = await getMemberInfo(doc[1].customerID);
     }
-    theClient.send('history-order-request-return', Array(doc.id, doc.data(), theMemberInfo))
+    theClient.send('history-order-request-return', Array(doc[0], doc[1], theMemberInfo))
   });
 }
 
@@ -3395,7 +3785,8 @@ async function startGatherAllActivity(){
     return
   }
   startGatherAllActivityA = true;
-  const q = query(collection(db, "activity"), where('access', '==', getSystemAccess()));
+  const q = query(collection(db, "activity"), where('active', '==', true), where('access', '==', getSystemAccess()));
+  let test = 1
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -3611,7 +4002,7 @@ async function startGatherAllOrders(){
     return
   }
   startGatherAllOrdersA = true;
-  const q = query(collection(db, "orders"), where('access', '==', getSystemAccess()));
+  const q = query(collection(db, "orders"), where('access', '==', getSystemAccess()), limit(50));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach( async (change) => {
       if (change.type === "added") {
@@ -3646,6 +4037,99 @@ async function startGatherAllOrders(){
   });
 }
 
+async function startSnapshotMessages(theChatID) {
+  const q = query(collection(db, "chats", theChatID, "messages"), where('access', '==', getSystemAccess()));
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach(async (change) => {
+      if (change.type === "added") {
+        chatsData.forEach(theChat => {
+          if (theChat[0] == theChatID && !theChats.includes(change.doc.id)) {
+            theChat[2].push(Array(change.doc.id, change.doc.data()))
+            theClient.send("add-chat-message", Array(getUID(), change.doc.data()))
+          }          
+        }) 
+      }
+      if (change.type === "modified") {
+        chatsData.forEach(theChat => {
+          if (theChat[0] == theChatID) {
+            theChat[2].forEach(theMessage => {
+              if (theMessage[0] == change.doc.id) {
+                theMessage[1] = change.doc.data()
+              }
+            })
+          }
+        })
+      }
+      if (change.type === "removed") {
+        chatsData.forEach(theChat => {
+          if (theChat[0] == theChatID) {
+            theChat[2].forEach((item, i) => {
+              if (item[0] == change.doc.id) {
+                item[1] = change.doc.data();
+                theChat[2].splice(i, 1)
+              }
+            });
+          }
+        })
+      }
+    });
+  });
+}
+
+async function startGatherAllChats() {
+  if (startGatherAllChatsA) {
+    return
+  }
+  startGatherAllChatsA = true;  
+  const q = query(collection(db, "chats"), where('participants', 'array-contains', getUID()), where('access', '==', getSystemAccess()));
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach(async (change) => {
+      if (change.type === "added") {
+        if (!theChats.includes(change.doc.id)) {
+          theChats.push(change.doc.id);
+          startSnapshotMessages(change.doc.id)
+          let chatMessages = Array()
+          let q2 = query(collection(db, "chats", change.doc.id, "messages"), where('access', '==', getSystemAccess()));
+          let querySnapshot = await getDocs(q2);
+          querySnapshot.forEach((doc2) => {
+            chatMessages.push(Array(doc2.id, doc2.data()))
+          });
+          chatsData.push(Array(change.doc.id, change.doc.data(), chatMessages));
+//          theClient.send('return-orders', Array(change.doc.id, change.doc.data()))
+        }
+      }
+      if (change.type === "modified") {
+        if (theChats.includes(change.doc.id)) {
+          chatsData.forEach(async (item, i) => {
+            if (item[0] == change.doc.id) {
+              item[1] = change.doc.data();
+              let chatMessages = Array()
+              let q2 = query(collection(db, "chats", change.doc.id, "messages"), where('access', '==', getSystemAccess()));
+              let querySnapshot = await getDocs(q2);
+              querySnapshot.forEach((doc2) => {
+                chatMessages.push(Array(doc2.id, doc2.data()))
+              });
+              item[2] = chatMessages
+//              theClient.send('return-orders-update', Array(change.doc.id, change.doc.data()))
+            }
+          });
+        }
+      }
+      if (change.type === "removed") {
+        if (theChats.includes(change.doc.id)) {
+          chatsData.forEach((item, i) => {
+            if (item[0] == change.doc.id) {
+              item[1] = change.doc.data();
+              chatsData.splice(i, 1)
+//              theClient.send('return-orders-remove', Array(change.doc.id))
+            }
+          });
+        }
+      }
+    });
+  });
+}
+
 async function displayAllActivity(){
   activitysData.forEach((activity) => {
     if (activity[1].active) {
@@ -3666,7 +4150,7 @@ async function attemptLogin(details){
   loginCreds = details;
   signInWithEmailAndPassword(auth, details[0], details[1])
   .then(async(userCredential) => {
-    addLog('auth', 'Login successful for ' + details[1])
+    addLog('auth', 'Login successful for ' + details[0])
     user = userCredential.user;
     await getUserData()
     if (!getSystemAccess()) {
@@ -3705,19 +4189,18 @@ async function attemptLogin(details){
 
 async function addAccess(code){
   notificationSystem('warning', 'Checking access code...')
-  updateDoc(doc(db, "users", getUID()), {
-    access: code,
-  }); 
-
+  firebaseUpdateDocument('users', getUID(), {
+    access: code
+  })
   setTimeout(async () => {
     const docRef = doc(db, "system", code);
     const docSnap = await getDoc(docRef).catch((error) => {
       console.log(error);
       if (error.code == "permission-denied") {
         notificationSystem('danger', 'Access code NOT valid!')
-        updateDoc(doc(db, "users", getUID()), {
-          access: "",
-        });        
+        firebaseUpdateDocument('users', getUID(), {
+          access: ''
+        })
       }
     })
 
@@ -3739,12 +4222,12 @@ function createAccount(accountInfo){
       }).then(() => {
         sendPasswordResetEmail(auth, accountInfo[0])
           .then(() => {
-            setDoc(doc(db, "users", newUser.uid), {
+            firebaseSetDocument('users', newUser.uid, {
               access: getSystemAccess(),
               rank: accountInfo[2],
               displayName: accountInfo[1],
               email: accountInfo[0],
-            });
+            })
             notificationSystem('success', "Account created! New employee must check their email to 'reset' their password.")
             signInWithEmailAndPassword(auth, loginCreds[0], loginCreds[1])
             .then((userCredential) => {
@@ -3780,7 +4263,7 @@ function createAccount(accountInfo){
 
 async function startLoading(){
   loadingProgress = 0;
-  totalLoadingProccesses = 11 // CHANGE ME
+  totalLoadingProccesses = 12 // CHANGE ME
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading user data...'))
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading system modules... This may take a couple minutes.'))
@@ -3826,9 +4309,16 @@ async function startLoading(){
   await startGatherAllOrders();
   loadingProgress = loadingProgress + 1
 
-  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
-  await quickBooksLogin();
+  theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading chats...'))
+  await startGatherAllChats();
   loadingProgress = loadingProgress + 1
+
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (quickbooksSystemEnabled) {
+    theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
+    await quickBooksLogin();
+    loadingProgress = loadingProgress + 1    
+  }
 
   theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Finished loading!'))
 
@@ -3843,21 +4333,24 @@ async function startLoading(){
   goHome(true);
   await updateTLID();
   setTimeout(() => { 
-    notificationSystem('primary', 'Welcome to CERMS! The system will continue to gather data. This may take a couple minutes. You may see less information when you first log in.')
     updateUserVersion()
   }, 2000);
 }
 
 function updateUserVersion(){
   if (userData.version != app.getVersion()) {
-    updateDoc(doc(db, "users", getUID()), {
-      version: app.getVersion(),
-    });
+    firebaseUpdateDocument('users', getUID(), {
+      version: app.getVersion()
+    })
     openChangelog()
   }
 }
 
 async function searchForMessage(){
+  if (systemData.maintenanceMode) {
+    notificationSystem("warning", '[SYSTEM] Maintence Mode has been enabled. You may see data that you did not create. You may still use CERMS.')
+  }
+
   // TODO: CREATE SNAPSHOT TO LISTEN LIVE INSTEAD OF 5 MINUTES
   let theCurrentTime = Math.floor(Date.now() / 1000);
   let theCurrentTimeMS = new Date(theCurrentTime * 1000);
@@ -3891,9 +4384,9 @@ async function getSystemData(){
     console.log(error);
     if (error.code == "permission-denied") {
       notificationSystem('danger', 'Access code NOT valid!')
-      updateDoc(doc(db, "users", getUID()), {
-        access: "",
-      });
+      firebaseUpdateDocument('users', getUID(), {
+        access: ''
+      })
       setTimeout(() => {
         userLogout()
       }, 2000);
@@ -3952,10 +4445,9 @@ async function updateFileDir(){
       }
       theDirsArray.push(theNewDirSingle)      
       systemData.fileSaveSystemDir = theNewDirSingle
-      const docRef = doc(db, "system", userData.access);
-      await updateDoc(docRef, {
+      firebaseUpdateDocument('system', userData.access, {
         fileSaveSystem: theDirsArray
-      });
+      })
       await getSystemData()
       goHome()      
     }
@@ -3982,27 +4474,28 @@ ipcMain.on('remove-dir', async (event, arg) => {
   });
   if (systemData.fileSaveSystemDir == arg) {
   }
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     fileSaveSystem: theDirsArray
-  });
+  })
   await getSystemData()
   goAccount()
 })
 
 async function updateLID(){
-  const docRef = doc(db, "system", userData.access);
   systemData.lid = Number(systemData.lid) + 1
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     lid: Number(systemData.lid)
-  });
+  })
 }
 
 async function updateOrderCustomerID(orderID, theCustomerID){
-  const docRef = doc(db, "orders", orderID);
-  await updateDoc(docRef, {
+  let registerSystemEnabled = canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return 
+  }
+  firebaseUpdateDocument('orders', orderID, {
     customerID: theCustomerID
-  });  
+  })
 }
 
 function userLogout(){
@@ -4011,11 +4504,10 @@ function userLogout(){
 }
 
 async function getUserData(){
-  const docRef = doc(db, "users", user.uid);
-  const docSnap = await getDoc(docRef);
+  let docSnap = await firebaseGetDocument('users', user.uid)
 
-  if (docSnap.exists()) {
-    userData = docSnap.data();    
+  if (docSnap) {
+    userData = docSnap;    
     darkMode = userData.darkMode
     theClient.send('recieve-dark-mode', darkMode)
     return true
@@ -4165,6 +4657,73 @@ function emailReciept(theEMail){
     createMail(theEMail, 'Reciept!', data, data)              
   })
 }
+
+function createAuthWindow(authUrl) {
+  let authWindow = new BrowserWindow({
+    width: 600,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  authWindow.loadURL(authUrl);
+
+  authWindow.on('closed', () => {
+    authWindow = null;
+  });
+  
+  return authWindow;
+}
+
+async function getAuthUrl() {
+  try {
+    const authUri = await oauthClient.authorizeUri({
+      scope: ['com.intuit.quickbooks.accounting'],
+      state: 'testState',
+    });
+    return authUri;
+  } catch (error) {
+    console.error('Error generating auth URL:', error);
+    throw error;
+  }
+}
+
+async function quickBooksConnect() {
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!canUser('permissionEditQBConnect') || !quickbooksSystemEnabled) {
+    notificationSystem('warning', 'You do not have permission to do this! Or, Quickbooks is not enabled. Admins can enable in settings.')
+    return
+  }
+  if (quickBooksCheckLogin()) {
+    return
+  }
+  const authUrl = await getAuthUrl();
+  const authWindow = createAuthWindow(authUrl);
+
+  let theInt = setInterval(() => {
+    let theURL = authWindow.webContents.getURL()
+    if (theURL.startsWith('http://clubentertainmentrms.com/resources/quickbooks')) {      
+      let urlParams = new URL(theURL).searchParams;
+      let code = urlParams.get('code');
+      let realmId = urlParams.get('realmId');
+
+      if (code && realmId) {
+        // Send data to the renderer process or handle it here
+        quickBooksLogin(theURL, realmId)
+        clearInterval(theInt);
+
+        // Close the OAuth window
+        authWindow.close();
+        quickBooksConnecting = false
+        // Exchange the authorization code for an access token
+        // Implement token exchange logic here
+      }
+    }    
+  }, 5000);
+};
+
 const createRecieptScreen = (shouldChoice, logoutTF) => {
   const recieptWindow = new BrowserWindow({
     width: 800,
@@ -4216,25 +4775,17 @@ const createRecieptScreen = (shouldChoice, logoutTF) => {
 };
 
 async function openChangelog(){
-  const response = await fetch('https://api.github.com/repos/matthewstriks/CERMS/releases/tags/v' + app.getVersion());
-  const bodyJson = await response.json();
-  let changelog = bodyJson.body
-
-  const options = {
-    type: 'info',
-    title: 'Changelog',
-    icon: './assets/cerms-icon.icns',
-    message: "View what is new in this update!\n\n" + changelog + "\n",
-    detail: 'Would you like to open this on GitHub?',
-    buttons: ['Yes', 'No']
-  }
-  dialog.showMessageBox(options, function (index) {
-
-  }).then(result => {
-    if (result.response === 0) {
-      shell.openExternal('https://github.com/matthewstriks/CERMS/releases/tag/v' + app.getVersion());
+  const changelogWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    icon: '/assets/cerms-icon.icns',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
     }
-  })
+  });
+
+  changelogWindow.loadFile(path.join(__dirname, 'changelog.html'));
 }
 
 app.on('ready', createWindow);
@@ -4317,12 +4868,14 @@ ipcMain.on('account-logout', (event, arg) => {
 ipcMain.on('membership-create', async (event, arg) => {
   theClient = event.sender;
   let alreadyExists = false
-  const q2 = query(collection(db, "members"), where("dob", "==", arg[2]), where('idnum', "==", arg[6]), where('access', '==', getSystemAccess()));
-  const querySnapshot2 = await getDocs(q2);
-  querySnapshot2.forEach(async (doc) => {
-    let theID = ""
-    if (doc.id) {
-      theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc.id + "</a>"
+  let querySnapshot2 = await firebaseGetDocuments('members', Array(
+    Array('dob', '==', arg[2]),
+    Array('idnum', '==', arg[6])
+  ), true)  
+  querySnapshot2.forEach(async (doc) => {    
+    let theID = "Unknown"
+    if (doc[0]) {
+      theID = "<a href='#' id='lastCreatedID' onclick='openMembership()' >" + doc[0] + "</a>"
     }
     let theMsg = "This member already exists! ID: " + theID
     notificationSystem('warning', theMsg)
@@ -4333,8 +4886,8 @@ ipcMain.on('membership-create', async (event, arg) => {
   if (alreadyExists) {
     return false
   }
-
-  if (importMembershipsMode) {
+  let registerSystemEnabled = canSystem('registerSystem')
+  if (importMembershipsMode || !registerSystemEnabled) {
     createMembership(arg)
   } else {
     goOrder()
@@ -4396,8 +4949,12 @@ ipcMain.on('request-account', (event, arg) => {
   theClient = event.sender;
   let displayName = getDisplayName();
   let rank = getRank();
-  theClient.send('recieve-account', Array(displayName, rank, systemData, oauthClient.isAccessTokenValid()))
-  theClient.send('recieve-account2', Array(userData, systemData, oauthClient.isAccessTokenValid(), importMembershipsMode, user.emailVerified, debugMode))
+  let quickBooksIsConnected = false
+  if (oauthClient.isAccessTokenValid()) {
+    quickBooksIsConnected = true
+  }
+  theClient.send('recieve-account', Array(displayName, rank, systemData, quickBooksCheckLogin()))
+  theClient.send('recieve-account2', Array(userData, systemData, quickBooksCheckLogin(), importMembershipsMode, user.emailVerified, debugMode))
 })
 
 ipcMain.on('account-create', (event, arg) => {
@@ -4418,8 +4975,7 @@ ipcMain.on('account-edit', async (event, arg) => {
     notificationSystem('warning', 'You do not have permisison to do this.')
     return
   }
-  const docRef = doc(db, "users", arg[0]);
-  updateDoc(docRef, {
+  firebaseUpdateDocument('users', arg[0], {
     displayName: arg[1],
     rank: arg[2],
     access: arg[3],
@@ -4440,8 +4996,9 @@ ipcMain.on('account-edit', async (event, arg) => {
     permissionEditMemberFiles: arg[18],
     permissionDeleteMembers: arg[19],
     permissionEditAnalytics: arg[20],
-    permissionEditVDTransactions: arg[21]
-  });
+    permissionEditVDTransactions: arg[21],
+    permissionEditQBConnect: arg[22]
+  })
 
   if (arg[0] == getUID()) {
     getUserData()
@@ -4472,7 +5029,7 @@ ipcMain.on('account-delete-user', async (event, arg) => {
   theClient = event.sender;
   let theRank = await getRank();
   if (theRank == "1") {
-    await deleteDoc(doc(db, "users", arg[0]));
+    firebaseDeleteDocument('users', arg[0])
   } else {
     notificationSystem('warning', 'You do not have permission to do this.')
     return
@@ -4482,16 +5039,27 @@ ipcMain.on('account-delete-user', async (event, arg) => {
   theClient.send('account-edit-success')
 })
 
-ipcMain.on('activity-create', (event, arg) => {
+ipcMain.on('activity-create', async (event, arg) => {
   theClient = event.sender;
-  goOrder()
-  createOrder(arg, 'activity', arg)
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    createActivity(arg)
+    goHome()
+  } else {
+    goOrder()
+    createOrder(arg, 'activity', arg)    
+  }
 })
 
-ipcMain.on('activity-renew', (event, arg) => {
+ipcMain.on('activity-renew', async (event, arg) => {
   theClient = event.sender;
-  goOrder()
-  createOrder(Array(arg[2], arg[1][2], arg[1][1]), 'renew', arg)
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    renewActivity(arg)
+  } else {
+    goOrder()
+    createOrder(Array(arg[2], arg[1][2], arg[1][1]), 'renew', arg)
+  }
 })
 
 ipcMain.on('activity-close', (event, arg) => {
@@ -4588,162 +5156,161 @@ ipcMain.on('activity-edit', (event, arg) => {
   editActivity(arg)
 })
 
-ipcMain.on("history-search", async (event, arg) => {
+ipcMain.on('history-search', async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
-  if (arg != "") {
-    notificationSystem('warning', 'Searching... This may take a few seconds. You will be notified when the query is finished.')
-    for (i = 0; i < activitysData.length; i++) {
-      let theActivityData = activitysData[i][1]
-      let theMemberData = activitysData[i][2]
-      let theName = theActivityData.lockerRoomStatus[2] + " " + theActivityData.lockerRoomStatus[1]
-      let brokenArg = arg.split(" ");
-
-      let a = new Date(theActivityData.timeIn.seconds * 1000);
-      let year = a.getFullYear();
-      let month = a.getMonth() + 1;
-      let date = a.getDate();
-      let theStartTime = month + '/' + date + '/' + year
-      if (theMemberData && ((theMemberData.fname + ' ' + theMemberData.lname).toUpperCase() == arg.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (theMemberData && (theMemberData.fname.toUpperCase() == arg.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (theMemberData && (theMemberData.lname.toUpperCase() == arg.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (theActivityData.memberID == arg) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg.toUpperCase() == theName.toUpperCase()) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg.toUpperCase() == theActivityData.lockerRoomStatus[2].toUpperCase()) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg.toUpperCase() == theActivityData.lockerRoomStatus[1].toUpperCase()) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else if (arg == theStartTime) {
-        wasFound = true
-        theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-      } else {
-        brokenArg.forEach((item, itemi) => {
-          if (theName.includes(item) && !wasFound) {
-            wasFound = true
-            theClient.send('history-request-return', Array(activitysData[i][0], theActivityData, theMemberData))
-          }
-        });
-      }
+  if (arg[0] != "") {
+    if (arg[1] == 'id') {
+      let resultsID = await firebaseGetDocuments('activity', Array(
+        Array('memberID', '==', arg[0] )
+      ), true)      
+      resultsID.forEach(async result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          let theMemberData = await getMemberInfo(result[1].memberID)
+          theClient.send('history-request-return', Array(result[0], result[1], theMemberData))
+        }
+      });
+    } else if (arg[1] == 'rlName' || arg[1] == 'rlNumber') {      
+      let resultsrlName = await firebaseGetDocuments('activity', Array(
+        Array('lockerRoomStatus', 'array-contains', arg[0])
+      ), true)      
+      resultsrlName.forEach(async result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          let theMemberData = await getMemberInfo(result[1].memberID)
+          theClient.send('history-request-return', Array(result[0], result[1], theMemberData))
+        }
+      });
+    } else {
+      notificationSystem('warning', 'You must select a search filter')
+      return
     }
-  } else {
-    displayAllHistory()
-  }
-  if (!wasFound && (arg != "")) {
-    notificationSystem('warning', 'No activity was found by the search "' + arg + '"')
-  } else {
-    notificationSystem('success', 'Results found!')
+    if (!wasFound) {
+      notificationSystem('warning', 'No activity was found by the search "' + arg[0] + '"')
+      return
+    }
+  } else{
+    displayAllActivity()
   }
 })
 
-ipcMain.on("order-search", async (event, arg) => {
+ipcMain.on('order-search', async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
-  if (arg != "") {
-    notificationSystem('warning', 'Searching... This may take a few seconds. You will be notified when the query is finished.')
-    for (i = 0; i < ordersData.length; i++) {
-      let theOrderID = ordersData[i][0]
-      let theOrderData = ordersData[i][1]
-      let theOrderCustomerInfo = await getMemberInfo(theOrderData.customerID) || Array()        
-
-      let theCustomerFName = theOrderCustomerInfo.fname || ""
-      let theCustomerLName = theOrderCustomerInfo.lname || ""
-      let brokenArg = arg.split(" ");
-
-      let a = new Date(theOrderData.timestamp['seconds'] * 1000);
-      let year = a.getFullYear();
-      let month = a.getMonth() + 1;
-      let date = a.getDate();
-      let theStartTime = month + '/' + date + '/' + year
-      if (theOrderID.toUpperCase() == arg.toUpperCase()) {
+  notificationSystem('warning', "Searching for " + arg[0] + '...')
+  if (arg[0] != "") {
+    if (arg[1] == 'id') {
+      let resultsID = await firebaseGetDocument('orders', arg[0])      
+      if (resultsID) {
         wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg == theStartTime) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg == theOrderData.total[2]) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg.toUpperCase() == theCustomerFName.toUpperCase()) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg.toUpperCase() == theCustomerLName.toUpperCase()) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
-      } else if (arg.toUpperCase() == (theCustomerFName.toUpperCase() + " " + theCustomerLName.toUpperCase())) {
-        wasFound = true
-        theClient.send('history-order-request-return', Array(theOrderID, theOrderData, theOrderCustomerInfo))
+        let theMemberData = await getMemberInfo(result[1].customerID)
+        theClient.send('history-order-request-return', Array(arg[0], resultsID, theMemberData))
       }
+    } else if (arg[1] == 'date') {      
+      const dateParts = arg[0].split("/"); // Split the date by "/"
+      const startDate = new Date(dateParts[2], dateParts[0] - 1, dateParts[1]);
+      startDate.setHours(0, 0, 0, 0); // Set time to 00:00:00
+
+      const endDate = new Date(dateParts[2], dateParts[0] - 1, dateParts[1]);
+      endDate.setHours(23, 59, 59, 999); // Set time to 23:59:59.999
+
+      const firestoreTimestampS = Timestamp.fromDate(startDate);
+      const firestoreTimestampE = Timestamp.fromDate(endDate);
+      let resultsrDate = await firebaseGetDocuments('orders', Array(
+        Array('timestamp', '>=', firestoreTimestampS),
+        Array('timestamp', '<=', firestoreTimestampE)
+      ), true)      
+      resultsrDate.forEach(async result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          let theMemberData = await getMemberInfo(result[1].customerID)
+          theClient.send('history-order-request-return', Array(result[0], result[1], theMemberData))
+        }
+      });
+    } else {
+      notificationSystem('warning', 'You must select a search filter')
+      return
     }
-  } else {
-    displayAllOrders()
-  }
-  if (!wasFound && (arg != "")) {
-    notificationSystem('warning', 'No order was found by the search "' + arg + '"')
-  } else {
-    notificationSystem('success', 'Results found!')
+    if (!wasFound) {
+      notificationSystem('warning', 'No order was found by the search "' + arg[0] + '"')
+      return
+    }
+  } else{
+    displayAllActivity()
   }
 })
 
-ipcMain.on('searchForMember', (event, arg) => {
+ipcMain.on('searchForMember', async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
-  if (arg != "") {
-    for (i = 0; i < membersData.length; i++) {
-      let theName = membersData[i][1].name.toUpperCase()
-      let theID = Number(membersData[i][1].idnum)
-      let theMemID = Number(membersData[i][1].id_number)
-      let theDOB = membersData[i][1].dob
-      let stringDate = false
-      if (arg.includes('/') || arg.includes('-')) {
-        stringDate = format(new Date(arg), "yyyy-MM-dd");        
-      }
-      let theMembership = membersData[i][1].membership_type.toUpperCase()
-      let brokenArg = arg.split(" ");
-      if (theName.includes(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (theID == Number(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (theMemID == Number(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (stringDate && (theDOB == stringDate)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      } else if (theMembership.includes(arg)) {
-        wasFound = true
-        theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-      }else{
-        /*
-        brokenArg.forEach((item, itemi) => {
-          if (theName.includes(item) && !wasFound) {
-            wasFound = true
-            theClient.send('membership-request-return', Array(membersData[i][0], membersData[i][1]))
-          }
-        });
-        */
-      }
+  if (arg[0] != "") {
+    if (arg[1] == 'name') {
+      let resultsFName = await firebaseGetDocuments('members', Array(
+        Array('fname', '==', arg[0] )
+      ), true)      
+      let resultsLName = await firebaseGetDocuments('members', Array(
+        Array('lname', '==', arg[0] )
+      ), true)      
+      let resultsFullName = await firebaseGetDocuments('members', Array(
+        Array('name', '==', arg[0] )
+      ), true)      
+      resultsFName.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))          
+        }
+      });
+      resultsLName.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))          
+        }
+      });
+      resultsFullName.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))          
+        }
+      });
+    } else if (arg[1] == 'dob') {
+      let resultsDOB = await firebaseGetDocuments('members', Array(
+        Array('dob', '==', arg[0])
+      ), true)      
+      resultsDOB.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))
+        }
+      });
+    } else if (arg[1] == 'id') {
+      let resultsID = await firebaseGetDocuments('members', Array(
+        Array('idnum', '==', arg[0])
+      ), true)
+      resultsID.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))
+        }
+      });
+    } else if (arg[1] == 'type') {
+      let resultsMT = await firebaseGetDocuments('members', Array(
+        Array('membership_type', '==', arg[0])
+      ), true)
+      resultsMT.forEach(result => {
+        if (result[0] && result[1]) {
+          wasFound = true
+          theClient.send('membership-request-return', Array(result[0], result[1]))
+        }
+      });
+    } else {
+      notificationSystem('warning', 'You must select a search filter')
+    }
+    if (!wasFound) {
+      notificationSystem('warning', 'No member was found by the search "' + arg[0] + '"')
     }
   } else{
     displayAllMembers()
-  }
-  if (!wasFound && (arg != "")) {
-    notificationSystem('warning', 'No member was found by the search "' + arg + '"')
-  } else {
-    notificationSystem('success', 'Results found!')
   }
 })
 
@@ -4828,14 +5395,33 @@ ipcMain.on('remove-discount', (event, arg) => {
   removeDiscount(arg)
 })
 
-ipcMain.on('register-status-request', (event, arg) => {
+ipcMain.on('register-status-request', async (event, arg) => {
   theClient = event.sender;
-  registerStatus()
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    goHome()
+    notificationSystem('warning', 'Register system is not enabled. Admins can enable in system settings.')
+  } else {
+    registerStatus()
+  }
 })
 
-ipcMain.on('register-all-request', (event, arg) => {
+ipcMain.on('register-all-request', async (event, arg) => {
   theClient = event.sender;
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   gatherAllRegisters()
+})
+
+ipcMain.on('register-qb-request', async (event, arg) => {
+  theClient = event.sender;
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
+  gatherAllQBRegisters()
 })
 
 ipcMain.on('starting-register', (event, arg) => {
@@ -4940,7 +5526,7 @@ ipcMain.on('resume-order', (event, arg) => {
   resumeOrder()
 })
 
-ipcMain.on('member-create-order', (event, arg) => {
+ipcMain.on('member-create-order', async (event, arg) => {
   theClient = event.sender;
   goOrder()
   createOrder(Array(arg, false, false), 'order', false)
@@ -4958,10 +5544,9 @@ ipcMain.on('edit-reciept', async (event, arg) => {
   theClient = event.sender;
   let userAllowed = canUser("permissionEditSystemSettings");
   if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('system', userData.access, {
       reciept: arg
-    });
+    })
     await getSystemData()
     goHome()      
   }
@@ -4971,10 +5556,9 @@ ipcMain.on('edit-register-reciept', async (event, arg) => {
   theClient = event.sender;
   let userAllowed = canUser("permissionEditSystemSettings");
   if (userAllowed) {
-    const docRef = doc(db, "system", userData.access);
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('system', userData.access, {
       registerReciept: arg
-    });
+    })
     await getSystemData()
     goHome()      
   }
@@ -5013,10 +5597,9 @@ ipcMain.on('uploadProductFile', (event, arg) => {
 ipcMain.on('uploadProductImg-complete', async (event, arg) => {
   theClient2 = event.sender;
 
-  const docRef = doc(db, "products", arg[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('products', arg[0], {
     image: arg[1]
-  });
+  })
   uploadImgWin.close()
 })
 
@@ -5027,12 +5610,11 @@ ipcMain.on('uploadProductFile-complete', async (event, arg) => {
     return
   }
 
-  const docRef = doc(db, "members", arg[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', arg[0], {
     files: arrayUnion(arg[1]),
     filesNames: arrayUnion(arg[2]),
     filesNamesRaw: arrayUnion(arg[3])
-  });
+  })
   uploadFileWin.close()
 })
 
@@ -5054,10 +5636,9 @@ ipcMain.on('edit-product-img', (event, arg) => {
 
 ipcMain.on('edit-product-img-remove', async (event, arg) => {
   theClient = event.sender;
-  const docRef = doc(db, "products", arg);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('products', arg[0], {
     image: false
-  });
+  })
   goProducts()
 })
 
@@ -5085,15 +5666,6 @@ ipcMain.on('reciept-choice-close', (event, arg) => {
   recieptWin.close()
 })
 
-function quickBooksConnect() {
-  // AuthorizationUri
-  const authUri = oauthClient.authorizeUri({
-    scope: [OAuthClient.scopes.Accounting, OAuthClient.scopes.OpenId],
-    state: 'testState',
-  }); // can be an array of multiple scopes ex : {scope:[OAuthClient.scopes.Accounting,OAuthClient.scopes.OpenId]}
-  shell.openExternal(authUri)
-}
-
 function quickBooksCheckLogin(){
   return oauthClient.isAccessTokenValid()
 }
@@ -5108,68 +5680,101 @@ const isValidUrl = urlString => {
   return !!urlPattern.test(urlString);
 }
 
-async function quickBooksLogin(parseRedirect) {
+async function refreshTokenIfNeeded() {
+  try {
+    let token = oauthClient.getToken();
+    if (!token || !token.refresh_token) {
+      token = systemData.quickBooksToken      
+    }
+    if (!token || !token.refresh_token) {
+      throw new Error("Refresh token is missing or invalid");
+    }
+
+    const newToken = await oauthClient.refreshUsingToken(token.refresh_token);
+    qbo = new QuickBooks(
+      oauthClient.clientId,
+      oauthClient.clientSecret,
+      oauthClient.getToken().access_token,
+      false, // no token secret for OAuth2, set to false
+      systemData.quickBooksToken2, // Pass the realmId correctly
+      true, // use the sandbox environment (true: sandbox, false: production)
+      true, // enable debugging
+      null, // request logging options, set to null if not used
+      '2.0', // minor version of the API
+      oauthClient.getToken().refresh_token // refresh token
+    );
+
+    // Set the new token for future use    
+    oauthClient.token.setToken(newToken.token);
+    return true;
+  } catch (error) {
+    console.error("Error refreshing token:", error);
+    quickBooksConnect()
+    return false;
+  }
+}
+
+async function quickBooksLogin(parseRedirect, theRealmID) {
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!canUser('permissionEditQBConnect') || !quickbooksSystemEnabled) {
+//    notificationSystem('warning', 'You do not have permission to do this!')
+    return
+  }
   let authToken
   if (systemData.quickBooksToken) {
     authToken = systemData.quickBooksToken
   }
-  if (isValidUrl(parseRedirect)) {
+  if (parseRedirect) {
     notificationSystem('warning', 'Connecting to Quickbooks...')
     oauthClient.createToken(parseRedirect)
       .then(async function (authResponse) {
-        authToken = authResponse.getJson()
+        authToken = authResponse.body
       })
       .catch(function (e) {
+        console.log(e);        
         notificationSystem('danger', 'Something went wrong. (' + e.originalMessage + ')')
         console.log("The error message is :" + e.originalMessage);
         console.log(e.intuit_tid);
         return false
     });
   }
-
   oauthClient.setToken(authToken);
   setTimeout(async () => {
-    if (oauthClient.isAccessTokenValid()) {      
+    if (quickBooksCheckLogin()) {      
+      oauthClient.setToken(authToken);
       quickbooksIsConnected = true
       console.log('Quickbooks has been connected.')
       if (parseRedirect) {
         notificationSystem('success', 'Quickbooks has been connected!')        
       }
-      const docRef = doc(db, "system", getSystemAccess());
-      await updateDoc(docRef, {
+      if (!theRealmID) {
+        theRealmID = systemData.quickBooksToken2
+      }
+      await firebaseUpdateDocument('system', getSystemAccess(), {
         access: getSystemAccess(),
-        quickBooksToken: authToken
-      }).catch((error) => {
-        console.log(error);
-        if (error.code == "permission-denied") {
-          notificationSystem('danger', 'Access code NOT valid!')
-          updateDoc(doc(db, "users", getUID()), {
-            access: "",
-          });
-        }
-      });
-      /*
-      console.log('running');
-      let theAuthToken = oauthClient.token.getToken();
-      var qbo = new QuickBooks(quickbooksConfig.clientId,
-        quickbooksConfig.clientSecret,
-        theAuthToken,
-        theAuthToken,
-        false,
-        true, // don't use the sandbox (i.e. for testing)
-        true); // turn debugging on
-
-
-      qbo.updateCustomer({
-        Id: '42',
-        SyncToken: '1',
-        sparse: true,
-        PrimaryEmailAddr: { Address: 'customer@example.com' }
-      }, function (err, customer) {
-        if (err) console.log(err)
-        else console.log(customer)
+        quickBooksToken: authToken,
+        quickBooksToken2: theRealmID
       })
-      */
+      systemData.quickBooksToken2 = theRealmID
+
+      // Initialize QuickBooks with OAuth 2.0 tokens
+      qbo = new QuickBooks(
+        oauthClient.clientId,
+        oauthClient.clientSecret,
+        oauthClient.getToken().access_token,
+        false, // no token secret for OAuth2, set to false
+        systemData.quickBooksToken2, // Pass the realmId correctly
+        true, // use the sandbox environment (true: sandbox, false: production)
+        true, // enable debugging
+        null, // request logging options, set to null if not used
+        '2.0', // minor version of the API
+        oauthClient.getToken().refresh_token // refresh token
+      );
+      oauthClient.token.setToken(oauthClient.getToken());
+      refreshTokenIfNeeded()
+      setTimeout(() => {
+        processPaymentMethods(0);
+      }, 3000);
       return true
     } else {
       quickbooksIsConnected = false
@@ -5179,108 +5784,60 @@ async function quickBooksLogin(parseRedirect) {
   }, 1000);  
 }
 
-function quickbooksGetAllProducts(){
-  console.log('HERE: ');
-  console.log(oauthClient.isAccessTokenValid());
-  console.log(oauthClient.getToken().access_token);
-  oauthClient
-    .makeApiCall({
-      url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/4620816365354134710/query',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: "select * from Item",
-    })
-    .then(function (response) {
-      console.log(response);
-      theClient.send('quickbooks-test-test', response)
-    })
-    .catch(function (e) {
-      console.log('The error is ' + JSON.stringify(e));
-    });
-}
-
-function quickBooksTest() {
-  let body = {
-    "Line": [
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 123.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Membership",
-            "value": "1"
-          }
-        }
-      },
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 123.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Membership",
-            "value": "1"
-          }
-        }
-      },
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 123.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Membership",
-            "value": "1"
-          }
-        }
-      },
-      {
-        "DetailType": "SalesItemLineDetail",
-        "Amount": 100.0,
-        "SalesItemLineDetail": {
-          "ItemRef": {
-            "name": "Product",
-            "value": "1"
-          }
-        }
-      }
-    ],
-    "CustomerRef": {
-      "value": "1"
+async function findCustomerByBusinessName(businessName, callback) {
+  await refreshTokenIfNeeded()
+  qbo.findCustomers({
+    fetchAll: true,
+    DisplayName: businessName // Use DisplayName for searching by business name
+  }, function (err, customers) {
+    if (err) {
+      console.error('Error finding customer:', err);
+      console.log(err.fault);
+      
+      callback(err);
+    } else if (customers.QueryResponse.Customer && customers.QueryResponse.Customer.length > 0) {
+      // Assuming the first matching customer is the desired one
+      const customer = customers.QueryResponse.Customer[0];
+      console.log('Customer found:', customer);
+      callback(null, customer.Id);
+    } else {
+      console.log('No customer found with the business name:', businessName);
+      callback(new Error('Customer not found'));
     }
-  }
-
-  oauthClient
-    .makeApiCall({
-      url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/4620816365354134710/invoice?minorversion=69',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-    .then(function (response) {
-      console.log(response);
-      console.log('\n\n');
-      console.log(arg['json']['Invoice']);
-      console.log('\n\n');
-      theClient.send('quickbooks-test-test', response)
-    })
-    .catch(function (e) {
-      console.log('The error is ' + JSON.stringify(e));
-    });
+  });
 }
-
-ipcMain.on('quickbooks-test', (event, arg) => {
-//  quickBooksTest()
-  quickbooksGetAllProducts()
-})
 
 ipcMain.on('quickbooks-connect', (event, arg) => {
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', 'Quickbooks is not enabled. Admins can enable this in the settings.')
+    return
+  }
   quickBooksConnect()
 })
 
+ipcMain.on('quickbooks-import-products', (event, arg) => {
+  theClient = event.sender;
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', 'Quickbooks is not enabled. Admins can enable this in the settings.')
+    return
+  }
+  let isConnected = quickBooksCheckLogin()
+  if (isConnected) {
+    productsData.forEach(product => {
+      findOrCreateItem(product, function(itemId){
+      })
+    });    
+  }
+})
+
 ipcMain.on('quickbooks-login', (event, arg) => {
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', 'Quickbooks is not enabled. Admins can enable this in the settings.')
+    return
+  }
   quickBooksLogin(arg)
 })
 
@@ -5314,8 +5871,7 @@ ipcMain.on('change-dark-mode', (event, arg) => {
   theClient = event.sender;
   darkMode = arg
   userData.darkMode = arg
-  const docRef = doc(db, "users", user.uid);
-  updateDoc(docRef, {
+  firebaseUpdateDocument('users', user.uid, {
     darkMode: arg,
   })
 })
@@ -5329,8 +5885,7 @@ ipcMain.on('trash-note', async (event, arg) => {
 
   let memberInfo = await getMemberInfo(arg[0])
   if (Array.isArray(memberInfo.notes)) {
-    const docRef = doc(db, "members", arg[0]);
-    await updateDoc(docRef, {
+    firebaseUpdateDocument('members', arg[0], {
       notes: arrayRemove(memberInfo.notes[arg[1]]),
     })
   }
@@ -5347,9 +5902,7 @@ ipcMain.on('trash-member-file', async (event, arg) => {
     notificationSystem('warning', 'You do not have permisison to remove member files.')
     return
   }
-
-  const docRef = doc(db, "members", arg[0]);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', arg[0], {
     files: arrayRemove(arg[1]),
     filesNames: arrayRemove(arg[2]),
     filesNamesRaw: arrayRemove(arg[3]),
@@ -5370,8 +5923,7 @@ ipcMain.on('settings-update-Account', async (event, arg) => {
 
   let currName = await getDisplayName()
   if (currName != arg[0]) {
-    const docRef = doc(db, "users", getUID());
-    updateDoc(docRef, {
+    firebaseUpdateDocument('users', getUID(), {
       displayName: arg[0]
     })    
     notificationSystem('success', 'Display Name has been updated!')
@@ -5380,8 +5932,7 @@ ipcMain.on('settings-update-Account', async (event, arg) => {
   let currEMail = await getEMail()
   if (currEMail != arg[1]) {
     updateEmail(auth.currentUser, arg[1]).then(() => {
-      const docRef = doc(db, "users", getUID());
-      updateDoc(docRef, {
+      firebaseUpdateDocument('users', getUID(), {
         email: arg[1]
       })    
       notificationSystem('success', 'EMail has been updated!')
@@ -5416,8 +5967,7 @@ ipcMain.on('settings-update-business-info', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-  const docRef = doc(db, "system", getSystemAccess());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('system', getSystemAccess(), {
     businessName: arg[0],
     businessAddress: arg[1],
     businessAddress2: arg[2],
@@ -5435,8 +5985,7 @@ ipcMain.on('settings-update-business-waiver-info', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-  const docRef = doc(db, "system", getSystemAccess());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('system', getSystemAccess(), {
     theWaiver: arg,
   })
   getSystemData()
@@ -5450,8 +5999,7 @@ ipcMain.on('settings-update-esign-enable', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-  const docRef = doc(db, "system", getSystemAccess());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('system', getSystemAccess(), {
     useESigning: arg,
   })
   getSystemData()
@@ -5464,10 +6012,10 @@ ipcMain.on('settings-update-esign-enable', async (event, arg) => {
 
 ipcMain.on('settings-quickbooks-disconnect', async (event, arg) => {
   theClient = event.sender
-
-  const docRef = doc(db, "system", getSystemAccess());
-  await updateDoc(docRef, {
-    quickBooksToken: ""
+  oauthClient.setToken()
+  firebaseUpdateDocument("system", getSystemAccess(), {
+    quickBooksToken: "",
+    quickBooksToken2: ""
   })
   notificationSystem('success', "Quickbooks has been disconnected. Close the application and re-open to fully disconnect.")
   getSystemData()
@@ -5508,9 +6056,7 @@ ipcMain.on('settings-hide-npp-toggle', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     hideNPPSwitch: arg
   });
   await getSystemData()
@@ -5523,9 +6069,7 @@ ipcMain.on('settings-include-expire-time-renew-toggle', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     includeExpireTimeRenew: arg
   });
   await getSystemData()
@@ -5538,18 +6082,29 @@ ipcMain.on('settings-mandatory-DNANotes-toggle', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     mandatoryDNANotes: arg
   });
   await getSystemData()
 })
 
+ipcMain.on('settings-register-system-toggle', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+  firebaseUpdateDocument('system', userData.access, {
+    registerSystem: arg
+  });
+  await getSystemData()
+  goAccount()
+})
+
 ipcMain.on('settings-update-notification-seconds', async (event, arg) => {
   theClient = event.sender;
-  const docRef = doc(db, "users", getUID());
-  updateDoc(docRef, {
+  firebaseUpdateDocument('users', getUID(), {
     notificationSecs: Number(arg)
   })    
   getUserData()
@@ -5562,9 +6117,7 @@ ipcMain.on('settings-update-invwarnemail', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     invWarnEMail: arg
   });
   await getSystemData()
@@ -5577,9 +6130,7 @@ ipcMain.on('settings-update-checkoutmsg', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     checkoutMsg: arg
   });
   await getSystemData()
@@ -5592,9 +6143,7 @@ ipcMain.on('settings-update-shifttimes', async (event, arg) => {
     notificationSystem('danger', 'You do not have permission to do this.')
     return
   }
-
-  const docRef = doc(db, "system", userData.access);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('system', userData.access, {
     shiftTimeA: arg[0],
     shiftTimeB: arg[1],
     shiftTimeC: arg[2]
@@ -5636,8 +6185,7 @@ ipcMain.on('uploadSignature', async (event, arg) => {
 ipcMain.on('uploadSignatureComplete', async (event, arg) => {
   theClient2 = event.sender;
   let theURL = arg;
-  const docRef = doc(db, "members", lastMemberCreated);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', lastMemberCreated, {
     signature: theURL,
     waiver_status: true
   });
@@ -5671,7 +6219,7 @@ ipcMain.on('esign-delete', async (event, arg) => {
     console.log(error);
   });  
   const docRef = doc(db, "members", arg);
-  await updateDoc(docRef, {
+  firebaseUpdateDocument('members', arg, {
     signature: "",
     waiver_status: false
   });
@@ -5682,8 +6230,12 @@ ipcMain.on('void-delete-order', async (event, arg) => {
   voidOrder(arg)
 }) 
 
-ipcMain.on('print-last-register-receipt', (event, arg) => {
+ipcMain.on('print-last-register-receipt', async (event, arg) => {
   theClient = event.sender
+  let registerSystemEnabled = await canSystem('registerSystem')
+  if (!registerSystemEnabled) {
+    return
+  }
   let lastRID = getLastRegister()
   notificationSystem('warning', 'Gathering last register receipt...')
   if (lastRID) {
@@ -5691,4 +6243,50 @@ ipcMain.on('print-last-register-receipt', (event, arg) => {
   } else {
     notificationSystem('danger', 'You do not have a previous register saved...')
   }
+})
+
+ipcMain.on('support-btn', (event, arg) => {
+  theClient = event.sender
+  shell.openExternal("https://www.clubentertainmentrms.com/support")
+})
+
+ipcMain.on('send-chat', (event, arg) => {
+  theClient = event.sender
+  sendChat(arg[0], arg[1])
+})
+
+ipcMain.on('request-chats', async (event, arg) => {
+  theClient = event.sender
+  theClient.send('return-chats', Array(getUID(), chatsData))    
+})
+
+async function sendChat(chatID, theMessage){
+  // TODO: Add deep doc function
+  const docRef = await addDoc(collection(db, "chats", chatID, "messages"), {
+    timestamp: serverTimestamp(),
+    sender: getUID(),
+    access: getSystemAccess(),
+    read: false,
+    message: theMessage
+  });
+}
+
+ipcMain.on('create-invoice-reg', (event, arg) => {
+  theClient = event.sender
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', "Quickbooks is not enabled. Admins can enable this in the settings.")
+    return
+  }
+  startQuickBooksReportGroup(Array(arg), false)
+})
+
+ipcMain.on('create-invoice-regs', (event, arg) => {
+  theClient = event.sender
+  let quickbooksSystemEnabled = canSystem('quickbooksSystem')
+  if (!quickbooksSystemEnabled) {
+    notificationSystem('warning', "Quickbooks is not enabled. Admins can enable this in the settings.")
+    return
+  }
+  startQuickBooksReportGroup(arg, false)
 })

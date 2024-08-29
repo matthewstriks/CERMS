@@ -19,42 +19,8 @@
       <h1 >Members</h1>
       <p>Look up a guest by their membership.</p>
     </div>
-    <div class="container">
-      <ul class="nav justify-content-end">
-        <li class="nav-item">
-          <div class="dropdown">
-            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
-              Options
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-              <div class="container">
-                <div class="btn-group-vertical">
-                  <a class="btn btn-primary" href="account.html" role="button">Account</a>
-                  <a class="btn btn-primary" href="products.html" role="button">Products</a>
-                  <a class="btn btn-primary" href="support.html" role="button">Support</a>
-                  <a class="btn btn-primary" href="#" id="darkModeToggle" role="button"><i class="fa-solid fa-moon"></i></a>
-                </div>
-                <hr>
-                <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
-              </div>
-            </ul>
-          </div>
-        </li>
-      </ul>
-    </div>
-    <hr>
-    <div class="container">
-      <div class="" role="alert" id="errorMsg">
-      </div>
-    </div>
-    <div class="container">
-      <a class="btn btn-primary" href="home.html" role="button">Home</a>
-      <a class="btn btn-secondary" href="members.html" disabled role="button">Members</a>
-      <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
-      <a class="btn btn-primary" href="register.html" role="button">Register</a>
-      <a class="btn btn-primary" href="history.html" role="button">History</a>
-      <a class="btn btn-primary" href="analytics.html" role="button">Analytics</a>
-    </div>
+    <script src="./js/core.js"></script>
+    <br>
     <div class="container">
       <button onclick="topFunction()" id="myBtn" title="Go to top">Go to top</button>
     </div>
@@ -357,7 +323,10 @@
                 <tr id="header">
                   <th scope="col">Order Number</th>
                   <th scope="col">Date/Time</th>
-                  <th scope="col">Amount</th>
+                  <th scope="col">Amount Credit Card</th>
+                  <th scope="col">Amount Gift Card</th>
+                  <th scope="col">Amount Cash</th>
+                  <th scope="col">Total</th>
                   <th scope="col">Actions</th>
                 </tr>
               </thead>
@@ -492,7 +461,27 @@
     </div>
     <br>
     <div class="container">
-      <input type="text" class="form-control" id="membershipSearch" onkeyup="membershipSearchFunct()" placeholder="Search for membership by name, membership ID, membership type, or DOB (MM-DD-YYYY) and press enter">
+      <div class="row">
+        <div class="col-md-2">
+          <select id="membershipSearchType" class="form-control">
+            <option value="">Search By...</option>
+            <option value="name">Name</option>
+            <option value="dob">DOB (yyyy-mm-dd)</option>
+            <option value="id">ID</option>
+            <option value="type">Type</option>
+          </select>
+        </div>
+        <div class="col-md-10">
+          <input type="text" class="form-control" id="membershipSearch" onkeyup="membershipSearchFunct()" placeholder="Choose your search filter and enter text here">
+        </div>
+      </div>
+<div class="row g-3 align-items-center">
+  <div class="col-auto">
+  </div>
+  <div class="col-auto">
+  </div>
+</div>
+
       <br>
       <table id="membershipTable" class="table table-striped table-hover">
         <thead>
@@ -519,7 +508,6 @@
 
     </div>
     <!-- Bootstrap Bundle with Popper -->
-    <script src="./js/core.js"></script>
     <script src="./js/members.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>

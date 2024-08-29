@@ -21,44 +21,7 @@
         <h1>Account</h1>
         <p>Edit/View account information</p>
     </div>
-    <div class="container">
-        <ul class="nav justify-content-end">
-            <li class="nav-item">
-                <div class="dropdown">
-                    <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                        Options
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-                        <div class="container">
-                            <div class="btn-group-vertical">
-                                <a class="btn btn-primary" href="account.html" role="button">Account</a>
-                                <a class="btn btn-primary" href="products.html" role="button">Products</a>
-                                <a class="btn btn-primary" href="support.html" role="button">Support</a>
-                                <a class="btn btn-primary" href="#" id="darkModeToggle" role="button"><i
-                                        class="fa-solid fa-moon"></i></a>
-                            </div>
-                            <hr>
-                            <button type="button" id="logoutBtn" class="btn btn-danger">Logout</button>
-                        </div>
-                    </ul>
-                </div>
-            </li>
-        </ul>
-    </div>
-    <hr>
-    <div class="container">
-        <div class="" role="alert" id="errorMsg">
-        </div>
-    </div>
-    <div class="container">
-        <a class="btn btn-primary" href="home.html" role="button">Home</a>
-        <a class="btn btn-primary" href="members.html" role="button">Members</a>
-        <a class="btn btn-primary" id="quickSaleBtn" role="button">Quick Sale</a>
-        <a class="btn btn-primary" href="register.html" role="button">Register</a>
-        <a class="btn btn-primary" href="history.html" role="button">History</a>
-        <a class="btn btn-primary" href="analytics.html" role="button">Analytics</a>
-    </div>
+    <script src="./js/core.js"></script>
     <br>
 
     <!-- Modal -->
@@ -239,11 +202,6 @@
                 <br>
                 <div class="card">
                     <div class="card-body">
-                        <div id="quickbooksStep2">
-                            <input id="quickbooksURL" type="text" class="form-control" placeholder="URL from CERMS Website"></input>
-                            <br>
-                            <button id="finishQuickbooks" type="button" class="btn btn-success">Finish Connecting</button>
-                        </div>
                         <button class="btn btn-warning" id="quickbooksConnect" type="button">Connect to Quickbooks</button>
                         <button class="btn btn-danger" id="quickbooksDisConnect" type="button">Disconnect Quickbooks</button>
                     </div>
@@ -251,6 +209,22 @@
                         Click the button to sign in to your Quickbooks Online account. You will then be redirected to the CERMS website. Copy the URL of the CERMS website back here and click connect again.
                     </div>
                 </div>                
+                <br>
+                <div id="importProductsQB" class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <label class="form-check-label" for="debugModeSwitch">[QuickBooks] Import Products</label>
+                            </div>
+                            <div class="col-4">
+                                <button id="importProductsQBBtn" class="btn btn-primary">Import</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        Imports products to quickbooks. (NOTE: This should only be done once when you first setup quickbooks.)
+                    </div>
+                </div>
                 <br>
                 <div class="card">
                     <div class="card-body">
@@ -411,6 +385,21 @@
                     </div>
                 </div>
                 <br>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <label class="form-check-label" for="enableRegisterSystem">Enable Register System</label>
+                            </div>
+                            <div class="col-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="enableRegisterSystem">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <br>
                 <br>
                 <br>
             </div>
@@ -545,6 +534,12 @@
                             Void/Delete Transactions
                         </label>
                     </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" value="" id="permissionEditQBConnect">
+                        <label class="form-check-label" for="permissionEditQBConnect">
+                            Quickbooks Connection
+                        </label>
+                    </div>
                     <br>
                     <button class="btn btn-success" type="button" id="editAccountSave">Save</button> <button class="btn btn-danger" type="button" id="editAccountCancel">Close</button>
                     <br>
@@ -575,7 +570,6 @@
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
         integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
         crossorigin="anonymous"></script>
-    <script src="./js/core.js"></script>
     <script src="./js/account.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"

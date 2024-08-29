@@ -3,6 +3,7 @@ let productsData = Array()
 let mandDNANotes = false
 let viewDNABtn = document.getElementById('viewDNABtn');
 let unViewDNABtn = document.getElementById('unViewDNABtn');
+let membershipSearchType = document.getElementById('membershipSearchType');
 let membershipSearch = document.getElementById('membershipSearch');
 let membershipTable = document.getElementById('membershipTable');
 let addLockerRoomWarning = document.getElementById('addLockerRoomWarning');
@@ -95,7 +96,6 @@ let fileTrashingList
 let esignRemoving
 let esignRemovingList
 
-
 if (scanIDBtn) {
   scanIDTxt.style.display = 'none'
   scanIDBtn.addEventListener('click', function () {
@@ -148,6 +148,7 @@ function scanIDFunction() {
   }
 
   membershipSearch.value = clientID
+  membershipSearchType.value = 'id'
   searchForMember(clientID)
 
   scanIDBtn.disabled = false
@@ -383,7 +384,7 @@ function formWasSubmitted(){
 
 function searchForMember(filter){
   removeAllRows()
-  ipcRenderer.send('searchForMember', filter);
+  ipcRenderer.send('searchForMember', Array(filter, membershipSearchType.value));
 }
 
 function updateExpireDate(){
@@ -434,7 +435,7 @@ if(membershipSearch){
     if (e.code == "Enter" || e.code == "Numpad Enter" || e.keyCode == 13) {
       enterPressed = true;
       var filter, tr, td, i, txtValue;
-      filter = membershipSearch.value.toUpperCase();
+      filter = membershipSearch.value;
       tr = membershipTable.getElementsByTagName("tr");
       searchForMember(filter)
       //for (i = 0; i < tr.length; i++) {
@@ -681,37 +682,17 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
   document.getElementById("viewinfo"+arg[0]).addEventListener('click', function(){
     memberCheckingIn = arg[0];
     memberCheckingInName = arg[1].name;
+    let theCreationTime
+    let isTimeExpired = false
     if (arg[1].creation_time.seconds) {
-      var a = new Date(arg[1].creation_time.seconds * 1000);
+      theCreationTime = getTimestampString(new Date(arg[1].creation_time.seconds * 1000), true)
     }else{
-      var a = new Date(arg[1].creation_time * 1000);
+      theCreationTime = getTimestampString(new Date(arg[1].creation_time * 1000), true)
     }
-    var a2 = new Date(arg[1].id_expiration * 1000);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var year = a.getFullYear();
-    var year2 = a2.getFullYear();
-    var month = months[a.getMonth()];
-    var month2 = months[a2.getMonth()];
-    var date = a.getDate();
-    var date2 = a2.getDate();
-    let hour = a.getHours();
-    let hour2 = a2.getHours();
-    let ampm = "AM"
-    let ampm2 = "AM"
-    if (hour > 12) {
-      ampm = "PM"
-      hour = hour - 12
+    let theExpireTime = getTimestampString(new Date(arg[1].id_expiration * 1000), true)
+    if (new Date(arg[1].id_expiration * 1000) < new Date()) {
+      isTimeExpired = true
     }
-    if (hour2 > 12) {
-      ampm2 = "PM"
-      hour2 = hour2 - 12
-    }
-    var min = a.getMinutes();
-    var min2 = a2.getMinutes();
-    var sec = a.getSeconds();
-    var sec2 = a2.getSeconds();
-    var time = month + ' ' + date + ' ' + ' ' + year + ' ' + hour + ':' + min + ':' + sec + ' ' + ampm;
-    var time2 = month2 + ' ' + date2 + ' ' + ' ' + year2 + ' ' + hour2 + ':' + min2 + ':' + sec2 + ' ' + ampm2;
 
     if (arg[1].tag) {
       memberInfoTag.innerHTML = 'READ NOTES'
@@ -739,10 +720,13 @@ ipcRenderer.on('membership-request-return', (event, arg) => {
     memberInfoID.innerHTML = 'Membership ID: ' + (arg[1].id_number || 'N/A');
     memberInfoEMail.innerHTML = 'EMail: ' + (arg[1].email || 'N/A');
     memberInfoType.innerHTML = 'Membership Type: ' + arg[1].membership_type;
-    memberInfoExpires.innerHTML = 'Membership Expires: ' + time2;
+    memberInfoExpires.innerHTML = 'Membership Expires: ' + theExpireTime;
+    if (isTimeExpired) {
+      memberInfoExpires.style = 'color:red'
+    }
     memberInfoIDNum2.innerHTML = 'State ID Number: ' + arg[1].idnum;
     memberInfoIDNum3.innerHTML = 'ID State: ' + arg[1].idstate;
-    memberInfoCT.innerHTML = 'Creation Time: ' + time;
+    memberInfoCT.innerHTML = 'Creation Time: ' + theCreationTime;
     memberInfoWS.innerHTML = 'Waiver Status: ' + arg[1].waiver_status;
     if (Array.isArray(arg[1].notes)) {
       let theNotesString = ""
@@ -1174,34 +1158,36 @@ ipcRenderer.on('member-order-history-request-return', (event, arg) => {
   var cell2 = row.insertCell(1);
   cell2.id = 'datecell' + arg[0];
   var cell3 = row.insertCell(2);
-  cell3.id = 'amountcell' + arg[0];
+  cell3.id = 'amountcccell' + arg[0];
   var cell4 = row.insertCell(3);
-  cell4.id = 'actioncell' + arg[0];
+  cell4.id = 'amountgccell' + arg[0];
+  var cell5 = row.insertCell(4);
+  cell5.id = 'amountccell' + arg[0];
+  var cell6 = row.insertCell(5);
+  cell6.id = 'totalcell' + arg[0];
+  var cell7 = row.insertCell(6);
+  cell7.id = 'actioncell' + arg[0];
 
-  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  var a = new Date(arg[1].timestamp * 1000);
-  var year = a.getFullYear();
-  var month = a.getMonth() + 1;
-  var fancyMonth = months[a.getMonth()];
-  var date = a.getDate();
-  let hour = String(a.getHours()).padStart(2, '0');
-  let ampm = "AM"
-  if (Number(hour) > 12) {
-    ampm = "PM"
-    hour = Number(hour) - 12
-  }
-  var min = String(a.getMinutes()).padStart(2, '0');
-  var sec = a.getSeconds();
-  var time = month + '/' + date + '/' + year + ' ' + hour + ':' + min + ':' + sec + ' ' + ampm;
-
+  let time = getTimestampString((arg[1].timestamp.seconds * 1000), true);
+  
+  // paymentMethod: credit card, gift card, cash
+  // total: Sub, Tax, Tot, OGTot
+  let theTotalCC = formatter.format(arg[1].paymentMethod[0])
+  let theTotalGC = formatter.format(arg[1].paymentMethod[1])
+  let theTotalC = formatter.format(arg[1].paymentMethod[2])
+  let theTotal = formatter.format(arg[1].total[2])
+  
   cell1.innerHTML = arg[0]
   cell2.innerHTML = time;
-  cell3.innerHTML = arg[1].total;
-  cell4.innerHTML = "<button data-bs-toggle='modal' data-bs-target='#myModal7' id='viewinfo" + arg[0] + "' type='button' class='btn btn-success'>View Info</button>";
+  cell3.innerHTML = theTotalCC;
+  cell4.innerHTML = theTotalGC;
+  cell5.innerHTML = theTotalC;
+  cell6.innerHTML = theTotal;
+  cell7.innerHTML = "<button id='viewinfo" + arg[0] + "' type='button' class='btn btn-success'>View Info</button>";
 
   document.getElementById('viewinfo' + arg[0]).addEventListener('click', function () {
-    viwingMore = true;
+    ipcRenderer.send('open-reciept', arg[0])
+//    viwingMore = true;
     // All order info  
     //    document.getElementById('memberHistoryInfoNameTotal').innerHTML = memberCheckingInName
     //    document.getElementById('memberHistoryInfoNotes').value = arg[1].notes

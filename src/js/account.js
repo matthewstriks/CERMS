@@ -42,11 +42,10 @@ let theWaiverEdit = document.getElementById('theWaiverEdit')
 let saveBusinessWaiverSettingsBtn = document.getElementById('saveBusinessWaiverSettingsBtn')
 let cancelBusinessWaiverSettingsBtn = document.getElementById('cancelBusinessWaiverSettingsBtn')
 let enableSignatureSigningSwitch = document.getElementById('enableSignatureSigningSwitch')
-let quickbooksStep2 = document.getElementById('quickbooksStep2')
-let quickbooksURL = document.getElementById('quickbooksURL')
-let finishQuickbooks = document.getElementById('finishQuickbooks')
 let quickbooksConnect = document.getElementById('quickbooksConnect')
 let quickbooksDisConnect = document.getElementById('quickbooksDisConnect')
+let importProductsQB = document.getElementById('importProductsQB')
+let importProductsQBBtn = document.getElementById('importProductsQBBtn')
 let debugModeSwitch = document.getElementById('debugModeSwitch')
 let importMembershipModeSwitch = document.getElementById('importMembershipModeSwitch')
 let saveDirTxt = document.getElementById('saveDirTxt')
@@ -66,6 +65,7 @@ let shiftTimeDiv = document.getElementById('shiftTimeDiv')
 let shiftTimeBtn = document.getElementById('shiftTimeBtn')
 let includeExpireTimeRenewSwitch = document.getElementById('includeExpireTimeRenewSwitch')
 let mandatoryDNANotesSwitch = document.getElementById('mandatoryDNANotesSwitch')
+let enableRegisterSystem = document.getElementById('enableRegisterSystem')
 
 // Accounts
 let editingID;
@@ -94,6 +94,7 @@ let permissionEditMemberFiles = document.getElementById('permissionEditMemberFil
 let permissionDeleteMembers = document.getElementById('permissionDeleteMembers')
 let permissionEditAnalytics = document.getElementById('permissionEditAnalytics')
 let permissionEditVDTransactions = document.getElementById('permissionEditVDTransactions')
+let permissionEditQBConnect = document.getElementById('permissionEditQBConnect')
 let editAccountSave = document.getElementById('editAccountSave')
 let editAccountCancel = document.getElementById('editAccountCancel')
 let addAccountBtn = document.getElementById('addAccountBtn')
@@ -189,21 +190,13 @@ cancelBusinessWaiverSettingsBtn.addEventListener('click', function(){
     businessWaiverSettingsEdit.style.display = 'none'
 })
 
-if (quickbooksStep2) {
-    quickbooksStep2.style.display = 'none'
-    quickbooksDisConnect.style.display = 'none'
-}
-
 quickbooksConnect.addEventListener('click', function() {
     quickbooksConnect.style.display = 'none'
-    quickbooksStep2.style.display = ''
     ipcRenderer.send('quickbooks-connect')
 })
 
-finishQuickbooks.addEventListener('click', function(){
-    quickbooksConnect.style.display = ''
-    quickbooksStep2.style.display = 'none'
-    ipcRenderer.send('quickbooks-login', quickbooksURL.value)
+importProductsQBBtn.addEventListener('click', function() {
+    ipcRenderer.send('quickbooks-import-products')
 })
 
 quickbooksDisConnect.addEventListener("click", function(){
@@ -228,6 +221,10 @@ includeExpireTimeRenewSwitch.addEventListener('change', function(){
 
 mandatoryDNANotesSwitch.addEventListener('change', function(){
     ipcRenderer.send('settings-mandatory-DNANotes-toggle', mandatoryDNANotesSwitch.checked)
+})
+
+enableRegisterSystem.addEventListener('change', function(){
+    ipcRenderer.send('settings-register-system-toggle', enableRegisterSystem.checked)
 })
 
 editSaveDir.addEventListener('click', function () {
@@ -293,7 +290,7 @@ editAccountSave.addEventListener('click', function(){
         editingAccessCode.style.display = ''
         ipcRenderer.send('account-create', Array(editingEMail.value, editingDisplayName.value, editingRank.value))
     } else {
-        ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionDeleteMembers.checked, permissionEditAnalytics.checked, permissionEditVDTransactions.checked))    
+        ipcRenderer.send('account-edit', Array(editingID, editingDisplayName.value, editingRank.value, editingAccessCode.value, permissionViewProductsPage.checked, permissionEditCategory.checked, permissionEditProducts.checked, permissionEditDiscounts.checked, permissionWaiveProducts.checked, permissionEditCoreProducts.checked, permissionEditSystemSettings.checked, permissionEditRegisters.checked, permissionImportMemberMode.checked, permissionEditDNAAdd.checked, permissionEditDNARemove.checked, permissionEditTagAdd.checked, permissionEditTagRemove.checked, permissionEditMemberNotes.checked, permissionEditMemberFiles.checked, permissionDeleteMembers.checked, permissionEditAnalytics.checked, permissionEditVDTransactions.checked, permissionEditQBConnect.checked))    
         document.getElementById('row' + editingID).remove()
     }
 })
@@ -354,12 +351,18 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
 
     theWaiver.innerHTML = arg[1].theWaiver || "No Waiver Found"
     theWaiverEdit.innerHTML = arg[1].theWaiver || ""
-
+    console.log('running');
+    console.log(arg);
+    
     if (arg[2]) {
        quickbooksConnect.disabled = true 
        quickbooksConnect.innerHTML = "Quickbooks Connected" 
        quickbooksConnect.className = 'btn btn-success'
-        quickbooksDisConnect.style.display = ''
+       quickbooksDisConnect.style.display = ''
+       importProductsQB.style.display = ''
+    } else {
+        quickbooksDisConnect.disabled = true
+        importProductsQB.style.display = 'none'
     }
 
     debugModeSwitch.checked = arg[5]
@@ -399,6 +402,7 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
     cshiftTime.value = arg[1].shiftTimeC || ""
     includeExpireTimeRenewSwitch.checked = arg[1].includeExpireTimeRenew || false
     mandatoryDNANotesSwitch.checked = arg[1].mandatoryDNANotes || false
+    enableRegisterSystem.checked = arg[1].registerSystem || false
     if (shiftTimeDiv) {
         shiftTimeDiv.style.display = 'none'
     }
@@ -455,6 +459,7 @@ ipcRenderer.on('recieve-users', (event, arg) => {
         permissionDeleteMembers.checked = arg[1].permissionDeleteMembers
         permissionEditAnalytics.checked = arg[1].permissionEditAnalytics
         permissionEditVDTransactions.checked = arg[1].permissionEditVDTransactions
+        permissionEditQBConnect.checked = arg[1].permissionEditQBConnect
     })
 
     document.getElementById('delete'+arg[0]).addEventListener('click', function(){

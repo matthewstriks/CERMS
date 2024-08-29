@@ -48,6 +48,10 @@ let endingSubmitLogoutBtn = document.getElementById('endingSubmitLogoutBtn');
 let endingSubmitBtn = document.getElementById('endingSubmitBtn');
 let dropSubmitBtn = document.getElementById('dropSubmitBtn');
 let manageRegisters = document.getElementById('manageRegisters');
+let manageRegistersQB = document.getElementById('manageRegistersQB');
+let groupQBInvoiceBtn = document.getElementById('groupQBInvoiceBtn');
+let SAgroupQBInvoiceBtn = document.getElementById('SAgroupQBInvoiceBtn');
+let registersTable = document.getElementById('registersTable');
 let plrrBtn = document.getElementById('plrrBtn')
 
 let theRegInfo;
@@ -154,6 +158,7 @@ dropCCardAmt.addEventListener('input', function(){
 
 if (manageRegisters) {
   manageRegisters.style.display = 'none'
+  manageRegistersQB.style.display = 'none'
 }
 
 if (personalRegOpen) {
@@ -254,8 +259,12 @@ ipcRenderer.on('register-status-change', (event, arg) => {
     personalRegClose.style.display = 'none'
     personalRegDrop.style.display = 'none'
   }
-  if (arg[1]) {
+  if (arg[1][0]) {
     manageRegisters.style.display = ''
+    if (arg[1][1]) {
+      manageRegistersQB.style.display = ''      
+      ipcRenderer.send('register-qb-request')
+    }
     if (!regsRequested) {
       ipcRenderer.send('register-all-request')
       regsRequested = true      
@@ -270,6 +279,78 @@ ipcRenderer.on('register-shift-times-return', (event, arg) => {
   document.getElementById('shiftB').innerHTML = arg[1]
   document.getElementById('shiftC').innerHTML = arg[2]
 })
+
+let selectedRegsForInvoice = Array()
+
+ipcRenderer.on('register-qb-request-return', (event, arg) => {
+  console.log(arg);
+  var row = registersTable.insertRow(1);
+  row.id = 'row' + arg[0];
+
+  var cell1 = row.insertCell(0);
+  cell1.id = 'selectcell' + arg[0];
+  var cell2 = row.insertCell(1);
+  cell2.id = 'datecell' + arg[0];
+  var cell3 = row.insertCell(2);
+  cell3.id = 'cashiercell' + arg[0];
+  var cell4 = row.insertCell(3);
+  cell4.id = 'shiftcell' + arg[0];
+  var cell5 = row.insertCell(4);
+  cell5.id = 'actioncell' + arg[0];
+
+  /*
+            <th scope="row"><input class="form-check-input" type="checkbox" value=""></th>
+            <td>08/01/2024</td>
+            <td>Matthew Striks</td>
+            <td>A Shift</td>
+            <td><button class="btn btn-success">Create Invoice</button></td>
+  */
+
+  let theShift = 'No Shift Assigned'
+  if (arg[1].shift == 'B') {
+    theShift = arg[2][1]
+  } else if (arg[1].shift == 'C') {
+    theShift = arg[2][2]
+  } else if (arg[1].shift == 'A') {
+    theShift = arg[2][0]
+  }
+
+  cell1.innerHTML = '<input id="' + arg[0] + 'check" class="form-check-input" type="checkbox" value=""></input>'
+  cell2.innerHTML = getTimestampString(new Date(arg[1].timestampStart.seconds * 1000), false)
+  cell3.innerHTML = arg[1].uname
+  cell4.innerHTML = theShift
+  cell5.innerHTML = '<button id="' + arg[0] + 'CIBtn" class="btn btn-success">Create Invoice</button>'
+
+  document.getElementById(arg[0] + 'check').addEventListener('change', function(){
+    console.log('check clicked!');
+    if (document.getElementById(arg[0] + 'check').checked && !selectedRegsForInvoice.includes(arg[0])) {
+      selectedRegsForInvoice.push(arg[0])
+    } else if (!document.getElementById(arg[0] + 'check').checked && selectedRegsForInvoice.includes(arg[0])) {
+      for (let index = 0; index < selectedRegsForInvoice.length; index++) {
+        const selectedReg = selectedRegsForInvoice[index];
+        if (selectedReg == arg[0]) {
+          selectedRegsForInvoice.splice(index, 1)
+        }
+      }
+    }
+  })
+
+  document.getElementById(arg[0] +'CIBtn').addEventListener('click', function(){
+    ipcRenderer.send('create-invoice-reg', arg[0])
+  })
+})
+
+groupQBInvoiceBtn.addEventListener('click', function(){
+  ipcRenderer.send('create-invoice-regs', selectedRegsForInvoice)
+  selectedRegsForInvoice = Array()
+})
+
+SAgroupQBInvoiceBtn.addEventListener('click', function () {
+  let theDocs = Array.from(document.getElementsByClassName('form-check-input'));
+  theDocs.forEach(docu => {
+    docu.checked = true;
+  });
+});
 
 ipcRenderer.on('register-all-request-return', (event, arg) => {
   let newCard = document.createElement('div')
