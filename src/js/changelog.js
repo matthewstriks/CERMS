@@ -1,3 +1,7 @@
+const { ipcRenderer } = require("electron");
+
+let versionTitle = document.getElementById('versionTitle')
+
 document.addEventListener("DOMContentLoaded", function () {
     fetch("https://api.github.com/repos/matthewstriks/CERMS/releases/tags/v3.1.2")
         .then(response => response.json())
@@ -32,3 +36,21 @@ function getRandomColor() {
 document.getElementById('closeBtn').addEventListener('click', function(){
     window.close(); 
 })
+
+ipcRenderer.on('changelog-open-receive', (event, arg) => {
+    versionTitle.innerHTML = "🎉 Welcome to Version " + arg + " 🎉"
+    fetch("https://api.github.com/repos/matthewstriks/CERMS/releases/tags/v" + arg)
+        .then(response => response.json())
+        .then(data => {
+            const changelogContainer = document.getElementById("changelog");
+            const changelogBody = data.body;
+
+            changelogContainer.innerHTML = marked.parse(changelogBody);
+
+            // Create confetti
+            createConfetti();
+        })
+        .catch(error => console.error('Error fetching the changelog:', error));
+})
+
+ipcRenderer.send("changelog-open")

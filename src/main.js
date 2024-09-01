@@ -6288,3 +6288,7 @@ ipcMain.on('create-invoice-regs', (event, arg) => {
   }
   startQuickBooksReportGroup(arg, false)
 })
+
+ipcMain.on('changelog-open', (event, arg) => {
+  event.sender.send('changelog-open-receive', app.getVersion())
+})
