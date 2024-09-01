@@ -3636,7 +3636,7 @@ async function startGatherAllMembers(){
   }
   startGatherAllMembersA = true;
 
-  const q = query(collection(db, "members"), where('access', '==', getSystemAccess()), orderBy("creation_time"), limit(50));
+  const q = query(collection(db, "members"), where('access', '==', getSystemAccess()), orderBy("creation_time", 'desc'), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
@@ -3672,17 +3672,18 @@ async function startGatherAllMembers(){
 }
 
 async function displayAllMembers(){
-  let membersDataBrokenDown = membersData.slice(Math.max(membersData.length - 10, 0))
+  let membersDataBrokenDown = membersData.slice(Math.max(membersData.length - 100, 0))
   membersDataBrokenDown.forEach((member) => {
     theClient.send('membership-request-return', Array(member[0], member[1]))
   })
 }
 
 async function displayAllDNAMembers(){
-  membersData.forEach((member) => {
-    if (member[1].dna) {
+  let theDNAs = await firebaseGetDocuments('members', Array(
+    Array('dna', '==', true)
+  ), true)
+  theDNAs.forEach((member) => {
       theClient.send('membership-request-return', Array(member[0], member[1]))      
-    }
   })
 }
 
@@ -4889,9 +4890,14 @@ ipcMain.on('membership-create', async (event, arg) => {
 
 ipcMain.on('membership-update', async (event, arg) => {
   theClient = event.sender;
+  let registerSystemEnabled = canSystem('registerSystem')
   if (arg[11]) {
-    goOrder()
-    createOrder(Array(arg[0], arg[4], arg[1] + ' ' + arg[2]), 'updatemembership', arg)        
+    if (registerSystemEnabled) {
+      goOrder()
+      createOrder(Array(arg[0], arg[4], arg[1] + ' ' + arg[2]), 'updatemembership', arg)              
+    } else {
+      editMembership(arg);
+    }
   }else{
     editMembership(arg);
   }
