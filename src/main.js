@@ -17,6 +17,7 @@ const theHostName = os.hostname();
 const OAuthClient = require('intuit-oauth');
 const QuickBooks = require('node-quickbooks');
 const { compareAsc, format } = require("date-fns");
+const { register } = require('module');
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
   .then((url) => {
@@ -965,7 +966,7 @@ async function registerReciept(registerID, logoutTF){
         }
         createRecieptScreen(false, logoutTF)
       });
-      await updateDoc(docRef, {
+      await firebaseUpdateDocument('registers', registerID, {
         reciept: withChargeTotal
       });    
     })
@@ -1416,6 +1417,7 @@ async function startRegister(registerInfo, redirect){
       Array('active', '==', true),
       Array('shift', '!=', 'd')
     ), true)
+    let stillOpen = false
     querySnapshot.forEach((doc) => {
       stillOpen = true
     });
