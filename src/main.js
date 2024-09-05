@@ -1159,7 +1159,7 @@ async function completeOrder(orderInfo){
 
   pendingOrders.forEach(porder => {
     if (porder[1] == 'membership') {
-      pendingOrderID = docRef.id
+      pendingOrderID = theNewOrder.id
       createMembership(porder[2])
     } else if (porder[1] == 'updatemembership'){
       editMembership(porder[2])
@@ -1645,7 +1645,7 @@ async function startQuickBooksReportGroup(registersID, isFinal){
   let theFirstTime = false
   registersID.forEach(async registerID => {
     registerIDs = registerIDs + registerID + " "
-    let registerInfo = await firebaseGetDocument('registers', registerID)
+    let registerInfo = await firebaseGetDocument('registers', registerID) 
     registersInfo.push(Array(registerID, registerInfo))
     if (!theFirstTime) {
       theFirstTime = registerInfo.timestampStart.seconds
