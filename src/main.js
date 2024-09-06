@@ -5365,6 +5365,11 @@ ipcMain.on('gather-products', (event, arg) => {
   displayAllProducts()
 })
 
+ipcMain.on('gather-taxRate', (event, arg) => {
+  theClient = event.sender;
+  theClient.send('receive-taxRate', systemData.taxRate)
+})
+
 ipcMain.on('edit-product', (event, arg) => {
   theClient = event.sender;
   editProduct(arg)
@@ -6100,6 +6105,19 @@ ipcMain.on('settings-register-system-toggle', async (event, arg) => {
   });
   await getSystemData()
   goAccount()
+})
+
+ipcMain.on('settings-register-system-taxRate', async (event, arg) => {
+  theClient = event.sender;
+  let userAllowed = canUser("permissionEditSystemSettings");
+  if (!userAllowed) {
+    notificationSystem('danger', 'You do not have permission to do this.')
+    return
+  }
+  firebaseUpdateDocument('system', userData.access, {
+    taxRate: Number(arg) / 100
+  });
+  await getSystemData()
 })
 
 ipcMain.on('settings-update-notification-seconds', async (event, arg) => {

@@ -54,6 +54,7 @@ let proPrice = false
 let proPriceArray = false
 let productsAFP = Array()
 let restrictPros = false
+let theTaxRate
 
 if (searchProducts) {
   searchProducts.addEventListener('click', function(){
@@ -390,7 +391,8 @@ if (checkoutBtn) {
             productsOGTot = productsOGTot + Number(theProductPrice)
           
             if (item2[1].taxable) {
-              productsTax = productsTax + (Number(theProductPrice) * .07)              
+//              productsTax = productsTax + (Number(theProductPrice) * .07)              
+              productsTax = productsTax + (Number(theProductPrice) * theTaxRate)              
             }
           }
         });
@@ -828,6 +830,15 @@ if (orderDiscountBtn) {
 }
 
 ipcRenderer.send('gather-products-order')
+ipcRenderer.send('gather-taxRate')
+
+ipcRenderer.on('receive-taxRate', (event, arg) => {
+  if (arg) {  
+    theTaxRate = arg     
+  } else {
+    theTaxRate = .07
+  }
+})
 
 ipcRenderer.on('return-products-order-all', (event, arg) => {
   productsData = arg[0];
