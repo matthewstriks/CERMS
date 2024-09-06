@@ -1,3 +1,4 @@
+var Tablesort = require('tablesort');
 let personalRegOpen = document.getElementById('personalRegOpen');
 let personalRegClose = document.getElementById('personalRegClose');
 let personalRegDrop = document.getElementById('personalRegDrop');
@@ -281,6 +282,14 @@ ipcRenderer.on('register-shift-times-return', (event, arg) => {
 })
 
 let selectedRegsForInvoice = Array()
+
+if (document.getElementById('testTable')) {
+  document.getElementById('testTable').style.display = 'none'
+}
+
+if (registersTable) {
+  new Tablesort(registersTable);
+}
 
 ipcRenderer.on('register-qb-request-return', (event, arg) => {
   console.log(arg);
