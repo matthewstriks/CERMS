@@ -718,7 +718,8 @@ ipcRenderer.on('return-discounts', (event, arg) => {
 
   cell3.innerHTML = arg[1].amount;
   if (arg[1].expires) {
-    cell4.innerHTML = timeConverter((arg[1].expires / 1000));
+//    cell4.innerHTML = timeConverter((arg[1].expires / 1000));
+    cell4.innerHTML = getTimestampString(arg[1].expires.seconds * 1000, false)
   }else{
     cell4.innerHTML = 'N/A'
   }
@@ -750,11 +751,12 @@ ipcRenderer.on('return-discounts', (event, arg) => {
     }
     editDiscountUsed.value = arg[1].used
     if (arg[1].expires) {
-      editDiscountExpDate.value = timeConverter2(arg[1].expires / 1000)
+      console.log(getTimestampString(arg[1].expires.seconds * 1000, false));
+      let dateString = getTimestampString(arg[1].expires.seconds * 1000, false)
+      let [month, day, year] = dateString.split('/');
+      let theFinalDateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;  // Format: "YYYY-MM-DD"
+      editDiscountExpDate.value = theFinalDateString
     }
-//    editCategoryName.value = arg[1].name
-//    editCategoryDescription.value = arg[1].desc
-//    editCategoryColor.value = arg[1].color
   })
 
   document.getElementById("remove"+arg[0]).addEventListener('click', function(){

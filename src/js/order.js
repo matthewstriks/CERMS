@@ -703,8 +703,10 @@ function startOrderDiscount(discountCode){
   let discountFound = false
   discountsSelected = false
   discountsData.forEach((item, i) => {
-    if (discountCode == item[1].code) {
-      if (item[1].expires <= Date.now()) {
+    if (discountCode == item[1].code) {      
+      let expDate = new Date(item[1].expires.seconds * 1000)
+      let todayDate = new Date(Math.floor(Date.now()))      
+      if (expDate <= todayDate) {
         failReason = 'Discount Expired!'
         return
       }
@@ -755,7 +757,9 @@ function startProductDiscount(discountCode, theDiscountWarning, theProductDiscou
   discountsSelected = false
   discountsData.forEach((item, i) => {
     if (discountCode == item[1].code) {
-      if (item[1].expires <= Date.now()) {
+      let expDate = new Date(item[1].expires.seconds * 1000)
+      let todayDate = new Date(Math.floor(Date.now()))      
+      if (expDate <= todayDate) {
         failReason = 'Discount Expired!'
         return
       }

@@ -671,7 +671,11 @@ async function createProduct(proCat, proName, proPrice, proInvWarn, proDesc, pro
 
 async function createDiscount(discCode, discDollar, discPercent, discAmount, discAS, discASPro, discExpDate, discTypeP, discTypeO, discLimit, discUsed){
   notificationSystem('warning', 'Creating Discount...')
-  let d = new Date(discExpDate).getTime();
+  let d = false
+  if (discExpDate) {
+    let date = new Date(discExpDate);
+    d = Timestamp.fromDate(date);    
+  }
   let userAllowed = canUser('permissionEditDiscounts')
   if (!userAllowed) {
     notificationSystem('danger', 'No permissions...')
@@ -691,14 +695,14 @@ async function createDiscount(discCode, discDollar, discPercent, discAmount, dis
     code: discCode,
     dollar: discDollar,
     percent: discPercent,
-    amount: discAmount,
+    amount: Number(discAmount),
     asCheck: discAS,
     asPro: discASPro,
     expires: d,
     typeProduct: discTypeP,
     typeOrder: discTypeO,
-    limit: theDiscLimit,
-    used: discUsed
+    limit: Number(theDiscLimit),
+    used: Number(discUsed)
   })
   notificationSystem('success', 'Discount Added!')
   goProducts()
@@ -3427,17 +3431,22 @@ async function editDiscount(discountInfo){
     notificationSystem('danger', 'No permissions...')
     return
   }
-  let d = new Date(discountInfo[5]).getTime();
+  let d = false
+  if (discountInfo[7]) {
+    let date = new Date(discountInfo[7]);
+    d = Timestamp.fromDate(date);
+  }
+
   firebaseUpdateDocument('discounts', discountInfo[0], {
     code: discountInfo[1],
     dollar: discountInfo[2],
     percent: discountInfo[3],
-    amount: discountInfo[4],
+    amount: Number(discountInfo[4]),
     asCheck: discountInfo[5],
     asPro: discountInfo[6],
     expires: d,
-    typeProduct: discountInfo[7],
-    typeOrder: discountInfo[8],
+    typeProduct: discountInfo[8],
+    typeOrder: discountInfo[9],
     limit: Number(discountInfo[10]),
     used: Number(discountInfo[11])
   })
