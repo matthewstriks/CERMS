@@ -113,7 +113,12 @@ function notificationSystem(notificationType, notificationMsg, theNotSecs, theNo
   }
 }
 
+let theUID = false
 if (fileName[0] != 'login.html' && fileName[0] != 'index.html' && fileName[0] != 'access.html') {
+  ipcRenderer.send('receive-uid')
+  ipcRenderer.on('return-uid', (event, arg) => {
+    theUID = arg
+  })
   // Create NavBar for every page (except above)
   let navBarBr = document.createElement('br')
   document.body.prepend(navBarBr)

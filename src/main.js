@@ -185,6 +185,9 @@ function canSystem(theFunction){
 }
 
 function getUID(){
+  if (!user) {
+    return false;
+  } 
   return user.uid;
 }
 
@@ -1641,138 +1644,174 @@ async function startQuickBooksReportGroup(registersID, isFinal){
   if (!registerSystemEnabled || !quickbooksSystemEnabled) {
     return
   }
-  await refreshTokenIfNeeded()
   notificationSystem('warning', 'Generating register report for QuickBooks... Do not shut down application.')
-  let registersInfo = Array()
-  let registerIDs = ""
-  let theTxnDate = ""
-  let theFirstTime = false
-  registersID.forEach(async registerID => {
-    registerIDs = registerIDs + registerID + " "
-    let registerInfo = await firebaseGetDocument('registers', registerID) 
-    registersInfo.push(Array(registerID, registerInfo))
-    if (!theFirstTime) {
-      theFirstTime = registerInfo.timestampStart.seconds
-    } else if (theFirstTime && (theFirstTime > registerInfo.timestampStart.seconds)) {
-      theFirstTime = registerInfo.timestampStart.seconds
-    }
-  });
-  getSystemData()
-  let theProductsData = Array()
-  let theCashReceived = 0
-  setTimeout(() => {
-    let theFirstTimeDate = new Date(theFirstTime * 1000)
-    let theFirstTimeDateYear = theFirstTimeDate.getFullYear()
-    let theFirstTimeDateMonth = (theFirstTimeDate.getMonth() + 1)
-    let theFirstTimeDateDay = theFirstTimeDate.getDate()
-    if (theFirstTimeDateMonth < 10) {
-      theFirstTimeDateMonth = '0' + theFirstTimeDateMonth
-    }
-    if (theFirstTimeDateDay < 10) {
-      theFirstTimeDateDay = '0' + theFirstTimeDateDay
-    }
-    theTxnDate = theFirstTimeDateYear + '-' + theFirstTimeDateMonth + '-' + theFirstTimeDateDay
-    registersInfo.forEach(async registerInfo => {
-      orderStartDate = new Date(registerInfo[1].timestampStart['seconds'] * 1000)
-      orderEndDate = new Date().getSeconds()
-      if (registerInfo[1].timestampEnd) {
-        orderEndDate = new Date(registerInfo[1].timestampEnd['seconds'] * 1000)
-      }
-      let theOrders = await firebaseGetDocuments('orders', Array(
-        Array("timestamp", ">", registerInfo[1].timestampStart),
-        Array("timestamp", "<", registerInfo[1].timestampEnd),
-        Array("cashier", "==", registerInfo[1].uid)
-      ), true)
-      theOrders.forEach(order => {
-        if (order[1].paymentMethod[2]) {
-          theCashReceived = theCashReceived + order[1].paymentMethod[2]
-        }
-        order[1].products.forEach(product => {
-          productsData.forEach(async productData => {
-            if (productData[0] == product) {
-              findOrCreateItem(productData, function (itemId) {
-                let wasFound = false
-                theProductsData.forEach(theProductsDataProduct => {
-                  if (theProductsDataProduct[0] == itemId) {
-                    wasFound = true
-                    theProductsDataProduct[2] = theProductsDataProduct[2] + 1
-                  }
-                });
-                if (!wasFound) {
-                  theProductsData.push(Array(itemId, productData[1], 1))
-                }
-              })
-            }
-          });
+  quickBooksConnect()
+  let quickBooksConnectCheck = setInterval(() => {
+    if (!authWin) {
+      clearInterval(quickBooksConnectCheck);
+      setTimeout(() => {
+        notificationSystem('warning', 'Waiting for QuickBooks to connect...')
+        
+        let registersInfo = Array()
+        let registerIDs = ""
+        let theTxnDate = ""
+        let theFirstTime = false
+        registersID.forEach(async registerID => {
+          registerIDs = registerIDs + registerID + " "
+          let registerInfo = await firebaseGetDocument('registers', registerID) 
+          registersInfo.push(Array(registerID, registerInfo))
+          if (!theFirstTime) {
+            theFirstTime = registerInfo.timestampStart.seconds
+          } else if (theFirstTime && (theFirstTime > registerInfo.timestampStart.seconds)) {
+            theFirstTime = registerInfo.timestampStart.seconds
+          }
         });
-      });
-    });
-
-    setTimeout(() => {
-      findCustomerByBusinessName("CERMS", function (err, customerId) {
-        if (err) {
-          notificationSystem('danger', '[QuickBooks] Error gathering business name... You may need to log out of quickbooks and log back in (from account settings)')
-          console.log(err);          
-        } else {
-          const invoice = {
-            "Line": theProductsData.map(product => ({
-              "Amount": product[1].price * product[2], // Example amount, you may need to adjust this
-              "DetailType": "SalesItemLineDetail",
-              "SalesItemLineDetail": {
-                "ItemRef": {
-                  "value": product[0]
-                },
-                "Qty": product[2],
-                "TaxCodeRef": product[1].taxable ? { "value": "TAX" } : { "value": "NON" } // Apply tax if product[1].tax is true
+        getSystemData()
+        let theProductsData = Array()
+        let theCashReceived = 0
+        setTimeout(() => {
+          let theFirstTimeDate = new Date(theFirstTime * 1000)
+          let theFirstTimeDateYear = theFirstTimeDate.getFullYear()
+          let theFirstTimeDateMonth = (theFirstTimeDate.getMonth() + 1)
+          let theFirstTimeDateDay = theFirstTimeDate.getDate()
+          if (theFirstTimeDateMonth < 10) {
+            theFirstTimeDateMonth = '0' + theFirstTimeDateMonth
+          }
+          if (theFirstTimeDateDay < 10) {
+            theFirstTimeDateDay = '0' + theFirstTimeDateDay
+          }
+          theTxnDate = theFirstTimeDateYear + '-' + theFirstTimeDateMonth + '-' + theFirstTimeDateDay
+          registersInfo.forEach(async registerInfo => {
+            orderStartDate = new Date(registerInfo[1].timestampStart['seconds'] * 1000)
+            orderEndDate = new Date().getSeconds()
+            if (registerInfo[1].timestampEnd) {
+              orderEndDate = new Date(registerInfo[1].timestampEnd['seconds'] * 1000)
+            }
+            let theOrders = await firebaseGetDocuments('orders', Array(
+              Array("timestamp", ">", registerInfo[1].timestampStart),
+              Array("timestamp", "<", registerInfo[1].timestampEnd),
+              Array("cashier", "==", registerInfo[1].uid)
+            ), true)
+            theOrders.forEach(order => {
+              if (order[1].paymentMethod[2]) {
+                theCashReceived = theCashReceived + order[1].paymentMethod[2]
               }
-            })),
-            "CustomerRef": {
-              "value": customerId
-            },
-            "PrivateNote": "Invoice generated from CERMS based on register IDs: " + registerIDs,
-            "TxnDate": theTxnDate
-          };
-
-          // Create the invoice
-          qbo.createInvoice(invoice, function (err, invoice) {
-            if (err) {
-              notificationSystem('danger', '[QuickBooks] Error creating invoice... You may need to log out of quickbooks and log back in (from account settings).')
-              console.error('Error creating invoice:', err);
-            } else {
-              let invoiceId = invoice.Id
-              let realmId = systemData.quickBooksToken2
-              const invoiceLink = `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
-              notificationSystem('success', "QuickBook Invoice created successfully! Click <a href='#' id='linkToExternal' theLink='" + invoiceLink + "'>here</a> to view!")
-              registersID.forEach(async register => {
-                firebaseUpdateDocument('registers', register, {
-                  qbinvoice: invoiceLink,
-                  qbinvoiceID: invoiceId
-                })
-                let theRegisterInfo = false
-                registersInfo.forEach(registerr => {
-                  if (registerr[0] == register) {
-                    theRegisterInfo = registerr[1]                    
+              order[1].products.forEach(product => {
+                productsData.forEach(async productData => {
+                  if (productData[0] == product) {
+                    findOrCreateItem(productData, function (itemId) {
+                      let wasFound = false
+                      theProductsData.forEach(theProductsDataProduct => {
+                        if (theProductsDataProduct[0] == itemId) {
+                          wasFound = true
+                          theProductsDataProduct[2] = theProductsDataProduct[2] + 1
+                        }
+                      });
+                      if (!wasFound) {
+                        theProductsData.push(Array(itemId, productData[1], 1))
+                      }
+                    })
                   }
                 });
-                createPayment(customerId, invoiceId, theRegisterInfo.ccard || 0, "Credit", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {                  
-                  addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
-                    createPayment(customerId, invoiceId, theRegisterInfo.gcard || 0, "Gift Card", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
-                      addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
-                        createPayment(customerId, invoiceId, Number((theRegisterInfo.ending - theRegisterInfo.starting) + theCashReceived), "Cash", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
-                          addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
-                          });
-                        })
-                      });
-                    })
-                  });
-                })
               });
-            }
+            });
           });
-        }
-      })
-    }, 5000);    
-  }, 5000);
+          
+          setTimeout(() => {
+            findCustomerByBusinessName("CERMS", function (err, customerId) {
+              if (err) {
+                notificationSystem('danger', '[QuickBooks] Error gathering business name... You may need to log out of quickbooks and log back in (from account settings)')
+                console.log(err);          
+              } else {
+                console.log('HERE');
+                console.log(theProductsData);
+                
+                const invoice = {
+                  "Line": theProductsData.map(product => {
+                    let priceWithTax = Number(product[1].price); // Base price of the product
+                    
+                    // Check if the product is taxable and calculate the price with tax if true
+                    if (product[1].taxable) {
+                      console.log('RIGHT HERE');
+                      console.log(product[1].price);
+                      console.log(systemData.taxRate);                
+                      const taxAmount = Number(product[1].price) * Number(systemData.taxRate); // Calculate tax
+                      console.log(taxAmount);                
+                      priceWithTax = Number(product[1].price) + Number(taxAmount); // Add tax to the base price
+                      console.log(priceWithTax);                
+                    }
+                    
+                    // Calculate the total amount (price with or without tax, multiplied by the quantity)
+                    const amount = priceWithTax * product[2];
+                    
+                    return {
+                      "Amount": amount, // Total amount for the line item
+                      "DetailType": "SalesItemLineDetail",
+                      "SalesItemLineDetail": {
+                        "ItemRef": {
+                          "value": product[0] // Reference to the item (product[0] contains the item ID)
+                        },
+                        "Qty": product[2], // Quantity of the product
+                        "UnitPrice": priceWithTax, // Unit price (with tax if applicable)
+                        "TaxCodeRef": product[1].taxable ? { "value": "TAX" } : { "value": "NON" } // Apply tax code if taxable
+                      },
+                      "Description": product[1].description // Optional: Add a description for the product
+                    };
+                  }),
+                  "CustomerRef": {
+                    "value": customerId // Reference to the customer ID
+                  },
+                  "PrivateNote": "Invoice generated from CERMS based on register IDs: " + registerIDs,
+                  "TxnDate": theTxnDate // Transaction date
+                };
+                
+                // Create the invoice
+                qbo.createInvoice(invoice, function (err, invoice) {
+                  if (err) {
+                    notificationSystem('danger', '[QuickBooks] Error creating invoice... You may need to log out of quickbooks and log back in (from account settings).')
+                    console.log('Here is the invoice:');
+                    console.log(invoice);                    
+                    console.error('Error creating invoice:', err);
+                  } else {
+                    let invoiceId = invoice.Id
+                    let realmId = systemData.quickBooksToken2
+                    const invoiceLink = `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
+                    notificationSystem('success', "QuickBook Invoice created successfully! Click <a href='#' id='linkToExternal' theLink='" + invoiceLink + "'>here</a> to view!")
+                    registersID.forEach(async register => {
+                      firebaseUpdateDocument('registers', register, {
+                        qbinvoice: invoiceLink,
+                        qbinvoiceID: invoiceId
+                      })
+                      let theRegisterInfo = false
+                      registersInfo.forEach(registerr => {
+                        if (registerr[0] == register) {
+                          theRegisterInfo = registerr[1]                    
+                        }
+                      });
+                      createPayment(customerId, invoiceId, theRegisterInfo.ccard || 0, "Credit", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {                  
+                        addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                          createPayment(customerId, invoiceId, theRegisterInfo.gcard || 0, "Gift Card", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
+                            addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                              createPayment(customerId, invoiceId, Number((theRegisterInfo.ending - theRegisterInfo.starting) + theCashReceived), "Cash", function (invoiceId1, paymentUnappliedAmt2, paymentMethodName3) {
+                                addUnappliedAmountToInvoice(invoiceId1, paymentUnappliedAmt2, paymentMethodName3, function(){
+                                });
+                              })
+                            });
+                          })
+                        });
+                      })
+                    });
+                  }
+                });
+              }
+            })
+          }, 5000);
+        }, 5000);    
+      }, 5000);
+    }
+  }, 1000);
+
+
 }
 
 async function findOrCreatePaymentMethod(paymentMethodName, callback) {
@@ -4042,14 +4081,14 @@ async function startGatherAllOrders(){
 }
 
 async function startSnapshotMessages(theChatID) {
-  const q = query(collection(db, "chats", theChatID, "messages"), where('access', '==', getSystemAccess()));
+  const q = query(collection(db, "chats", theChatID, "messages"), where('access', '==', getSystemAccess()), orderBy('timestamp'));
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach(async (change) => {
       if (change.type === "added") {
         chatsData.forEach(theChat => {
           if (theChat[0] == theChatID && !theChats.includes(change.doc.id)) {
             theChat[2].push(Array(change.doc.id, change.doc.data()))
-            theClient.send("add-chat-message", Array(getUID(), change.doc.data()))
+            theClient.send("add-chat-message", Array(theChatID, change.doc.data()))
           }          
         }) 
       }
@@ -4320,7 +4359,7 @@ async function startLoading(){
   let quickbooksSystemEnabled = canSystem('quickbooksSystem')
   if (quickbooksSystemEnabled) {
     theClient.send('send-loading-progress', Array(totalLoadingProccesses, loadingProgress, 'Loading quickbooks...'))
-    await quickBooksLogin();
+//    await quickBooksLogin();
     loadingProgress = loadingProgress + 1    
   }
 
@@ -4705,7 +4744,7 @@ async function quickBooksConnect() {
   }
   const authUrl = await getAuthUrl();
   const authWindow = createAuthWindow(authUrl);
-
+  authWin = authWindow
   let theInt = setInterval(() => {
     let theURL = authWindow.webContents.getURL()
     if (theURL.startsWith('http://clubentertainmentrms.com/resources/quickbooks')) {      
@@ -4720,9 +4759,7 @@ async function quickBooksConnect() {
 
         // Close the OAuth window
         authWindow.close();
-        quickBooksConnecting = false
-        // Exchange the authorization code for an access token
-        // Implement token exchange logic here
+        authWin = false
       }
     }    
   }, 5000);
@@ -5852,7 +5889,8 @@ ipcMain.on('quickbooks-login', (event, arg) => {
     notificationSystem('warning', 'Quickbooks is not enabled. Admins can enable this in the settings.')
     return
   }
-  quickBooksLogin(arg)
+//  quickBooksLogin(arg)
+  notificationSystem('warning', 'You can not log into QuickBooks from here. Go to Registers and send an invoice to quickbooks to login.')
 })
 
 ipcMain.on('request-update', (event, arg) => {
@@ -6320,4 +6358,28 @@ ipcMain.on('create-invoice-regs', (event, arg) => {
 
 ipcMain.on('changelog-open', (event, arg) => {
   event.sender.send('changelog-open-receive', app.getVersion())
+})
+
+ipcMain.on('receive-chat-messages', (event, arg) => {
+  theClient = event.sender
+  theClient.send('return-chat-messages', chatsData)
+})
+
+ipcMain.on('send-message', async (event, arg) => {
+  theClient = event.sender
+  let wasFound = false
+  chatsData.forEach(chat => {
+    if (chat[1].participants.includes(arg.contactId)) {
+      wasFound = true
+      sendChat(chat[0], arg.message)
+    }
+  });
+  if (!wasFound) {
+    console.log('new message time');    
+  }
+})
+
+ipcMain.on('receive-uid', (event, arg) => {
+  theClient = event.sender
+  theClient.send('return-uid', getUID())
 })

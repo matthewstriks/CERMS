@@ -249,6 +249,7 @@ plrrBtn.addEventListener('click', function(){
   ipcRenderer.send('print-last-register-receipt')
 })
 
+let registerQbRequest = false
 ipcRenderer.on('register-status-change', (event, arg) => {
   if (arg[0]) {
     personalRegOpen.style.display = 'none'
@@ -264,7 +265,10 @@ ipcRenderer.on('register-status-change', (event, arg) => {
     manageRegisters.style.display = ''
     if (arg[1][1]) {
       manageRegistersQB.style.display = ''      
-      ipcRenderer.send('register-qb-request')
+      if (!registerQbRequest) {
+        ipcRenderer.send('register-qb-request')        
+        registerQbRequest = true
+      }
     }
     if (!regsRequested) {
       ipcRenderer.send('register-all-request')
@@ -292,6 +296,7 @@ if (registersTable) {
 }
 
 ipcRenderer.on('register-qb-request-return', (event, arg) => {
+  registerQbRequest = false
   console.log(arg);
   var row = registersTable.insertRow(1);
   row.id = 'row' + arg[0];
