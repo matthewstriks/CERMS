@@ -5291,37 +5291,48 @@ ipcMain.on('searchForMember', async (event, arg) => {
   theClient = event.sender;
   let wasFound = false
   if (arg[0] != "") {
-    if (arg[1] == 'name') {
-      let resultsFName = await firebaseGetDocuments('members', Array(
-        Array('fname', '==', arg[0] )
-      ), true)      
-      let resultsLName = await firebaseGetDocuments('members', Array(
-        Array('lname', '==', arg[0] )
-      ), true)      
-      let resultsFullName = await firebaseGetDocuments('members', Array(
-        Array('name', '==', arg[0] )
-      ), true)      
-      resultsFName.forEach(result => {
-        if (result[0] && result[1]) {
-          wasFound = true
-          theClient.send('membership-request-return', Array(result[0], result[1]))          
+    if (arg[1] === 'name') {
+      let ogInput = arg[0];
+      let capInput = arg[0].toUpperCase();
+      let lowInput = arg[0].toLowerCase();
+      let regInput = arg[0].toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+      // Create an array of input variations to search
+      let inputVariations = [ogInput, capInput, lowInput, regInput];
+
+      // Fields to search across
+      let searchFields = ['fname', 'lname', 'name'];
+
+      // Loop through input variations and search fields
+      for (let input of inputVariations) {
+        for (let field of searchFields) {
+          let results = await firebaseGetDocuments('members', Array(
+            Array(field, '==', input)
+          ), true);
+
+          // Process results if any are found
+          results.forEach(result => {
+            if (result[0] && result[1]) {
+              wasFound = true;
+              theClient.send('membership-request-return', Array(result[0], result[1]));
+            }
+          });
+
+          // Optionally, you can break out of the loops if a result is found to avoid redundant searches
+          if (wasFound) break;
         }
-      });
-      resultsLName.forEach(result => {
-        if (result[0] && result[1]) {
-          wasFound = true
-          theClient.send('membership-request-return', Array(result[0], result[1]))          
-        }
-      });
-      resultsFullName.forEach(result => {
-        if (result[0] && result[1]) {
-          wasFound = true
-          theClient.send('membership-request-return', Array(result[0], result[1]))          
-        }
-      });
+        if (wasFound) break;
+      }
     } else if (arg[1] == 'dob') {
+      console.log('Searching by DOB');      
+      let theDOB = arg[0]
+      if (arg[0].includes('/')) {
+        const [month, day, year] = arg[0].split('/');
+        theDOB = `${year}-${month}-${day}`;
+      }
+      console.log(theDOB);      
       let resultsDOB = await firebaseGetDocuments('members', Array(
-        Array('dob', '==', arg[0])
+        Array('dob', '==', theDOB)
       ), true)      
       resultsDOB.forEach(result => {
         if (result[0] && result[1]) {
