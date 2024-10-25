@@ -4,6 +4,15 @@
   "version": "4.0.4",
   "description": "Club Entertainment RMS Desktop Application",
   "main": "src/main.js",
+  "build": {
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "matthewstriks",
+        "repo": "cerms"
+      }
+    ]
+  },
   "scripts": {
     "start": "electron-forge start",
     "test": "electron-forge start",
