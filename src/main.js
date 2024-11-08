@@ -5228,6 +5228,30 @@ ipcMain.on('history-search', async (event, arg) => {
           theClient.send('history-request-return', Array(result[0], result[1], theMemberData))
         }
       });
+    } else if (arg[1] == "date") {
+      console.log(arg[0], arg[1])
+      const inputDate = arg[0];
+      const [month, day, year] = inputDate.split("/");
+      const searchDate1 = new Date(`${year}-${month}-${day}`);
+      const searchDate2 = new Date(`${year}-${month}-${(parseInt(day) + 1)}`);
+      const timestampInMillis1 = searchDate1.getTime();
+      const timestampInMillis2 = searchDate2.getTime();
+      
+      const firestoreTimestamp1 = Timestamp.fromMillis(timestampInMillis1);
+      const firestoreTimestamp2 = Timestamp.fromMillis(timestampInMillis2);
+
+      let resultsDate = await firebaseGetDocuments('activity', Array(
+        Array('timeIn', '>=', firestoreTimestamp1),
+        Array('timeOut', '<=', firestoreTimestamp2)
+      ), true);
+
+      resultsDate.forEach(async result => {
+        if (result[0] && result[1]) {
+          wasFound = true;
+          let theMemberData = await getMemberInfo(result[1].memberID);
+          theClient.send('history-request-return', Array(result[0], result[1], theMemberData));
+        }
+      });      
     } else {
       notificationSystem('warning', 'You must select a search filter')
       return
