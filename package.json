@@ -5,6 +5,14 @@
   "description": "Club Entertainment RMS Desktop Application",
   "main": "src/main.js",
   "build": {
+    "appId": "com.RocMTSSolutions.cerms",
+    "productName": "CERMS",
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "src/assets/cerms-icon.ico"
+    },
     "publish": [
       {
         "provider": "github",
