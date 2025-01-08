@@ -55,6 +55,7 @@ let proPriceArray = false
 let productsAFP = Array()
 let restrictPros = false
 let theTaxRate
+let tryingToAddDNA = false
 
 if (searchProducts) {
   searchProducts.addEventListener('click', function(){
@@ -496,6 +497,15 @@ function addProductCard(theProduct, theProductInfo){
     });
   }
 
+  if (theProduct[1].rental && theCustomerInfo[1].dna && !tryingToAddDNA) {
+    tryingToAddDNA = true
+    setTimeout(() => {
+      tryingToAddDNA = false
+    }, 5000);
+    notificationSystem('danger', 'This user is on the DNA list. If you still want to add this product you can override this by adding the rental again within 5 seconds.', 5000, 99)
+    return
+  }
+
   let productPrice = theProduct[1].price
 
   if (theProduct[1].askforprice && !proPrice) {
@@ -845,6 +855,7 @@ ipcRenderer.on('receive-taxRate', (event, arg) => {
 })
 
 ipcRenderer.on('return-products-order-all', (event, arg) => {
+  console.log(arg)
   productsData = arg[0];
   discountsData = arg[1];
   discountsData.push(Array("return", Array()))
