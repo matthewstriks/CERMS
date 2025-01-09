@@ -3,7 +3,7 @@ const { ipcRenderer } = require("electron");
 let versionTitle = document.getElementById('versionTitle')
 
 document.addEventListener("DOMContentLoaded", function () {
-    fetch("https://api.github.com/repos/matthewstriks/CERMS/releases/tags/v3.1.2")
+    fetch("https://api.github.com/repos/matthewstriks/CERMS/releases/latest")
         .then(response => response.json())
         .then(data => {
             const changelogContainer = document.getElementById("changelog");
