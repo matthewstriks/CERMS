@@ -67,6 +67,7 @@ let includeExpireTimeRenewSwitch = document.getElementById('includeExpireTimeRen
 let mandatoryDNANotesSwitch = document.getElementById('mandatoryDNANotesSwitch')
 let enableRegisterSystem = document.getElementById('enableRegisterSystem')
 let taxRate = document.getElementById('taxRate')
+let preventDNACheckInSwitch = document.getElementById('preventDNACheckInSwitch')
 
 // Accounts
 let editingID;
@@ -230,6 +231,10 @@ enableRegisterSystem.addEventListener('change', function(){
 
 taxRate.addEventListener('change', function(){
     ipcRenderer.send('settings-register-system-taxRate', taxRate.value)
+})
+
+preventDNACheckInSwitch.addEventListener('change', function(){
+    ipcRenderer.send('settings-register-system-preventDNACheckInSwitch', preventDNACheckInSwitch.checked)
 })
 
 editSaveDir.addEventListener('click', function () {
@@ -409,6 +414,7 @@ ipcRenderer.on('recieve-account2', (event, arg) => {
     mandatoryDNANotesSwitch.checked = arg[1].mandatoryDNANotes || false
     enableRegisterSystem.checked = arg[1].registerSystem || false
     taxRate.value = arg[1].taxRate * 100 || ""
+    preventDNACheckInSwitch.checked = arg[1].preventDNACheckInSwitch || false
     if (shiftTimeDiv) {
         shiftTimeDiv.style.display = 'none'
     }
