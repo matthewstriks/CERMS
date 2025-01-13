@@ -46,7 +46,7 @@ let theAddingRental;
 let totalLeftAmt;
 let ran = false
 let discountingOrder = false
-let theCustomerInfo;
+let theCustomerInfo = Array();
 let favPros = Array()
 let isReturn = false
 let theProductCheckoutList = ""
@@ -498,18 +498,28 @@ function addProductCard(theProduct, theProductInfo){
     });
   }
 
-  if (theProduct[1].rental && theCustomerInfo[1].dna && preventDNA) {
-    notificationSystem('danger', 'This user is on the DNA list. You cannot add any rental products to this order.', 5000, 99)
-    return
-  }
-
-  if (theProduct[1].rental && theCustomerInfo[1].dna && !tryingToAddDNA) {
-    tryingToAddDNA = true
-    setTimeout(() => {
-      tryingToAddDNA = false
-    }, 5000);
-    notificationSystem('danger', 'This user is on the DNA list. If you still want to add this product you can override this by adding the rental again within 5 seconds.', 5000, 99)
-    return
+  if (theCustomerInfo && theCustomerInfo[1]?.dna) {
+    if (theProduct[1].rental && preventDNA) {
+      notificationSystem(
+        'danger',
+        'This user is on the DNA list. You cannot add any rental products to this order.',
+        5000,
+        99
+      );
+      return;
+    } else if (theProduct[1].rental && !tryingToAddDNA) {
+      tryingToAddDNA = true;
+      setTimeout(() => {
+        tryingToAddDNA = false;
+      }, 5000);
+      notificationSystem(
+        'danger',
+        'This user is on the DNA list. If you still want to add this product you can override this by adding the rental again within 5 seconds.',
+        5000,
+        99
+      );
+      return;
+    }
   }
 
   let productPrice = theProduct[1].price
@@ -1070,11 +1080,12 @@ ipcRenderer.on('send-customer-info', (event, arg) => {
     modal3Body2.style.display = ''  
     theCustomerID = 0
   }
-
-  if (theCustomerInfo[1].tag) {
-    customerName.innerHTML = customerName.innerHTML + " <button class='btn btn-success' id='readNotesBtn' data-bs-toggle='modal' data-bs-target='#myModal4'>Read Notes</button>"
-    document.getElementById('readNotesBtn').click()
-    completeTagNotes.value = theCustomerInfo[1].notes
+  if (theCustomerInfo && theCustomerInfo[1]?.tag) {
+    if (theCustomerInfo[1].tag) {
+      customerName.innerHTML = customerName.innerHTML + " <button class='btn btn-success' id='readNotesBtn' data-bs-toggle='modal' data-bs-target='#myModal4'>Read Notes</button>"
+      document.getElementById('readNotesBtn').click()
+      completeTagNotes.value = theCustomerInfo[1].notes
+    }
   }
 })
 
