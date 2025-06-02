@@ -66,6 +66,7 @@
       font-size: 0.75rem;
       color: #888;
       margin-top: 5px;
+      margin-left: 5px;
     }
   </style>
 </head>
@@ -73,8 +74,8 @@
 <body>
   <br>
   <div class="container">
-    <h1 id="welcomeMsg">Welcome ...</h1>
-    <p id="welcomeMsg2"></p>
+    <h1 id="welcomeMsg">Messages</h1>
+    <p id="welcomeMsg2">Chat with employees</p>
   </div>
   <script src="./js/core.js"></script>
   <br>
@@ -85,10 +86,12 @@
         <!-- Contacts List -->
         <div class="col-3 p-3 border-end contacts">
           <h5>Contacts</h5>
+          <!-- Search Bar -->
+          <input type="text" id="contactSearch" class="form-control mb-2" placeholder="Search contacts...">
           <ul class="list-group contacts-list" id="contactsList">
             <!-- Contacts will be added here dynamically -->
           </ul>
-        </div>
+        </div>        
         <!-- Chat Box -->
         <div class="col-9 d-flex flex-column messages">
           <div class="p-3 border-bottom">
@@ -98,10 +101,10 @@
             <!-- Messages will be displayed here -->
           </div>
           <div class="p-3 border-top">
-            <div class="input-group">
+            <form id="chatForm" class="input-group">
               <input type="text" id="messageInput" class="form-control" placeholder="Type a message..." disabled>
-              <button class="btn btn-primary" id="sendMessage" disabled>Send</button>
-            </div>
+              <button type="submit" class="btn btn-primary" id="sendMessage" disabled>Send</button>
+            </form>
           </div>
         </div>
       </div>

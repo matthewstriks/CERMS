@@ -17,6 +17,7 @@ if (runAnalytics) {
 }
 
 ipcRenderer.on('analytics-return', async (event, arg) => {
+  console.log("Hey, I got the analytics data back", arg);
   configureDiv.style.display = 'none';
   analyticsTabs.style.display = '';
 

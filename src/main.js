@@ -53,7 +53,7 @@ const discounts = Array();
 const discountsData = Array();
 const orders = Array();
 const ordersData = Array();
-const theChats = Array();
+const chats = Array();
 const chatsData = Array();
 const users = Array();
 const usersData = Array();
@@ -80,7 +80,7 @@ let startGatherAllProductsA = false
 let startGatherAllDiscountsA = false
 let startGatherAllUsersA = false
 let startGatherAllOrdersA = false
-let startGatherAllChatsA = false
+let startGatherAllChatsA = false;
 let darkMode = false
 let quickbooksIsConnected = false
 let qbo
@@ -1261,7 +1261,6 @@ async function editActivity(activityInfo){
   goHome()
 }
 
-
 async function changeInOut(activityInfo){
   firebaseUpdateDocument('activity', activityInfo[0], {
     currIn: activityInfo[1]
@@ -1556,6 +1555,11 @@ async function endRegister(registerInfo, logoutTF){
 }
 
 async function updateRegisterSub(registerInfo, amount, total, drop) {
+  console.log('updateRegisterSub')
+  console.log("registerInfo: ", registerInfo)
+  console.log("amount: ", amount)
+  console.log("total: ", total)
+  console.log("drop: ", drop)
   //  // paymentMethod: credit card, gift card, cash
 
   let registerAmount = registerInfo.starting
@@ -4080,95 +4084,87 @@ async function startGatherAllOrders(){
   });
 }
 
-async function startSnapshotMessages(theChatID) {
-  const q = query(collection(db, "chats", theChatID, "messages"), where('access', '==', getSystemAccess()), orderBy('timestamp'));
+async function startGatherAllChats() {
+  if (startGatherAllChatsA) {
+    return;
+  }
+  startGatherAllChatsA = true;
+
+  const q = query(
+    collection(db, "chats"),
+    where("access", "==", getSystemAccess()),
+    where("participants", "array-contains", getUID()),
+    limit(50)
+  );
+
   const unsubscribe = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach(async (change) => {
+      const chatId = change.doc.id;
+      const chatData = change.doc.data();
+
       if (change.type === "added") {
-        chatsData.forEach(theChat => {
-          if (theChat[0] == theChatID && !theChats.includes(change.doc.id)) {
-            theChat[2].push(Array(change.doc.id, change.doc.data()))
-            theClient.send("add-chat-message", Array(theChatID, change.doc.data()))
-          }          
-        }) 
+        if (!chats.includes(chatId)) {
+          chats.push(chatId);
+          chatsData.push([chatId, { ...chatData, messages: [] }]); // Store chat data with an empty messages array
+
+          // Start listening for messages in this chat
+          listenForMessages(chatId);
+        }
       }
+
       if (change.type === "modified") {
-        chatsData.forEach(theChat => {
-          if (theChat[0] == theChatID) {
-            theChat[2].forEach(theMessage => {
-              if (theMessage[0] == change.doc.id) {
-                theMessage[1] = change.doc.data()
-              }
-            })
-          }
-        })
+        if (chats.includes(chatId)) {
+          chatsData.forEach((item) => {
+            if (item[0] === chatId) {
+              item[1] = { ...chatData, messages: item[1].messages }; // Preserve messages array
+            }
+          });
+        }
       }
+
       if (change.type === "removed") {
-        chatsData.forEach(theChat => {
-          if (theChat[0] == theChatID) {
-            theChat[2].forEach((item, i) => {
-              if (item[0] == change.doc.id) {
-                item[1] = change.doc.data();
-                theChat[2].splice(i, 1)
-              }
-            });
-          }
-        })
+        if (chats.includes(chatId)) {
+          chatsData.forEach((item, i) => {
+            if (item[0] === chatId) {
+              chatsData.splice(i, 1);
+            }
+          });
+        }
       }
     });
   });
 }
 
-async function startGatherAllChats() {
-  if (startGatherAllChatsA) {
-    return
-  }
-  startGatherAllChatsA = true;  
-  const q = query(collection(db, "chats"), where('participants', 'array-contains', getUID()), where('access', '==', getSystemAccess()));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    snapshot.docChanges().forEach(async (change) => {
-      if (change.type === "added") {
-        if (!theChats.includes(change.doc.id)) {
-          theChats.push(change.doc.id);
-          startSnapshotMessages(change.doc.id)
-          let chatMessages = Array()
-          let q2 = query(collection(db, "chats", change.doc.id, "messages"), where('access', '==', getSystemAccess()));
-          let querySnapshot = await getDocs(q2);
-          querySnapshot.forEach((doc2) => {
-            chatMessages.push(Array(doc2.id, doc2.data()))
-          });
-          chatsData.push(Array(change.doc.id, change.doc.data(), chatMessages));
-//          theClient.send('return-orders', Array(change.doc.id, change.doc.data()))
+// Function to listen for messages in a specific chat
+function listenForMessages(chatId) {
+  console.log("Listening for messages in chat", chatId);
+  const messagesRef = collection(db, "chats", chatId, "messages");
+  const messagesQuery = query(messagesRef, where("access", "==", getSystemAccess()), orderBy("timestamp", "asc"));
+
+  onSnapshot(messagesQuery, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      const messageData = change.doc.data();
+      const messageId = change.doc.id;
+
+      chatsData.forEach((chat) => {
+        if (chat[0] === chatId) {
+          let messages = chat[1].messages || [];
+
+          if (change.type === "added") {
+            messages.push({ id: messageId, ...messageData });
+          }
+          if (change.type === "modified") {
+            messages = messages.map((msg) =>
+              msg.id === messageId ? { id: messageId, ...messageData } : msg
+            );
+          }
+          if (change.type === "removed") {
+            messages = messages.filter((msg) => msg.id !== messageId);
+          }
+
+          chat[1].messages = messages; // Update messages in chatsData
         }
-      }
-      if (change.type === "modified") {
-        if (theChats.includes(change.doc.id)) {
-          chatsData.forEach(async (item, i) => {
-            if (item[0] == change.doc.id) {
-              item[1] = change.doc.data();
-              let chatMessages = Array()
-              let q2 = query(collection(db, "chats", change.doc.id, "messages"), where('access', '==', getSystemAccess()));
-              let querySnapshot = await getDocs(q2);
-              querySnapshot.forEach((doc2) => {
-                chatMessages.push(Array(doc2.id, doc2.data()))
-              });
-              item[2] = chatMessages
-//              theClient.send('return-orders-update', Array(change.doc.id, change.doc.data()))
-            }
-          });
-        }
-      }
-      if (change.type === "removed") {
-        if (theChats.includes(change.doc.id)) {
-          chatsData.forEach((item, i) => {
-            if (item[0] == change.doc.id) {
-              item[1] = change.doc.data();
-              chatsData.splice(i, 1)
-//              theClient.send('return-orders-remove', Array(change.doc.id))
-            }
-          });
-        }
-      }
+      });
     });
   });
 }
@@ -4575,21 +4571,41 @@ async function runAnalytics(timeStart, timeEnd){
     let theTimeStartSec = Math.floor(theTimeStartDate / 1000)
     let theTimeEndDate = new Date(timeEnd);
     let theTimeEndSec = Math.floor(theTimeEndDate / 1000)
-    membersData.forEach(member => {
-      if (member[1].creation_time.seconds > theTimeStartSec && member[1].creation_time.seconds < theTimeEndSec) {
-        membersDataSend.push(member)
-      }
-    })
-    activitysData.forEach(activity => {
-      if (activity[1].timeIn.seconds > theTimeStartSec && activity[1].timeIn.seconds < theTimeEndSec){
-        activitysDataSend.push(activity)
-      }
+
+    let theMembersResults = await firebaseGetDocuments('members', Array(
+      Array('creation_time', '>=', theTimeStartDate),
+      Array('creation_time', '<=', theTimeEndDate)
+    ), true)
+
+    let theActivityResults = await firebaseGetDocuments('activity', Array(
+      Array('timeIn', '>=', theTimeStartDate),
+      Array('timeIn', '<=', theTimeEndDate)
+    ), true)
+
+    let theOrdersResults = await firebaseGetDocuments('orders', Array(
+      Array('timestamp', '>=', theTimeStartDate),
+      Array('timestamp', '<=', theTimeEndDate)
+    ), true)
+
+    console.log("theMembersResults.length")
+    console.log(theMembersResults.length)
+    console.log("theActivityResults.length")
+    console.log(theActivityResults.length)
+    console.log("theOrdersResults.length")
+    console.log(theOrdersResults.length)
+
+    theMembersResults.forEach(member => {
+      membersDataSend.push(member)
     });
-    ordersData.forEach(order => {
-      if (order[1].timestamp.seconds > theTimeStartSec && order[1].timestamp.seconds < theTimeEndSec){
-        ordersDataSend.push(order)
-      }
+
+    theActivityResults.forEach(member => {
+      activitysDataSend.push(member)
     });
+
+    theOrdersResults.forEach(member => {
+      ordersDataSend.push(member)
+    });
+    
     setTimeout(() => {
       theClient.send('analytics-return', Array(membersDataSend, activitysDataSend, productsData, ordersDataSend));      
       setTimeout(() => {
@@ -6368,27 +6384,6 @@ ipcMain.on('support-btn', (event, arg) => {
   shell.openExternal("https://www.clubentertainmentrms.com/support")
 })
 
-ipcMain.on('send-chat', (event, arg) => {
-  theClient = event.sender
-  sendChat(arg[0], arg[1])
-})
-
-ipcMain.on('request-chats', async (event, arg) => {
-  theClient = event.sender
-  theClient.send('return-chats', Array(getUID(), chatsData))    
-})
-
-async function sendChat(chatID, theMessage){
-  // TODO: Add deep doc function
-  const docRef = await addDoc(collection(db, "chats", chatID, "messages"), {
-    timestamp: serverTimestamp(),
-    sender: getUID(),
-    access: getSystemAccess(),
-    read: false,
-    message: theMessage
-  });
-}
-
 ipcMain.on('create-invoice-reg', (event, arg) => {
   theClient = event.sender
   let quickbooksSystemEnabled = canSystem('quickbooksSystem')
@@ -6413,26 +6408,67 @@ ipcMain.on('changelog-open', (event, arg) => {
   event.sender.send('changelog-open-receive', app.getVersion())
 })
 
-ipcMain.on('receive-chat-messages', (event, arg) => {
-  theClient = event.sender
-  theClient.send('return-chat-messages', chatsData)
-})
-
-ipcMain.on('send-message', async (event, arg) => {
-  theClient = event.sender
-  let wasFound = false
-  chatsData.forEach(chat => {
-    if (chat[1].participants.includes(arg.contactId)) {
-      wasFound = true
-      sendChat(chat[0], arg.message)
-    }
-  });
-  if (!wasFound) {
-    console.log('new message time');    
-  }
-})
-
 ipcMain.on('receive-uid', (event, arg) => {
   theClient = event.sender
   theClient.send('return-uid', getUID())
 })
+
+ipcMain.on("receive-chats", async (event) => {
+  theClient = event.sender;
+  console.log(chatsData)
+  theClient.send("return-chats", chatsData);
+});
+
+ipcMain.on("send-chat", async (event, { to, message }) => {
+  let senderId = getUID()
+
+  console.log("Sender ID:", senderId);
+  console.log("Receiver ID:", to);
+  console.log("Message:", message);
+  console.log("Access Level:", getSystemAccess());
+  try {
+    // Query the chats collection to find an existing chat with both participants
+    const chatsRef = collection(db, "chats");
+    const chatQuery = query(
+      chatsRef,
+      where("participants", "array-contains", senderId), // Initial filter
+      where("access", "==", getSystemAccess())
+    );
+
+    const chatDocs = await getDocs(chatQuery);
+    let chatId = null;
+
+    // Check for a chat that contains both participants
+    chatDocs.forEach((doc) => {
+      const chatData = doc.data();
+      if (chatData.participants.includes(to)) {
+        chatId = doc.id; // Found an existing chat
+      }
+    });
+
+    // If no chat was found, create a new chat
+    if (!chatId) {
+      const newChatRef = await addDoc(collection(db, "chats"), {
+        participants: [senderId, to],
+        createdAt: serverTimestamp(),
+        access: getSystemAccess()
+      });
+      chatId = newChatRef.id;
+    }
+
+    // Add the message to the "messages" subcollection
+    const messagesRef = collection(db, "chats", chatId, "messages");
+    await addDoc(messagesRef, {
+      senderId,
+      message,
+      timestamp: serverTimestamp(),
+      access: getSystemAccess()
+    });
+
+    // Notify the renderer process that message was sent
+    event.reply("chat-sent", { success: true, chatId });
+  } catch (error) {
+    console.error("Error sending chat:", error);
+    event.reply("chat-sent", { success: false, error: error.message });
+  }
+});

@@ -6,24 +6,31 @@ admin.initializeApp();
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
-const servers = ["TheZSATX"];
-
-exports.generateDailyRegisterReport = onSchedule(
-  {
-    schedule: "0 7 * * *",
-    timeZone: "America/New_York",
-    retryConfig: { maxAttempts: 3 },
-    minInstances: 0,
+const manageServers = {
+  TheZSATX: {
+    managers: ["bchadventure@yahoo.com", "matthew@rocmtssolutions.com"],
   },
-  async (event) => {
-    servers.forEach(async serverID => {
-      console.log(`Starting daily register report for ${serverID}...`);
+  dev: {
+    managers: ["matthew@rocmtssolutions.com"],
+  },
+};
 
+// Command to run to deploy this function:
+// firebase deploy --only functions:generateDailyRegisterReport
+// Command to run to deploy all functions: 
+// firebase deploy --only functions
+
+exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZone: "America/New_York", retryConfig: { maxAttempts: 3 }, minInstances: 0}, async (event) => {
+  console.log("Starting daily register report generation...");
+  for (const serverID of Object.keys(manageServers)) {
+    try {
+      console.log(`Starting daily register report for ${serverID}...`);
+  
       const currentDate = new Date();
       const startDate = new Date(currentDate);
       startDate.setHours(startDate.getHours() - 24, 0, 0, 0);
       const endDate = new Date(currentDate);
-
+  
       console.log(
         `Report Date: ${currentDate
           .toLocaleDateString("en-US")
@@ -31,30 +38,30 @@ exports.generateDailyRegisterReport = onSchedule(
       );
       console.log(`Start Date: ${startDate.toLocaleString("en-US")}`);
       console.log(`End Date: ${endDate.toLocaleString("en-US")}`);
-
+  
       const ordersSnapshot = await db
         .collection("orders")
         .where("timestamp", ">", startDate)
         .where("timestamp", "<=", endDate)
         .where("access", "==", serverID)
         .get();
-
+  
       if (ordersSnapshot.empty) {
-        console.log("No orders found.");
-        return null;
+        console.log("No orders found for " + serverID + ".");
+        continue;
       }
-
+  
       const ordersList = [];
       const productSales = {};
       const cashierMap = {};
       const customerMap = {};
       const productMap = {};
       const registerData = {};
-
+  
       for (const doc of ordersSnapshot.docs) {
         const order = doc.data();
         const orderID = doc.id;
-
+  
         let cashierName = "Unknown";
         if (order.cashier && typeof order.cashier === "string") {
           if (!cashierMap[order.cashier]) {
@@ -73,7 +80,7 @@ exports.generateDailyRegisterReport = onSchedule(
           }
           cashierName = cashierMap[order.cashier];
         }
-
+  
         let customerName = "Guest";
         if (order.customerID && typeof order.customerID === "string") {
           if (!customerMap[order.customerID]) {
@@ -95,7 +102,7 @@ exports.generateDailyRegisterReport = onSchedule(
           }
           customerName = customerMap[order.customerID];
         }
-
+  
         const productNames = [];
         if (Array.isArray(order.products)) {
           for (const productID of order.products) {
@@ -115,13 +122,13 @@ exports.generateDailyRegisterReport = onSchedule(
                 }
               }
               productNames.push(productMap[productID]);
-
+  
               productSales[productMap[productID]] =
                 (productSales[productMap[productID]] || 0) + 1;
             }
           }
         }
-
+  
         ordersList.push({
           "Order ID": orderID,
           Cashier: cashierName,
@@ -137,14 +144,14 @@ exports.generateDailyRegisterReport = onSchedule(
           Timestamp: order.timestamp?.toDate() || "N/A",
         });
       }
-
+  
       const registersSnapshot = await db
         .collection("registers")
         .where("timestampStart", ">", startDate)
         .where("timestampEnd", "<=", endDate)
         .where("access", "==", serverID)
         .get();
-
+  
       for (const doc of registersSnapshot.docs) {
         const register = doc.data();
         const cashier = register.uname || "Unknown";
@@ -160,17 +167,17 @@ exports.generateDailyRegisterReport = onSchedule(
           "Timestamp End": register.timestampEnd?.toDate() || "N/A",
         };
       }
-
+  
       const wb = new xl.Workbook();
       const headerStyle = wb.createStyle({
         font: { bold: true, size: 12 },
         alignment: { horizontal: "center" },
       });
-
+  
       const moneyStyle = wb.createStyle({
         numberFormat: "$#,##0.00; ($#,##0.00); -",
       });
-
+  
       const orderSheet = wb.addWorksheet("Orders");
       const headers = [
         "Order ID",
@@ -186,14 +193,14 @@ exports.generateDailyRegisterReport = onSchedule(
         "Cash",
         "Timestamp",
       ];
-
+  
       headers.forEach((header, i) =>
         orderSheet
           .cell(1, i + 1)
           .string(header)
           .style(headerStyle)
       );
-
+  
       let row = 2;
       for (const order of ordersList) {
         Object.values(order).forEach((value, i) => {
@@ -208,7 +215,7 @@ exports.generateDailyRegisterReport = onSchedule(
         });
         row++;
       }
-
+  
       const productSheet = wb.addWorksheet("Product Sales");
       productSheet.cell(1, 1).string("Product Name").style(headerStyle);
       productSheet.cell(1, 2).string("Quantity Sold").style(headerStyle);
@@ -218,7 +225,7 @@ exports.generateDailyRegisterReport = onSchedule(
         productSheet.cell(row, 2).number(quantity);
         row++;
       }
-
+  
       for (const [cashier, register] of Object.entries(registerData)) {
         const sheet = wb.addWorksheet(`Register - ${cashier}`);
         let row = 1;
@@ -228,40 +235,28 @@ exports.generateDailyRegisterReport = onSchedule(
           row++;
         }
       }
-
-      const tempFilePath =
-        "/tmp/" +
-        currentDate.toLocaleDateString("en-US").replace(/\//g, "-") +
-        "_Daily_Register_Report.xlsx";
+  
+      const tempFilePath = "/tmp/" + currentDate.toLocaleDateString("en-US").replace(/\//g, "-") + "_Daily_Register_Report_" + serverID + ".xlsx";
       await new Promise((resolve, reject) => {
         wb.write(tempFilePath, (err) => {
           if (err) reject(err);
           else resolve();
         });
       });
-
+  
       await bucket.upload(tempFilePath, {
-        destination:
-          "reports/" +
-          currentDate.toLocaleDateString("en-US").replace(/\//g, "-") +
-          "_Daily_Register_Report.xlsx",
+        destination: "reports/" + currentDate.toLocaleDateString("en-US").replace(/\//g, "-") + "_Daily_Register_Report_" + serverID + ".xlsx",
       });
-      // Get URL to download the file
-      const file = bucket.file(
-        "reports/" +
-          currentDate.toLocaleDateString("en-US").replace(/\//g, "-") +
-          "_Daily_Register_Report.xlsx"
-      );
-      // Make the file publicly accessible
+  
+      const file = bucket.file("reports/" + currentDate.toLocaleDateString("en-US").replace(/\//g, "-") + "_Daily_Register_Report_" + serverID + ".xlsx");
+  
       await file.makePublic();
-
-      // Get the public URL
+  
       const url = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
-
-      // Add to mail collection
+  
       const mailRef = db.collection("mail").doc();
       await mailRef.set({
-        to: "matthew@striks.com",
+        to: manageServers[serverID].managers,
         message: {
           html: `Attached is the daily register report for ${serverID} on ${currentDate.toLocaleDateString(
             "en-US"
@@ -274,9 +269,11 @@ exports.generateDailyRegisterReport = onSchedule(
           )}. Download the report here: ${url}`,
         },
       });
-
-      console.log("✅ Report successfully generated and saved.");
-      console.log("📊 Report URL:", url);
-    });
+  
+      console.log("✅ Report successfully generated and saved. (" + serverID + ")");
+      console.log("📊 Report URL (" + serverID + "):", url);
+    } catch (error) {
+      console.error("Error generating daily register report:", error);
+    }
   }
-);
+});

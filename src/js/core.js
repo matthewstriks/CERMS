@@ -15,7 +15,7 @@ let navBarPages = Array(
   Array('Register', 'register.html'),
   Array('History', 'history.html'),
   Array('Analytics', 'analytics.html'),
-  //Array('Messages', 'messages.html'),
+//  Array('Messages', 'messages.html'),
   //Array('Events', 'events.html')
 )
 // TO OPTIONS DROPDOWN
@@ -183,6 +183,16 @@ if (fileName[0] != 'login.html' && fileName[0] != 'index.html' && fileName[0] !=
       navBarBtnListBtn.href = page[1]
     }
     navBarBtnListList.appendChild(navBarBtnListBtn)
+
+    // Add badge notification for Messages
+    if (page[0] === "Messages") {
+      let badge = document.createElement('span')
+      badge.classList = 'badge bg-danger ms-2 position-absolute top-0 start-100 translate-middle p-1'
+      badge.style.fontSize = '0.75em'
+      badge.innerHTML = '99+'
+      navBarBtnListBtn.style.position = 'relative'
+      navBarBtnListBtn.appendChild(badge)
+    }
   });
 
   let navBarBtnListEnd = document.createElement('ul')
