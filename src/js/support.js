@@ -38,7 +38,7 @@ if (sbmtTicket2) {
 
 if (viewKnowledgebase){
   viewKnowledgebase.addEventListener('click', function(){
-    ipcRenderer.send('open-link', "https://clubentertainmentrms.com/support/knowledgebase.php")
+    ipcRenderer.send('open-link', "https://rocmtssolutions.com/support/knowledgebase.php")
   })
 }
 

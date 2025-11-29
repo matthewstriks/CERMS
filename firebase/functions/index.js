@@ -8,7 +8,7 @@ const bucket = admin.storage().bucket();
 
 const manageServers = {
   TheZSATX: {
-    managers: ["bchadventure@yahoo.com", "matthew@rocmtssolutions.com"],
+    managers: ["bchadventure@yahoo.com"],
   },
   dev: {
     managers: ["matthew@rocmtssolutions.com"],

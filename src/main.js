@@ -4850,7 +4850,7 @@ app.on('ready', createWindow);
 app.setAboutPanelOptions({
   applicationName: "CERMS",
   applicationVersion: app.getVersion(),
-  credits: "Created by Matthew Striks / clubentertainmentrms.com"
+  credits: "Created by Matthew Striks / https://rocmtssolutions.com"
 })
 
 app.on('window-all-closed', () => {
@@ -6300,14 +6300,14 @@ ipcMain.on('submit-support-ticket', async (event, arg) => {
 
 //  encodeURIComponent
 
-  let theURL = 'https://clubentertainmentrms.com/support/index.php?a=add'
+  let theURL = "https://rocmtssolutions.com/support/index.php?a=add&category=8";
 
   theURL = theURL + '&name=' + encodeURIComponent(getDisplayName())
   theURL = theURL + '&email=' + encodeURIComponent(getEMail())
   theURL = theURL + '&catid=' + encodeURIComponent(arg[0])
   theURL = theURL + '&subject=' + encodeURIComponent(arg[1])
   theURL = theURL + '&message=' + encodeURIComponent(arg[2])
-  theURL = theURL + '&custom2=' + encodeURIComponent(systemData.businessName)
+  theURL = theURL + '&custom=' + encodeURIComponent(systemData.businessName)
   shell.openExternal(theURL)
 })
 
@@ -6381,7 +6381,7 @@ ipcMain.on('print-last-register-receipt', async (event, arg) => {
 
 ipcMain.on('support-btn', (event, arg) => {
   theClient = event.sender
-  shell.openExternal("https://www.clubentertainmentrms.com/support")
+  shell.openExternal("https://rocmtssolutions.com/support/index.php?a=add&catid=8")
 })
 
 ipcMain.on('create-invoice-reg', (event, arg) => {
