@@ -1,6 +1,8 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const xl = require("excel4node");
+const { formatInTimeZone, fromZonedTime } = require("date-fns-tz");
+const { subDays } = require("date-fns");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -20,28 +22,31 @@ const manageServers = {
 // Command to run to deploy all functions: 
 // firebase deploy --only functions
 
-exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZone: "America/New_York", retryConfig: { maxAttempts: 3 }, minInstances: 0}, async (event) => {
+exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZone: "America/Chicago", retryConfig: { maxAttempts: 3 }, minInstances: 0}, async (event) => {
   console.log("Starting daily register report generation...");
   for (const serverID of Object.keys(manageServers)) {
     try {
       console.log(`Starting daily register report for ${serverID}...`);
-  
-      const currentDate = new Date();
-      const startDate = new Date(currentDate);
-      startDate.setHours(startDate.getHours() - 24, 0, 0, 0);
-      const endDate = new Date(currentDate);
-  
-      console.log(
-        `Report Date: ${currentDate
-          .toLocaleDateString("en-US")
-          .replace(/\//g, "-")}`
-      );
-      console.log(`Start Date: ${startDate.toLocaleString("en-US")}`);
-      console.log(`End Date: ${endDate.toLocaleString("en-US")}`);
+
+      const texasTimeZone = "America/Chicago";
+
+      // We run at ~7am local; compute "yesterday" in Texas by date string in that TZ.
+      const now = new Date();
+      const ymdTexas = formatInTimeZone(subDays(now, 1), texasTimeZone, "yyyy-MM-dd");
+      const dateLabel = ymdTexas;
+      // Create UTC instants that represent Texas local day boundaries
+      const startDate = fromZonedTime(`${ymdTexas} 00:00:00.000`, texasTimeZone);
+      const endDate = fromZonedTime(`${ymdTexas} 23:59:59.999`, texasTimeZone);
+      
+      console.log(`Report Date (Texas): ${ymdTexas}`);
+      console.log(`Start Date (UTC): ${startDate.toISOString()}`);
+      console.log(`End Date (UTC): ${endDate.toISOString()}`);
+      console.log(`Start Date (Texas): ${formatInTimeZone(startDate, texasTimeZone, "yyyy-MM-dd HH:mm:ss.SSS XXX")}`);
+      console.log(`End Date (Texas): ${formatInTimeZone(endDate, texasTimeZone, "yyyy-MM-dd HH:mm:ss.SSS XXX")}`);
   
       const ordersSnapshot = await db
         .collection("orders")
-        .where("timestamp", ">", startDate)
+        .where("timestamp", ">=", startDate)
         .where("timestamp", "<=", endDate)
         .where("access", "==", serverID)
         .get();
@@ -147,7 +152,7 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
   
       const registersSnapshot = await db
         .collection("registers")
-        .where("timestampStart", ">", startDate)
+        .where("timestampEnd", ">=", startDate)
         .where("timestampEnd", "<=", endDate)
         .where("access", "==", serverID)
         .get();
@@ -155,7 +160,9 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
       for (const doc of registersSnapshot.docs) {
         const register = doc.data();
         const cashier = register.uname || "Unknown";
-        registerData[cashier] = {
+
+        if (!registerData[cashier]) registerData[cashier] = [];
+        registerData[cashier].push({
           "Register ID": doc.id,
           Cashier: cashier,
           "Starting Amount": register.starting || 0,
@@ -165,7 +172,7 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
           "Credit Card Total": register.ccard || 0,
           "Timestamp Start": register.timestampStart?.toDate() || "N/A",
           "Timestamp End": register.timestampEnd?.toDate() || "N/A",
-        };
+        });
       }
   
       const wb = new xl.Workbook();
@@ -226,17 +233,23 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
         row++;
       }
   
-      for (const [cashier, register] of Object.entries(registerData)) {
-        const sheet = wb.addWorksheet(`Register - ${cashier}`);
-        let row = 1;
-        for (const [key, value] of Object.entries(register)) {
-          sheet.cell(row, 1).string(key).style(headerStyle);
-          sheet.cell(row, 2).string(String(value));
-          row++;
+      const safeSheetName = (name) => `Register - ${name}`.slice(0, 31);
+
+      for (const [cashier, registers] of Object.entries(registerData)) {
+        const sheet = wb.addWorksheet(safeSheetName(cashier));
+        let r = 1;
+
+        for (const reg of registers) {
+          for (const [key, value] of Object.entries(reg)) {
+            sheet.cell(r, 1).string(key).style(headerStyle);
+            sheet.cell(r, 2).string(String(value));
+            r++;
+          }
+          r++; // blank line between closes
         }
       }
   
-      const tempFilePath = "/tmp/" + currentDate.toLocaleDateString("en-US").replace(/\//g, "-") + "_Daily_Register_Report_" + serverID + ".xlsx";
+      const tempFilePath = `/tmp/${dateLabel}_Daily_Register_Report_${serverID}.xlsx`;
       await new Promise((resolve, reject) => {
         wb.write(tempFilePath, (err) => {
           if (err) reject(err);
@@ -244,29 +257,22 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
         });
       });
   
-      await bucket.upload(tempFilePath, {
-        destination: "reports/" + currentDate.toLocaleDateString("en-US").replace(/\//g, "-") + "_Daily_Register_Report_" + serverID + ".xlsx",
-      });
-  
-      const file = bucket.file("reports/" + currentDate.toLocaleDateString("en-US").replace(/\//g, "-") + "_Daily_Register_Report_" + serverID + ".xlsx");
-  
+      const destinationPath = `reports/${dateLabel}_Daily_Register_Report_${serverID}.xlsx`;
+
+      await bucket.upload(tempFilePath, { destination: destinationPath });
+
+      const file = bucket.file(destinationPath);
       await file.makePublic();
-  
-      const url = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
-  
+
+      const url = `https://storage.googleapis.com/${bucket.name}/${destinationPath}`;
+
       const mailRef = db.collection("mail").doc();
       await mailRef.set({
         to: manageServers[serverID].managers,
         message: {
-          html: `Attached is the daily register report for ${serverID} on ${currentDate.toLocaleDateString(
-            "en-US"
-          )}. <a href="${url}">Download Report</a>`,
-          subject: `Daily Register Report for ${serverID} - ${currentDate.toLocaleDateString(
-            "en-US"
-          )}`,
-          text: `Attached is the daily register report for ${serverID} on ${currentDate.toLocaleDateString(
-            "en-US"
-          )}. Download the report here: ${url}`,
+          html: `Attached is the daily register report for ${serverID} on ${dateLabel}. <a href="${url}">Download Report</a>`,
+          subject: `Daily Register Report for ${serverID} - ${dateLabel}`,
+          text: `Attached is the daily register report for ${serverID} on ${dateLabel}. Download the report here: ${url}`,
         },
       });
   

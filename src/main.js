@@ -18,6 +18,8 @@ const OAuthClient = require('intuit-oauth');
 const QuickBooks = require('node-quickbooks');
 const { compareAsc, format } = require("date-fns");
 const { register } = require('module');
+const { checkForUpdates, analyticsAdd } = require("./autoupdater.js");
+
 /*
   getDownloadURL(ref(storage, 'product-images/286x180.svg'))
   .then((url) => {
@@ -4198,7 +4200,8 @@ async function attemptLogin(details){
       mainWin.loadFile(path.join(__dirname, 'index.html'));
       user = userCredential.user;
       setTimeout(function () { startLoading() }, 1000);
-      setTimeout(function () { autoUpdater.checkForUpdatesAndNotify() }, 30000);
+//      setTimeout(function () { autoUpdater.checkForUpdatesAndNotify() }, 30000);
+      setTimeout(function () { checkForUpdates() }, 30000);
     }      
   })
   .catch((error) => {
@@ -5528,7 +5531,7 @@ ipcMain.on('register-qb-request', async (event, arg) => {
   if (!registerSystemEnabled) {
     return
   }
-  gatherAllQBRegisters()
+  //gatherAllQBRegisters()
 })
 
 ipcMain.on('starting-register', (event, arg) => {
@@ -5951,7 +5954,8 @@ ipcMain.on('quickbooks-login', (event, arg) => {
 
 ipcMain.on('request-update', (event, arg) => {
   theClient = event.sender;
-  autoUpdater.checkForUpdatesAndNotify();
+//  autoUpdater.checkForUpdatesAndNotify();
+  checkForUpdates()
 })
 
 ipcMain.on('request-changelog', async (event, arg) => {
