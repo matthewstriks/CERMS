@@ -17,6 +17,24 @@ const manageServers = {
   },
 };
 
+const categoryTotalsReportNames = [
+  "Hygiene",
+  "Health",
+  "Snacks",
+  "Flip Flops",
+  "Incense",
+  "Towels",
+];
+
+const categoryTotalsReportAliases = {
+  Snacks: ["Beverages", "Candy", "Chips", "Snacks"],
+};
+
+const normalizeCategoryName = (name) =>
+  String(name || "")
+    .trim()
+    .toLowerCase();
+
 // Command to run to deploy this function:
 // firebase deploy --only functions:generateDailyRegisterReport
 // Command to run to deploy all functions: 
@@ -61,6 +79,18 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
       const cashierMap = {};
       const customerMap = {};
       const productMap = {};
+      const categoryMap = {};
+      const categoryTotals = Object.fromEntries(
+        categoryTotalsReportNames.map((name) => [name, 0])
+      );
+      const categoryNameLookup = Object.fromEntries(
+        categoryTotalsReportNames.flatMap((name) =>
+          (categoryTotalsReportAliases[name] || [name]).map((alias) => [
+            normalizeCategoryName(alias),
+            name,
+          ])
+        )
+      );
       const registerData = {};
   
       for (const doc of ordersSnapshot.docs) {
@@ -119,17 +149,43 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
                     .doc(productID)
                     .get();
                   productMap[productID] = productDoc.exists
-                    ? productDoc.data().name
-                    : "Unknown Product";
+                    ? productDoc.data()
+                    : { name: "Unknown Product" };
                 } catch (err) {
                   console.error(`Error fetching product ${productID}:`, err);
-                  productMap[productID] = "Unknown Product";
+                  productMap[productID] = { name: "Unknown Product" };
                 }
               }
-              productNames.push(productMap[productID]);
+              const product = productMap[productID];
+              const productName = product.name || "Unknown Product";
+
+              productNames.push(productName);
   
-              productSales[productMap[productID]] =
-                (productSales[productMap[productID]] || 0) + 1;
+              productSales[productName] =
+                (productSales[productName] || 0) + 1;
+
+              if (product.cat && typeof product.cat === "string") {
+                if (!Object.prototype.hasOwnProperty.call(categoryMap, product.cat)) {
+                  try {
+                    const categoryDoc = await db
+                      .collection("categories")
+                      .doc(product.cat)
+                      .get();
+                    categoryMap[product.cat] = categoryDoc.exists
+                      ? categoryDoc.data().name
+                      : "";
+                  } catch (err) {
+                    console.error(`Error fetching category ${product.cat}:`, err);
+                    categoryMap[product.cat] = "";
+                  }
+                }
+
+                const reportCategory =
+                  categoryNameLookup[normalizeCategoryName(categoryMap[product.cat])];
+                if (reportCategory) {
+                  categoryTotals[reportCategory]++;
+                }
+              }
             }
           }
         }
@@ -230,6 +286,18 @@ exports.generateDailyRegisterReport = onSchedule({schedule: "0 7 * * *", timeZon
       for (const [product, quantity] of Object.entries(productSales)) {
         productSheet.cell(row, 1).string(product);
         productSheet.cell(row, 2).number(quantity);
+        row++;
+      }
+
+      const categoryTotalsSheet = wb.addWorksheet("Category Totals");
+      categoryTotalsSheet.cell(1, 1).string("Report Date").style(headerStyle);
+      categoryTotalsSheet.cell(1, 2).string(dateLabel);
+      categoryTotalsSheet.cell(3, 1).string("Category").style(headerStyle);
+      categoryTotalsSheet.cell(3, 2).string("Quantity Sold").style(headerStyle);
+      row = 4;
+      for (const categoryName of categoryTotalsReportNames) {
+        categoryTotalsSheet.cell(row, 1).string(categoryName);
+        categoryTotalsSheet.cell(row, 2).number(categoryTotals[categoryName]);
         row++;
       }
   
