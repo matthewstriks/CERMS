@@ -1,3 +1,4 @@
+import { dobVariants } from '../../../data/membership-search'
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { DependencyList } from 'react'
 import type { ClubRepository } from '../../../data/contracts'
@@ -40,4 +41,15 @@ export function money(value: number | null): string {
   return value === null
     ? 'Not recorded'
     : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+}
+
+/** Format calendar dates without timezone conversion or changing their stored value. */
+export function dobLabel(value: string | undefined): string {
+  if (!value?.trim()) return 'Not recorded'
+  try {
+    const [year, month, day] = dobVariants(value)[0]!.split('-')
+    return `${month}/${day}/${year}`
+  } catch {
+    return 'Invalid date'
+  }
 }

@@ -76,7 +76,7 @@ export const modules = [
     id: 'products',
     label: 'Products',
     icon: Package,
-    group: 'Operations',
+    group: 'Administration',
     description: 'Your membership, rental, and retail catalog.',
     features: [
       'Categories and product images',

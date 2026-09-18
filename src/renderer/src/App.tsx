@@ -10,6 +10,7 @@ import { canSwitchSystems } from '../../shared/firebase-policy'
 import { useMembershipSession } from './lib/membership-session'
 const Activity = lazy(() => import('./features/Activity'))
 const Members = lazy(() => import('./features/Members'))
+const Products = lazy(() => import('./features/Products'))
 const Settings = lazy(() => import('./features/Settings'))
 
 function readRoute(): ModuleId {
@@ -135,6 +136,8 @@ export default function App() {
               <Activity showRentalAlerts={route === 'overview'} />
             ) : route === 'members' ? (
               <Members />
+            ) : route === 'products' ? (
+              <Products key={`${membership.reader?.uid}:${membership.reader?.club}`} />
             ) : route === 'settings' ? (
               <Settings />
             ) : (

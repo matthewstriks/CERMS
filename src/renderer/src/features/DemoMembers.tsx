@@ -1,3 +1,4 @@
+import { dobLabel } from '../lib/data'
 import { useState } from 'react'
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { MemberQuery } from '../../../data/contracts'
@@ -89,7 +90,7 @@ export default function DemoMembers() {
                           </div>
                         </td>
                         <td>#{member.number}</td>
-                        <td>{member.dob || 'Not recorded'}</td>
+                        <td>{dobLabel(member.dob)}</td>
                         <td>{member.membership}</td>
                         <td>{dateLabel(member.expiresAt)}</td>
                         <td>

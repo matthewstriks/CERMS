@@ -41,6 +41,143 @@ service cloud.firestore {
         && (!('email' in data) || (data.email is string && data.email.size() <= 320))
         && (!('version' in data) || (data.version is string && data.version.size() <= 128) || data.version is number);
     }
+    // Dev-only creates: legacy display fields plus versioned search/audit metadata.
+    // Atomic companion reservations have only access and memberId; all are immutable.
+    function devCreator() {
+      return switcher()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access == 'dev'
+        && exists(/databases/$(database)/documents/system/dev);
+    }
+    function shortText(value, maximum) {
+      return value is string && value.size() <= maximum;
+    }
+    function adultDob(value) {
+      let parts = value.split('-');
+      let birth = timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+      let years = request.time.year() - birth.year();
+      return birth <= request.time && years <= 125 && (years > 18 || (years == 18
+        && (request.time.month() > birth.month() || (request.time.month() == birth.month() && request.time.day() >= birth.day()))));
+    }
+    function validDevMember(d) {
+      return d.keys().hasOnly(['phone','access','name','fname','lname','mname','suffix','dob','membership_type','idnum','idstate','email','createdBy','productId','identityKey','fingerprint','searchFirst','searchLast','searchName','searchId','searchEmail','dna','checkedIn','waiver_status','id_number','id_expiration','schemaVersion','notes','creation_time'])
+        && d.keys().hasAll(['access','name','fname','lname','mname','suffix','dob','membership_type','idnum','idstate','email','createdBy','productId','identityKey','fingerprint','searchFirst','searchLast','searchName','searchId','searchEmail','dna','checkedIn','waiver_status','id_number','id_expiration','schemaVersion','notes','creation_time'])
+        && d.access == 'dev' && d.createdBy == request.auth.uid && d.schemaVersion == 2
+        && shortText(d.fname,200) && d.fname.size() > 0 && shortText(d.lname,200) && d.lname.size() > 0
+        && shortText(d.mname,200) && d.suffix in ['','II','III','IV','JR.','SR.']
+        && d.name == d.fname + ' ' + d.lname
+        && d.dob is string && d.dob.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && adultDob(d.dob)
+        && shortText(d.idnum,200) && d.idnum.size() > 0
+        && d.idstate in ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','military','passport','other']
+        && (!('phone' in d) || (d.phone is string && d.phone.matches('[+][1-9][0-9]{7,14}')))
+        && shortText(d.email,320) && shortText(d.searchEmail,320)
+        && shortText(d.searchFirst,500) && shortText(d.searchLast,500) && shortText(d.searchName,500) && shortText(d.searchId,500)
+        && d.identityKey is string && d.identityKey.matches('[a-f0-9]{64}')
+        && d.fingerprint is string && d.fingerprint.matches('[a-f0-9]{64}')
+        && d.productId == 'dev-annual' && d.membership_type == 'Development membership'
+        && d.id_number is int && d.id_number >= 100000000 && d.id_number <= 999999999
+        && d.id_expiration is int && d.id_expiration > request.time.toMillis() / 1000 + 364*86400
+        && d.id_expiration <= request.time.toMillis() / 1000 + 366*86400
+        && d.creation_time == request.time && d.dna == false && d.checkedIn == false && d.waiver_status == false
+        && d.notes is list && d.notes.size() <= 1 && (d.notes.size() == 0 || shortText(d.notes[0],10200));
+    }
+    function devReservations(d, memberId) {
+      let identityPath = /databases/$(database)/documents/system/dev/memberIdentities/$(d.identityKey);
+      let numberPath = /databases/$(database)/documents/system/dev/memberNumbers/$(string(d.id_number));
+      return !exists(identityPath) && !exists(numberPath)
+        && getAfter(identityPath).data.memberId == memberId
+        && getAfter(numberPath).data.memberId == memberId;
+    }
+    function validDevClaim(d) {
+      return d.keys().hasOnly(['access','memberId']) && d.keys().hasAll(['access','memberId'])
+        && d.access == 'dev' && d.memberId is string && d.memberId.matches('[a-f0-9-]{36}');
+    }
+    function claimedMember(d, key, identity) {
+      let memberPath = /databases/$(database)/documents/members/$(d.memberId);
+      let member = getAfter(memberPath).data;
+      return !exists(memberPath) && member.access == 'dev' && member.createdBy == request.auth.uid
+        && (identity ? member.identityKey == key : string(member.id_number) == key);
+    }
+    match /system/{systemId}/memberIdentities/{key} {
+      allow get: if systemId == 'dev' && devCreator();
+      allow create: if systemId == 'dev' && devCreator() && validDevClaim(request.resource.data) && claimedMember(request.resource.data,key,true);
+      allow list, update, delete: if false;
+    }
+    match /system/{systemId}/memberNumbers/{key} {
+      allow get: if systemId == 'dev' && devCreator();
+      allow create: if systemId == 'dev' && devCreator() && validDevClaim(request.resource.data) && claimedMember(request.resource.data,key,false);
+      allow list, update, delete: if false;
+    }
+    // Append-only Dev view events; actor identity/name and timestamp are server-validated.
+    function logMember(systemId, memberId) {
+      return systemId == 'dev' && devCreator()
+        && get(/databases/$(database)/documents/members/$(memberId)).data.access == systemId;
+    }
+    function validMemberView(d) {
+      return d.keys().hasOnly(['type','actorUid','actorName','schemaVersion','occurredAt'])
+        && d.keys().hasAll(['type','actorUid','actorName','schemaVersion','occurredAt'])
+        && d.type == 'member.viewed' && d.schemaVersion == 1
+        && d.actorUid == request.auth.uid
+        && shortText(d.actorName,256) && d.actorName.size() > 0
+        && d.actorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+        && d.occurredAt == request.time;
+    }
+    match /system/{systemId}/memberLogs/{memberId}/events/{eventId} {
+      allow get: if logMember(systemId,memberId);
+      allow list: if logMember(systemId,memberId) && request.query.limit <= 50;
+      allow create: if logMember(systemId,memberId) && eventId.matches('[a-f0-9-]{36}') && validMemberView(request.resource.data);
+      allow update, delete: if false;
+    }
+    // Catalog administration is temporarily owner-only until business roles are defined.
+    function catalogAdmin(systemId) {
+      return switcher() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access == systemId
+        && exists(/databases/$(database)/documents/system/$(systemId));
+    }
+    function catalogMeta(d) {
+      return d.version is int && d.version >= 1 && d.version <= 1000000000
+        && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
+    function catalogQuantity(v) {
+      return v == null || (v is int && v >= 0 && v <= 1000000000);
+    }
+    function catalogDuration(n,u) {
+      return n is number && n > 0 && n <= 1000 && u in ['hour','day','week','month','year'];
+    }
+    function validCategory(d) {
+      return d.keys().hasOnly(['name','desc','color','version','updatedBy','updatedAt'])
+        && d.keys().hasAll(['name','desc','color','version','updatedBy','updatedAt'])
+        && shortText(d.name,200) && d.name.matches('.*[^\\s].*') && shortText(d.desc,4000)
+        && d.color is string && d.color.matches('#[a-fA-F0-9]{6}') && catalogMeta(d);
+    }
+    function validProduct(d,systemId) {
+      return d.keys().hasOnly(['name','desc','cat','barcode','priceCents','inventory','inventoryPar','invWarning','favorite','taxable','active','core','rental','membership','restricted','payout','askforprice','rentalLengthRaw','rentalLengthType','membershipLengthRaw','membershipLengthType','restrictedUsers','version','updatedBy','updatedAt'])
+        && d.keys().hasAll(['name','desc','cat','barcode','priceCents','inventory','inventoryPar','invWarning','favorite','taxable','active','core','rental','membership','restricted','payout','askforprice','rentalLengthRaw','rentalLengthType','membershipLengthRaw','membershipLengthType','restrictedUsers','version','updatedBy','updatedAt'])
+        && catalogMeta(d) && shortText(d.name,200) && d.name.matches('.*[^\\s].*') && shortText(d.desc,4000) && shortText(d.barcode,200)
+        && d.cat is string && d.cat.matches('[a-zA-Z0-9_-]{1,128}')
+        && exists(/databases/$(database)/documents/system/$(systemId)/categories/$(d.cat))
+        && d.priceCents is int && d.priceCents >= 0 && d.priceCents <= 999999999
+        && catalogQuantity(d.inventory) && catalogQuantity(d.inventoryPar) && catalogQuantity(d.invWarning)
+        && d.favorite is bool && d.taxable is bool && d.active is bool && d.core is bool
+        && d.rental is bool && d.membership is bool && d.restricted is bool && d.payout is bool && d.askforprice is bool
+        && (!d.askforprice || d.priceCents == 0)
+        && catalogDuration(d.rentalLengthRaw,d.rentalLengthType) && catalogDuration(d.membershipLengthRaw,d.membershipLengthType)
+        && d.restrictedUsers is list && d.restrictedUsers.size() <= 100
+        && d.restrictedUsers.toSet().size() == d.restrictedUsers.size()
+        && (d.restricted ? (d.restrictedUsers.size() > 0 && d.restrictedUsers.join(',').matches('[a-zA-Z0-9_-]{1,128}(,[a-zA-Z0-9_-]{1,128}){0,99}')) : d.restrictedUsers.size() == 0);
+    }
+    match /system/{systemId}/categories/{categoryId} {
+      allow get: if catalogAdmin(systemId);
+      allow list: if catalogAdmin(systemId) && request.query.limit <= 100;
+      allow create: if catalogAdmin(systemId) && categoryId.matches('[a-zA-Z0-9_-]{1,128}') && validCategory(request.resource.data) && request.resource.data.version == 1;
+      allow update: if catalogAdmin(systemId) && validCategory(request.resource.data) && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
+    match /system/{systemId}/products/{productId} {
+      allow get: if catalogAdmin(systemId);
+      allow list: if catalogAdmin(systemId) && request.query.limit <= 100;
+      allow create: if catalogAdmin(systemId) && productId.matches('[a-zA-Z0-9_-]{1,128}') && validProduct(request.resource.data,systemId) && request.resource.data.version == 1;
+      allow update: if catalogAdmin(systemId) && validProduct(request.resource.data,systemId) && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
     match /users/{uid} {
       allow get: if ownsProfile(uid);
       allow list, create, delete: if false;
@@ -55,7 +192,10 @@ service cloud.firestore {
     }
     match /members/{memberId} {
       allow read: if ownClub();
-      allow write: if false;
+      allow get: if devCreator() && !exists(/databases/$(database)/documents/members/$(memberId));
+      allow create: if devCreator() && memberId.matches('[a-f0-9-]{36}')
+        && validDevMember(request.resource.data) && devReservations(request.resource.data,memberId);
+      allow update, delete: if false;
     }
     match /activity/{visitId} {
       allow read: if ownClub();

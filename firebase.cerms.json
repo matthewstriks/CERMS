@@ -2,7 +2,8 @@
   "firestore": [
     {
       "database": "cerms",
-      "rules": "firebase/cerms.rules"
+      "rules": "firebase/cerms.rules",
+      "indexes": "firebase/cerms.indexes.json"
     }
   ]
 }

@@ -15,6 +15,14 @@ let activeClub = 'fixture-club'
 let denySwitch = false
 let denyProfileReload = false
 let commitCount = 0
+let devCreateCount = 0
+let catalogWriteCount = 0
+let logCount = 0
+let logQueries = 0
+let denyLogOnce = false
+let expectedLogDenials = 0
+let denyMemberScan = false
+const devDocuments = new Map()
 const ownerUid = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 const base = 'projects/cerms-7af24/databases/cerms/documents/'
 const str = (stringValue) => ({ stringValue })
@@ -131,8 +139,81 @@ try {
       })
     }
     if (url.hostname === 'firestore.googleapis.com' && url.pathname.endsWith(':commit')) {
-      commitCount++
       const body = request.postDataJSON()
+      if (/\/system\/[^/]+\/(products|categories)\//.test(body.writes[0]?.update?.name ?? '')) {
+        const write = body.writes[0]
+        assert.equal(activeClub, 'dev')
+        assert.equal(write.update.fields.updatedBy.stringValue, ownerUid)
+        const before = devDocuments.get(write.update.name)
+        assert.equal(
+          Number(write.update.fields.version.integerValue),
+          before ? Number(before.fields.version.integerValue) + 1 : 1,
+        )
+        devDocuments.set(write.update.name, {
+          ...write.update,
+          fields: { ...write.update.fields, updatedAt: { timestampValue: '2026-09-18T13:00:00Z' } },
+        })
+        catalogWriteCount++
+        return respond({
+          writeResults: [{ updateTime: '2026-09-18T13:00:00Z' }],
+          commitTime: '2026-09-18T13:00:00Z',
+        })
+      }
+      if (body.writes[0]?.update?.name.includes('/memberLogs/')) {
+        const write = body.writes[0]
+        assert.equal(activeClub, 'dev')
+        assert.equal(write.update.fields.actorUid.stringValue, ownerUid)
+        assert.equal(write.update.fields.actorName.stringValue, 'Fixture owner')
+        assert.equal(write.update.fields.type.stringValue, 'member.viewed')
+        assert.equal(write.currentDocument.exists, false)
+        if (denyLogOnce) {
+          denyLogOnce = false
+          expectedLogDenials++
+          return route.fulfill({
+            status: 403,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 403, status: 'PERMISSION_DENIED' } }),
+          })
+        }
+        assert.equal(devDocuments.has(write.update.name), false)
+        devDocuments.set(write.update.name, {
+          ...write.update,
+          fields: {
+            ...write.update.fields,
+            occurredAt: { timestampValue: '2026-09-18T13:00:00Z' },
+          },
+        })
+        logCount++
+        return respond({
+          writeResults: [{ updateTime: '2026-09-18T13:00:00Z' }],
+          commitTime: '2026-09-18T13:00:00Z',
+        })
+      }
+      if (body.writes.length === 3) {
+        assert.equal(activeClub, 'dev')
+        assert.equal(fixtureUid, ownerUid)
+        assert.equal(body.writes[0].update.fields.access.stringValue, 'dev')
+        assert.equal(body.writes[0].update.fields.phone.stringValue, '+12105550123')
+        for (const write of body.writes) {
+          assert.equal(write.currentDocument.exists, false)
+          assert.equal(devDocuments.has(write.update.name), false)
+          devDocuments.set(write.update.name, {
+            ...write.update,
+            fields: {
+              ...write.update.fields,
+              ...(write.updateTransforms
+                ? { creation_time: { timestampValue: '2026-09-18T12:00:00Z' } }
+                : {}),
+            },
+          })
+        }
+        devCreateCount++
+        return respond({
+          writeResults: body.writes.map(() => ({ updateTime: '2026-09-18T12:00:00Z' })),
+          commitTime: '2026-09-18T12:00:00Z',
+        })
+      }
+      commitCount++
       assert.equal(fixtureUid, ownerUid)
       assert.equal(body.writes.length, 1)
       const target = body.writes[0].update.fields.access.stringValue
@@ -175,6 +256,18 @@ try {
             error: { code: 403, status: 'PERMISSION_DENIED', message: 'Fixture reload denial' },
           }),
         })
+      if (activeClub === 'dev')
+        return respond(
+          body.documents.map((name) => {
+            if (name.includes('/users/'))
+              return {
+                found: { name, fields: { access: str('dev'), displayName: str('Fixture owner') } },
+              }
+            return devDocuments.has(name)
+              ? { found: devDocuments.get(name) }
+              : { missing: name, readTime: '2026-09-18T12:00:00Z' }
+          }),
+        )
       return respond(
         body.documents.map((name) => ({
           found: name.includes('/users/')
@@ -198,6 +291,39 @@ try {
       )
     }
     if (url.hostname === 'firestore.googleapis.com' && url.pathname.endsWith(':runQuery')) {
+      if (/\/system\/[^/]+:runQuery$/.test(url.pathname)) {
+        const q = request.postDataJSON().structuredQuery
+        assert.equal(q.limit, 100)
+        assert.ok(['products', 'categories'].includes(q.from[0].collectionId))
+        const parent =
+          url.pathname.slice(4, -':runQuery'.length) + '/' + q.from[0].collectionId + '/'
+        return respond(
+          [...devDocuments.values()]
+            .filter((d) => d.name.startsWith(parent))
+            .sort((a, b) => a.fields.name.stringValue.localeCompare(b.fields.name.stringValue))
+            .map((document) => ({ document })),
+        )
+      }
+      if (url.pathname.includes('/memberLogs/')) {
+        logQueries++
+        const q = request.postDataJSON().structuredQuery
+        assert.equal(q.from[0].collectionId, 'events')
+        assert.equal(q.limit, 50)
+        const parent = url.pathname.slice(4, -':runQuery'.length) + '/events/'
+        let rows = [...devDocuments.values()]
+          .filter((d) => d.name.startsWith(parent))
+          .sort(
+            (a, b) =>
+              b.fields.occurredAt.timestampValue.localeCompare(
+                a.fields.occurredAt.timestampValue,
+              ) || b.name.localeCompare(a.name),
+          )
+        if (q.startAt) {
+          const last = q.startAt.values.at(-1).referenceValue
+          rows = rows.slice(rows.findIndex((d) => d.name === last) + 1)
+        }
+        return respond(rows.slice(0, 50).map((document) => ({ document })))
+      }
       assert.equal(url.pathname, '/v1/' + base.slice(0, -1) + ':runQuery')
       const q = request.postDataJSON().structuredQuery
       queries.push(q)
@@ -218,6 +344,31 @@ try {
         'Every query must be club-scoped',
       )
       const collection = q.from[0].collectionId
+      if (
+        activeClub === 'dev' &&
+        collection === 'members' &&
+        field(q.where, 'searchId') &&
+        denyMemberScan
+      )
+        return route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 403, status: 'PERMISSION_DENIED', message: 'Synthetic lookup denial' },
+          }),
+        })
+      if (activeClub === 'dev' && collection === 'members')
+        return respond(
+          [...devDocuments.values()]
+            .filter(
+              (d) =>
+                d.name.includes('/members/') &&
+                (!field(q.where, 'searchId') ||
+                  d.fields.searchId?.stringValue === field(q.where, 'searchId').stringValue),
+            )
+            .map((document) => ({ document })),
+        )
+      if (activeClub === 'dev' && ['activity', 'orders'].includes(collection)) return respond([])
       let records = []
       if (collection === 'members') {
         if (q.startAt) records = [record(26)]
@@ -265,6 +416,11 @@ try {
   page.setDefaultTimeout(15000)
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('console', (message) => {
+    if (expectedLogDenials && /Failed to load resource:.*403/.test(message.text())) {
+      expectedLogDenials--
+      return
+    }
+    if (denyMemberScan && /Failed to load resource:.*403/.test(message.text())) return
     if (message.type() === 'error' && !denySwitch && !denyProfileReload) errors.push(message.text())
   })
   await page.getByRole('button', { name: 'Forgot password?' }).click()
@@ -361,8 +517,9 @@ try {
     )
     .toEqual({ maximized: true, fullscreen: false })
   assert.equal(await page.getByRole('button', { name: 'Change system', exact: true }).count(), 0)
+  await page.getByRole('link', { name: 'Products', exact: true }).click()
+  await page.getByRole('heading', { name: 'Business admin access required' }).waitFor()
   for (const label of [
-    'Products',
     'Point of sale',
     'Registers',
     'History',
@@ -386,6 +543,18 @@ try {
     await page.getByRole('button', { name: 'Create membership', exact: true }).isDisabled(),
     true,
   )
+  await page.getByRole('button', { name: 'Scan ID', exact: true }).click()
+  const staffScan = page.getByRole('dialog', { name: 'Find member by ID' })
+  await staffScan
+    .getByLabel('Scanned ID data')
+    .fill('DAQ001234\nDACFIXTURE\nDCSGUEST\nDBB02091980\nDAJTX')
+  await staffScan.getByRole('button', { name: 'Search members', exact: true }).click()
+  await staffScan.getByRole('button', { name: 'View member Test Member 01', exact: true }).waitFor()
+  assert.equal(
+    await staffScan.getByRole('button', { name: 'Create membership with this ID' }).count(),
+    0,
+  )
+  await staffScan.getByRole('button', { name: 'Close', exact: true }).click()
   await page.getByRole('button', { name: 'Next page', exact: true }).click()
   await page.getByRole('button', { name: 'View Test Member 26' }).waitFor()
   await page.getByRole('button', { name: 'Previous page', exact: true }).click()
@@ -580,6 +749,243 @@ try {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await page.getByRole('button', { name: 'View Test Member 01' }).waitFor()
   assert.equal(commitCount, 3, 'Sign-in must never write access')
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.getByRole('heading', { name: 'Sign in to CERMS' }).waitFor()
+  // Dev member creation is exercised with synthetic intercepted writes only.
+  activeClub = 'dev'
+  await page.getByLabel('Email', { exact: true }).fill('fixture@example.test')
+  await page.getByLabel('Password', { exact: true }).fill('fixture-password')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  const barcode =
+    'IDDAQFAKE-DEV-001\nDCSGUEST\nDACSYNTHETIC\nDBB01021990\nDAJTX\nDBA01012035\nDCGUSA'
+  await page.getByRole('button', { name: 'Scan ID', exact: true }).click()
+  const scanDialog = page.getByRole('dialog', { name: 'Find member by ID' })
+  const captured = scanDialog.getByLabel('Scanned ID data')
+  await expect(captured).toBeFocused()
+  const scannerSpeed = scanDialog.getByLabel('Scanner finish delay')
+  await scannerSpeed.focus()
+  await scannerSpeed.selectOption('4000')
+  await expect(captured).toBeFocused()
+  await scannerSpeed.focus()
+  await scannerSpeed.selectOption('2000')
+  await expect(captured).toBeFocused()
+  await captured.fill('IDDAQFAKE-DEV-001\nDCSGUEST\nDACSYNTHETIC\nDBB01021990\n')
+  const scanQueriesBeforeTail = queries.length
+  await page.waitForTimeout(1200)
+  assert.equal(
+    queries.length,
+    scanQueriesBeforeTail,
+    'A pause shorter than two seconds cannot finish a scan',
+  )
+  await captured.pressSequentially('DAJTX', { delay: 120 })
+  await captured.press('Enter')
+  await captured.pressSequentially('DBA01012035', { delay: 120 })
+  await captured.press('Enter')
+  await captured.pressSequentially('DCGUSA', { delay: 120 })
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Tab')
+  assert.equal(devCreateCount, 0, 'Scanner control keys never save')
+  await scanDialog.getByText('No member found with this ID', { exact: true }).waitFor()
+  assert.equal(devCreateCount, 0, 'No-match lookup does not create automatically')
+  await scanDialog.getByRole('button', { name: 'Create membership with this ID' }).click()
+  const createDialog = page.getByRole('dialog', { name: 'Create member · Dev System' })
+  await createDialog
+    .getByRole('option', { name: 'Development membership' })
+    .waitFor({ state: 'attached' })
+  assert.equal(await createDialog.getByLabel('Enter existing membership details').count(), 0)
+  await expect(createDialog.getByLabel('First name', { exact: true })).toHaveValue('SYNTHETIC')
+  await expect(createDialog.getByLabel('ID number', { exact: true })).toHaveValue('FAKE-DEV-001')
+  await createDialog.getByRole('button', { name: 'Scan ID', exact: true }).click()
+  await expect(createDialog.getByLabel('Scanned ID data')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(createDialog).toBeVisible()
+  await expect(createDialog.getByLabel('Scanned ID data')).toHaveCount(0)
+  await createDialog.getByLabel('Type of membership').selectOption('dev-annual')
+  const phone = createDialog.getByLabel('Phone number (optional)')
+  await phone.fill('123')
+  await phone.blur()
+  assert.equal(await phone.evaluate((node) => node.checkValidity()), false)
+  await createDialog.getByRole('button', { name: 'Create membership', exact: true }).click()
+  assert.equal(devCreateCount, 0, 'Invalid phone blocks save')
+  await phone.fill('2105550123')
+  await phone.blur()
+  await expect(phone).toHaveValue('(210) 555-0123')
+  await createDialog.getByRole('button', { name: 'Create membership', exact: true }).click()
+  await createDialog.getByText(/SYNTHETIC GUEST created/).waitFor()
+  assert.equal(devCreateCount, 1)
+  await createDialog
+    .getByRole('button', { name: 'View member SYNTHETIC GUEST', exact: true })
+    .click()
+  await expect(createDialog).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+  await expect(page.getByRole('dialog')).toContainText('SYNTHETIC GUEST')
+  await expect(page.getByRole('dialog')).toContainText('(210) 555-0123')
+  await expect.poll(() => logCount).toBe(1)
+  const memberLog = page.locator('details.member-log')
+  assert.equal(await memberLog.evaluate((node) => node.open), false)
+  assert.equal(logQueries, 0, 'Collapsed log does not read event history')
+  const firstEvent = [...devDocuments.values()].find((d) => d.name.includes('/memberLogs/'))
+  for (let i = 0; i < 51; i++) {
+    const name = firstEvent.name.replace(/[^/]+$/, 'fixture-event-' + String(i).padStart(3, '0'))
+    devDocuments.set(name, {
+      ...firstEvent,
+      name,
+      fields: { ...firstEvent.fields, occurredAt: { timestampValue: '2026-09-18T12:30:00Z' } },
+    })
+  }
+  await memberLog.locator('summary').click()
+  await expect(memberLog.getByText('Member viewed by', { exact: true })).toHaveCount(50)
+  await expect(memberLog.getByText('Member created', { exact: true })).toBeVisible()
+  await expect(memberLog).toContainText('Fixture owner')
+  await memberLog.getByRole('button', { name: 'Load older activity' }).click()
+  await expect(memberLog.getByText('Member viewed by', { exact: true })).toHaveCount(52)
+  await expect(memberLog.getByRole('button', { name: 'Load older activity' })).toHaveCount(0)
+  await memberLog.locator('summary').click()
+  await memberLog.locator('summary').click()
+  await memberLog.getByRole('button', { name: 'Refresh log' }).click()
+  assert.equal(logCount, 1, 'Expanding and refreshing do not record another view')
+  await page.getByRole('button', { name: 'Member history', exact: true }).click()
+  await page.getByRole('button', { name: 'Member details', exact: true }).click()
+  await expect(memberLog).toBeVisible()
+  assert.equal(logCount, 1, 'Changing detail tabs does not record another view')
+
+  await page.keyboard.press('Escape')
+
+  // Standalone scan finds an existing member and opens their record without a write.
+  const originalDevMember = [...devDocuments.values()].find((d) => d.name.includes('/members/'))
+  const secondMatchName = base + 'members/synthetic-second-match'
+  devDocuments.set(secondMatchName, {
+    ...originalDevMember,
+    name: secondMatchName,
+    fields: {
+      ...originalDevMember.fields,
+      name: str('SECOND GUEST'),
+      fname: str('SECOND'),
+      id_number: integer(987654321),
+    },
+  })
+  await page.getByRole('button', { name: 'Scan ID', exact: true }).click()
+  await scanDialog.getByLabel('Scanned ID data').fill(barcode)
+  await expect(scanDialog.getByRole('button', { name: /^View member / })).toHaveCount(2)
+  await scanDialog.getByRole('button', { name: 'View member SYNTHETIC GUEST', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('SYNTHETIC GUEST')
+  await page.keyboard.press('Escape')
+  assert.equal(devCreateCount, 1)
+
+  devDocuments.delete(secondMatchName)
+  // Scanning while creating reports the duplicate, blocks apply/save, and links to it.
+  await page.getByRole('button', { name: 'Create membership', exact: true }).click()
+  await createDialog.getByRole('button', { name: 'Scan ID', exact: true }).click()
+  await createDialog.getByLabel('Scanned ID data').fill(barcode)
+  await createDialog.getByText('A member with this ID already exists', { exact: true }).waitFor()
+  await expect(
+    createDialog.getByRole('button', { name: 'Create membership', exact: true }),
+  ).toBeDisabled()
+  denyLogOnce = true
+  await createDialog
+    .getByRole('button', { name: 'View member SYNTHETIC GUEST', exact: true })
+    .click()
+  await expect(createDialog).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+  await expect(page.getByRole('dialog')).toContainText('SYNTHETIC GUEST')
+  await expect(memberLog.locator('summary')).toContainText('View not recorded')
+  await memberLog.locator('summary').click()
+  await memberLog.getByRole('button', { name: 'Retry recording view' }).click()
+  await expect(memberLog.locator('summary')).not.toContainText('View not recorded')
+  await expect.poll(() => logCount).toBe(3)
+  await page.keyboard.press('Escape')
+  await page.screenshot({ path: 'artifacts/member-scan-duplicate-fixtures.png', fullPage: true })
+  assert.equal(devCreateCount, 1)
+
+  await page.getByRole('button', { name: 'Scan ID', exact: true }).click()
+  await scanDialog.getByLabel('Scanned ID data').fill('DAQPARTIAL\nDACGUEST')
+  const beforeIncomplete = queries.length
+  await page.waitForTimeout(2300)
+  assert.equal(queries.length, beforeIncomplete, 'Incomplete IDs cannot auto-search')
+  await expect(scanDialog.getByRole('status')).toContainText('Waiting for a complete')
+  await scanDialog.getByLabel('Scanned ID data').fill(barcode)
+  await scanDialog.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.waitForTimeout(2300)
+  assert.equal(queries.length, beforeIncomplete, 'Closing capture cancels scheduled lookup')
+
+  // Failed lookup must not be presented as no account, or offer creation.
+  denyMemberScan = true
+  await page.getByRole('button', { name: 'Scan ID', exact: true }).click()
+  await scanDialog.getByLabel('Scanned ID data').fill(barcode)
+  await scanDialog.getByRole('alert').waitFor()
+  await expect(
+    scanDialog.getByRole('button', { name: 'Create membership with this ID' }),
+  ).toHaveCount(0)
+  await expect(scanDialog.getByLabel('Scanned ID data')).toHaveValue('')
+  denyMemberScan = false
+  await scanDialog.getByRole('button', { name: 'Close', exact: true }).click()
+
+  await page.getByRole('link', { name: 'Products', exact: true }).click()
+  await page.getByRole('button', { name: 'Create category', exact: true }).click()
+  const categoryDialog = page.getByRole('dialog', { name: 'Create category' })
+  await categoryDialog.getByLabel('Category name').fill('Retail')
+  await categoryDialog.getByLabel('Category description').fill('Synthetic category')
+  await categoryDialog.getByRole('button', { name: 'Create category', exact: true }).click()
+  await expect(categoryDialog).toHaveCount(0)
+  await page.getByRole('button', { name: 'Create product', exact: true }).click()
+  const productDialog = page.getByRole('dialog', { name: 'Create product' })
+  await productDialog.getByLabel('Product name', { exact: true }).fill('Guest towel')
+  await productDialog.getByLabel('Product category').selectOption({ label: 'Retail' })
+  await productDialog.getByLabel('Barcode', { exact: true }).fill('000123')
+  await productDialog.getByLabel('Barcode', { exact: true }).press('Enter')
+  assert.equal(catalogWriteCount, 1, 'Barcode terminator cannot submit product')
+  await productDialog.getByLabel('Price ($)', { exact: true }).fill('1.234')
+  await productDialog.getByRole('button', { name: 'Create product', exact: true }).click()
+  await expect(productDialog.getByRole('alert')).toContainText('two decimal places')
+  await productDialog.getByLabel('Price ($)', { exact: true }).fill('2.99')
+  await productDialog.getByLabel('Inventory amount', { exact: true }).fill('0')
+  await productDialog.getByLabel('Inventory warning', { exact: true }).fill('0')
+  await productDialog.getByLabel('Favorite', { exact: true }).check()
+  await productDialog.getByLabel('Taxable product', { exact: true }).check()
+  await productDialog.getByLabel('Membership product', { exact: true }).check()
+  await productDialog.getByLabel('Membership length', { exact: true }).fill('1')
+  await productDialog.getByLabel('Membership unit', { exact: true }).selectOption('year')
+  await productDialog.getByRole('button', { name: 'Create product', exact: true }).click()
+  await expect(productDialog).toHaveCount(0)
+  assert.equal(catalogWriteCount, 2)
+  const catalogProduct = [...devDocuments.values()].find((d) =>
+    d.name.includes('/system/dev/products/'),
+  )
+  assert.equal(catalogProduct.fields.priceCents.integerValue, '299')
+  assert.equal(catalogProduct.fields.inventory.integerValue, '0')
+  assert.equal(catalogProduct.fields.barcode.stringValue, '000123')
+  await page.getByLabel('Search products', { exact: true }).fill('000123')
+  await page.getByRole('button', { name: 'Edit product Guest towel', exact: true }).click()
+  const editProduct = page.getByRole('dialog', { name: 'Edit product', exact: true })
+  await editProduct.getByLabel('Ask for payment amount', { exact: true }).check()
+  await editProduct.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await expect(editProduct.getByRole('alert')).toContainText('zero price')
+  await editProduct.getByLabel('Price ($)', { exact: true }).fill('0')
+  await editProduct.getByLabel('Product is active', { exact: true }).uncheck()
+  await editProduct.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await expect(editProduct).toHaveCount(0)
+  assert.equal(catalogWriteCount, 3)
+  await page.getByLabel('Status', { exact: true }).selectOption('active')
+  await expect(
+    page.getByRole('button', { name: 'Edit product Guest towel', exact: true }),
+  ).toHaveCount(0)
+  await page.getByLabel('Status', { exact: true }).selectOption('inactive')
+  await page.getByRole('button', { name: 'Edit product Guest towel', exact: true }).click()
+  const concurrent = devDocuments.get(catalogProduct.name)
+  concurrent.fields.version = integer(3)
+  await editProduct.getByLabel('Product name', { exact: true }).fill('Stale change')
+  await editProduct.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await expect(editProduct.getByRole('alert')).toContainText('changed since you opened')
+  assert.equal(catalogWriteCount, 3)
+  await editProduct.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Categories', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit category Retail', exact: true }).click()
+  const editCategory = page.getByRole('dialog', { name: 'Edit category', exact: true })
+  await editCategory.getByLabel('Category name').fill('Retail updated')
+  await editCategory.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await expect(editCategory).toHaveCount(0)
+  assert.equal(catalogWriteCount, 4)
+  await page.screenshot({ path: 'artifacts/catalog-fixtures.png', fullPage: true })
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await page.getByRole('heading', { name: 'Sign in to CERMS' }).waitFor()
   assert.deepEqual(errors, [])

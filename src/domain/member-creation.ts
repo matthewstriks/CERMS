@@ -1,3 +1,5 @@
+import { normalizePhone } from './phone'
+
 /** UI/application model. No Firebase types or legacy field names cross this boundary. */
 export interface MemberDraft {
   firstName: string
@@ -5,6 +7,7 @@ export interface MemberDraft {
   lastName: string
   suffix: string
   birthDate: string
+  phone: string
   email: string
   membershipProductId: string
   governmentIdType: string
@@ -35,6 +38,7 @@ export const emptyMemberDraft = (): MemberDraft => ({
   lastName: '',
   suffix: '',
   birthDate: '',
+  phone: '',
   email: '',
   membershipProductId: '',
   governmentIdType: '',
@@ -286,13 +290,15 @@ export function ageOn(birthDate: string, today = new Date()): number {
   )
 }
 export function validateMemberDraft(draft: MemberDraft, now = new Date()): MemberDraft {
-  const clean = { ...draft }
+  const clean = { ...draft, phone: normalizePhone(draft.phone) }
   for (const key of Object.keys(clean) as (keyof MemberDraft)[]) {
     if (typeof clean[key] === 'string')
       Object.assign(clean, { [key]: (clean[key] as string).trim() })
   }
   if (!clean.firstName || !clean.lastName || !clean.governmentId || !clean.membershipProductId)
     throw new Error('First name, last name, ID number, and membership type are required.')
+  if (ageOn(clean.birthDate, now) > 125) throw new Error('Check the date of birth.')
+  if (clean.email.length > 320) throw new Error('Email is too long.')
   if (ageOn(clean.birthDate, now) < 18) throw new Error('Members must be at least 18 years old.')
   if (!suffixes.includes(clean.suffix as (typeof suffixes)[number]))
     throw new Error('Choose a listed suffix.')
@@ -324,25 +330,65 @@ export function validateMemberDraft(draft: MemberDraft, now = new Date()): Membe
   }
   return clean
 }
-/** Decode the same newline-delimited ID fields supported by CERMS 4. Never persist raw scans. */
-export function parseMemberScan(raw: string): Partial<MemberDraft> {
+export interface MemberScan {
+  draft: Partial<MemberDraft>
+  expirationDate: string | null
+  warnings: string[]
+}
+export const maxScanLength = 16384
+/** Decoded US PDF417 text only. Never retain the raw barcode or unrelated card fields. */
+export function decodeMemberScan(raw: string, today = new Date()): MemberScan {
+  if (!raw || raw.length > maxScanLength)
+    throw new Error('Unable to read this scan. Scan one ID at a time.')
+  // Keyboard scanners may preserve CR, LF, record separators, or substitute tabs.
+  const lines = raw.replace(/^\]L[0-9]/, '').split(/[\r\n\t\x1d\x1e]+/)
   const fields = new Map<string, string>()
-  for (const line of raw.split(/[\r\n]+/)) {
-    const match = line.trim().match(/^(?:DL)?(DAC|DAD|DCS|DAE|DBB|DAQ|DAJ)(.*)$/)
-    if (match) fields.set(match[1]!, match[2]!.trim())
+  for (let line of lines) {
+    line = line.trim()
+    // ANSI header: IIN, version, jurisdiction version, entry count, subfile directory.
+    line = line.replace(/^@?\s*ANSI \d{12}(?:(?:DL|ID|Z[A-Z])\d{8})+/, '')
+    const match = line.match(/^(?:DL|ID)?(D[A-Z]{2})(.*)$/)
+    if (!match) continue
+    const [, key, text] = match
+    if (fields.has(key!))
+      throw new Error('Unable to read this scan. Conflicting or repeated fields.')
+    fields.set(key!, text!.trim())
   }
+  if (fields.get('DCG') && fields.get('DCG') !== 'USA')
+    throw new Error('This scanner flow supports US IDs. Enter this document manually.')
   const dob = fields.get('DBB') ?? ''
   if (!fields.get('DAC') || !fields.get('DCS') || !fields.get('DAQ') || !/^\d{8}$/.test(dob))
-    throw new Error('Unable to read this scan. Enter the details manually or scan again.')
-  const birthDate = `${dob.slice(4)}-${dob.slice(0, 2)}-${dob.slice(2, 4)}`
-  dateOnlyMillis(birthDate)
-  const suffix = (fields.get('DAE') ?? '').toUpperCase().replace(/^(JR|SR)$/, '$1.')
+    throw new Error(
+      'Unable to read this scan. Preserve barcode line breaks or enter details manually.',
+    )
+  function scanDate(value: string) {
+    if (!/^\d{8}$/.test(value)) throw new Error('Enter a valid scanned date.')
+    const date = `${value.slice(4)}-${value.slice(0, 2)}-${value.slice(2, 4)}`
+    dateOnlyMillis(date)
+    return date
+  }
+  const birthDate = scanDate(dob)
+  if (ageOn(birthDate, today) < 0 || ageOn(birthDate, today) > 125)
+    throw new Error('The scanned date of birth is not plausible. Check the card.')
+  const suffix = (fields.get('DCU') ?? fields.get('DAE') ?? '')
+    .toUpperCase()
+    .replace(/^(JR|SR)$/, '$1.')
   if (!suffixes.includes(suffix as (typeof suffixes)[number]))
     throw new Error('Unrecognized scanned suffix. Enter the details manually.')
   const governmentIdType = fields.get('DAJ') ?? ''
   if (governmentIdType && !idTypes.some((type) => type.value === governmentIdType))
     throw new Error('Unrecognized scanned state. Enter the details manually.')
-  return {
+  const expirationDate = fields.get('DBA') ? scanDate(fields.get('DBA')!) : null
+  const warnings = [
+    'Confirm the issuing state on the card. The barcode state is the address state.',
+  ]
+  const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  if (expirationDate && expirationDate < localToday)
+    warnings.push('This ID is expired. Check the physical card.')
+  if (['DDE', 'DDF', 'DDG'].some((key) => fields.get(key) === 'T'))
+    warnings.push('The barcode contains a shortened name. Complete it from the card.')
+  if (!expirationDate) warnings.push('No ID expiration was decoded. Check the physical card.')
+  const draft = {
     firstName: fields.get('DAC')!,
     middleName: fields.get('DAD') ?? '',
     lastName: fields.get('DCS')!,
@@ -351,4 +397,10 @@ export function parseMemberScan(raw: string): Partial<MemberDraft> {
     governmentId: fields.get('DAQ')!,
     governmentIdType,
   }
+  if (Object.values(draft).some((value) => value.length > 200 || /[\x00-\x1f]/.test(value)))
+    throw new Error('Unable to read this scan. Invalid field length or characters.')
+  return { draft, expirationDate, warnings }
+}
+export function parseMemberScan(raw: string): Partial<MemberDraft> {
+  return decodeMemberScan(raw).draft
 }

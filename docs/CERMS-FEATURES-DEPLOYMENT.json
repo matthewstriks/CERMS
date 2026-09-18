@@ -1,0 +1,43 @@
+{
+  "database": "cerms",
+  "verifiedAt": "2026-09-18T18:54:20.805Z",
+  "ruleset": "projects/cerms-7af24/rulesets/459d1ec8-8ca8-46ab-b5a6-5337e1f28223",
+  "previousRuleset": "projects/cerms-7af24/rulesets/45affbe4-5afe-4b17-abaf-afccbd381505",
+  "sha256": "b699c9e95979ed87bd275f23d18d430736c0d00f998079f8292beed47779d6d9",
+  "defaultReleaseUnchanged": true,
+  "legacyRuleset": "projects/cerms-7af24/rulesets/aca432a9-ef36-44cd-ba44-b689dedd0053",
+  "index": {
+    "name": "projects/cerms-7af24/databases/cerms/collectionGroups/members/indexes/CICAgOjXh4EK",
+    "state": "READY",
+    "fields": [
+      {
+        "fieldPath": "access",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "creation_time",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ]
+  },
+  "reservationRelocation": {
+    "moved": 2,
+    "sourceCounts": {
+      "devMemberIdentities": 1,
+      "devMemberNumbers": 1
+    },
+    "verified": true,
+    "memberDocumentsChanged": 0
+  },
+  "rulesTests": 182,
+  "features": [
+    "business-scoped member reservations",
+    "optional phone",
+    "Dev member activity log",
+    "owner-gated business product and category administration"
+  ]
+}

@@ -1,3 +1,4 @@
+import { normalizeMemberSearch, normalizeGovernmentId } from '../domain/dev-member'
 import { initializeApp } from 'firebase/app'
 import {
   initializeAuth,
@@ -145,7 +146,17 @@ export async function loadMembershipSession(): Promise<MembershipReader> {
       ]
       if (request.dnaOnly) filters.push(where('dna', '==', true))
       if (value) {
-        if (request.field === 'name')
+        if (access === 'dev' && request.field === 'name')
+          filters.push(
+            or(
+              ...['searchFirst', 'searchLast', 'searchName'].map((field) =>
+                where(field, '==', normalizeMemberSearch(value)),
+              ),
+            ),
+          )
+        else if (access === 'dev' && request.field === 'id')
+          filters.push(where('searchId', '==', normalizeGovernmentId(value)))
+        else if (request.field === 'name')
           filters.push(
             or(
               ...['fname', 'lname', 'name'].flatMap((field) =>

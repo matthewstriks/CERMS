@@ -1,3 +1,6 @@
+import { isCatalogCommit } from './catalog-policy'
+import { isMemberViewCommit } from './member-log-policy'
+import { isDevMemberCommit } from './dev-member-policy'
 /** Fixed to the existing CERMS project. This is configuration, not a credential. */
 export const firebaseProjectId = 'cerms-7af24'
 export const firebaseDatabaseId = 'cerms'
@@ -37,7 +40,25 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
         )
       }
       const base = `/v1/projects/${firebaseProjectId}/databases/${firebaseDatabaseId}/documents`
-      if (method === 'POST' && url.pathname === base + ':commit') return isAccessSwitchCommit(body)
+      if (method === 'POST' && url.pathname === base + ':commit')
+        return (
+          isAccessSwitchCommit(body) ||
+          isDevMemberCommit(body) ||
+          isMemberViewCommit(body) ||
+          isCatalogCommit(body)
+        )
+      if (
+        method === 'POST' &&
+        url.pathname.startsWith(base + '/system/') &&
+        /^\/[a-zA-Z0-9_-]{1,128}:runQuery$/.test(url.pathname.slice((base + '/system').length))
+      )
+        return true
+      if (
+        method === 'POST' &&
+        url.pathname.startsWith(base + '/system/dev/memberLogs/') &&
+        /^\/[^/]+:runQuery$/.test(url.pathname.slice((base + '/system/dev/memberLogs').length))
+      )
+        return true
       return (
         method === 'POST' && [':batchGet', ':runQuery'].some((rpc) => url.pathname === base + rpc)
       )

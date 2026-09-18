@@ -1,0 +1,27 @@
+{
+  "database": "cerms",
+  "verifiedAt": "2026-09-18T17:56:47.241Z",
+  "ruleset": "projects/cerms-7af24/rulesets/45affbe4-5afe-4b17-abaf-afccbd381505",
+  "previousRuleset": "projects/cerms-7af24/rulesets/86ddfbc1-ffd5-42c1-a743-9b47432315ce",
+  "sha256": "7f8077c712201e27c31351b00da32e82f31d33a81a2e9db9ae413f2237fc5776",
+  "defaultReleaseUnchanged": true,
+  "index": {
+    "name": "projects/cerms-7af24/databases/cerms/collectionGroups/members/indexes/CICAgOjXh4EK",
+    "state": "READY",
+    "fields": [
+      {
+        "fieldPath": "access",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "creation_time",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ]
+  },
+  "documentsMutated": 0
+}

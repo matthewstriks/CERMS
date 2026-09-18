@@ -1,3 +1,4 @@
+import { normalizePhone } from '../domain/phone'
 import { dateOnlyMillis, type MemberDraft, type MembershipOption } from '../domain/member-creation'
 
 /** The only encoder for the legacy member schema. Keep migration changes here. */
@@ -22,6 +23,7 @@ export function encodeLegacyMember(
     draft.importExisting && draft.expiresDate
       ? dateOnlyMillis(draft.expiresDate) / 1000
       : Math.floor(context.now.getTime() / 1000) + product.durationSeconds
+  const phone = normalizePhone(draft.phone)
   return {
     access: context.club,
     notes: draft.notes
@@ -44,5 +46,6 @@ export function encodeLegacyMember(
     idnum: draft.governmentId,
     idstate: draft.governmentIdType,
     email: draft.email,
+    ...(phone ? { phone } : {}),
   }
 }

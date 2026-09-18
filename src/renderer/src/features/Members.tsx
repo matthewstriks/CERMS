@@ -1,3 +1,6 @@
+import { dobLabel } from '../lib/data'
+import type { MemberScan } from '../../../domain/member-creation'
+import ScanMemberDialog from './members/ScanMemberDialog'
 import { useEffect, useState } from 'react'
 import { Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMembershipSession } from '../lib/membership-session'
@@ -7,6 +10,8 @@ import type { MembershipPage, MemberSearchField } from '../../../data/membership
 import type { Member } from '../../../domain/legacy'
 import { membershipStatus } from '../../../domain/legacy'
 import { searchDescription } from '../../../data/membership-search'
+import { canCreateDevMember } from '../../../shared/dev-member-policy'
+import CreateMemberDialog from './members/CreateMemberDialog'
 import MemberDetails from './members/MemberDetails'
 
 function LiveMembers() {
@@ -22,6 +27,9 @@ function LiveMembers() {
     [error, setError] = useState('')
   const [revision, setRevision] = useState(0),
     [selected, setSelected] = useState<Member | null>(null)
+  const [creating, setCreating] = useState<{ scan?: MemberScan } | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const canCreate = canCreateDevMember(reader.uid, reader.club)
   const cursor = pages[pages.length - 1]
   useEffect(() => {
     let active = true
@@ -52,7 +60,11 @@ function LiveMembers() {
   return (
     <>
       <div className="membership-actions">
-        <button disabled title="Not implemented yet" aria-describedby="membership-unavailable">
+        <button
+          disabled={!canCreate}
+          onClick={() => setCreating({})}
+          aria-describedby="membership-unavailable"
+        >
           Create membership
         </button>
         <button
@@ -64,16 +76,16 @@ function LiveMembers() {
         >
           {dnaOnly ? 'Normal view' : 'View all DNA'}
         </button>
-        <button disabled title="Not implemented yet" aria-describedby="membership-unavailable">
-          Scan ID
-        </button>
+        <button onClick={() => setScanning(true)}>Scan ID</button>
         <button onClick={refresh} disabled={loading}>
           <RefreshCw size={15} />
           Refresh
         </button>
       </div>
       <p className="page-note" id="membership-unavailable">
-        Membership creation and ID scanning are not implemented yet.
+        {canCreate
+          ? 'Scan an ID to find a member, or create a development membership. No checkout charge is recorded.'
+          : 'Member creation is available only to the owner in Dev System.'}
       </p>
       <form
         className="toolbar member-search-form"
@@ -174,7 +186,7 @@ function LiveMembers() {
                             </div>
                           </div>
                         </td>
-                        <td>{member.dob || 'Not recorded'}</td>
+                        <td>{dobLabel(member.dob)}</td>
                         <td>{member.membership}</td>
                         <td>{dateLabel(member.expiresAt)}</td>
                         <td>
@@ -244,6 +256,35 @@ function LiveMembers() {
       <p className="page-note">
         Editing, renewals, check-in, and deletion are not implemented yet.
       </p>
+      {scanning && (
+        <ScanMemberDialog
+          reader={reader}
+          canCreate={canCreate}
+          onClose={() => setScanning(false)}
+          onView={(member) => {
+            setScanning(false)
+            setSelected(member)
+          }}
+          onCreate={(scan) => {
+            setScanning(false)
+            setCreating({ scan })
+          }}
+        />
+      )}
+      {creating && (
+        <CreateMemberDialog
+          uid={reader.uid}
+          club={reader.club}
+          reader={reader}
+          initialScan={creating.scan}
+          onViewMember={(member) => {
+            setCreating(null)
+            setSelected(member)
+          }}
+          onClose={() => setCreating(null)}
+          onCreated={refresh}
+        />
+      )}
       {selected && <MemberDetails member={selected} onClose={() => setSelected(null)} />}
     </>
   )

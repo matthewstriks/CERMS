@@ -1,5 +1,9 @@
 # System switching
 
+The user subsequently authorized a development system. `cerms/system/dev` was created with only `businessName: "Dev System"`, using a nonexistence precondition, and read back to verify it. This is a separate business scope within the same database, not a separate Firebase project or server. No user access was switched and no development records were seeded.
+
+On September 18, 2026, the user authorized provisioning only The Z SA in the named `cerms` database, using its existing legacy system ID. A read-only lookup confirmed `TheZSATX` identifies `The Z SA`. The document `cerms/system/TheZSATX` was created with only `businessName: "The Z SA"`, using a nonexistence precondition, and read back to verify it. No other legacy system settings were copied. No user access fields, legacy documents, Auth accounts, rules, or indexes were changed.
+
 Only Firebase Auth UID `c7D7AH07kgXmjn8tSiOgzHscLZ12` can use the CERMS system switcher. The UID is hardcoded in `src/shared/firebase-policy.ts`; no editable role, display name, or email address grants this capability.
 
 Use **Change system** under the current system in the sidebar. The picker reads existing `system` documents and displays `businessName` with the document ID. Select a different system and click **Switch system**. Opening the picker, selecting an option, canceling, and signing in never write to Firebase.

@@ -40,7 +40,7 @@ export function dobVariants(input: string): string[] {
 export function searchDescription(field: MemberSearchField): string {
   return {
     name: 'Exact first, last, or full name; common capitalization variants are included.',
-    dob: 'Date of birth in YYYY-MM-DD or MM/DD/YYYY format.',
+    dob: 'Date of birth in MM/DD/YYYY format.',
     id: 'Exact government/state ID number.',
     number: 'Exact CERMS membership number.',
     type: 'Exact membership type name.',

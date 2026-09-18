@@ -1,6 +1,8 @@
-# Member creation: audit and isolated implementation
+# Member creation: Dev System and local lab
 
-The CERMS 5 member form is implemented in a **separate local development environment**. It does not enable creation in the live Electron application. No production Firebase reads, writes, configuration changes, or deployments were performed for this work. Waiver collection is intentionally deferred.
+The user subsequently authorized desktop member creation **only in Dev System (`access: "dev"`) in the named `cerms` database**. The desktop implementation is available for the designated owner UID; the user authorized deployment of the reviewed rules and index on September 18, 2026. Deployment verification is recorded in `docs/DEV-MEMBER-DEPLOYMENT.json`. See [Dev member creation](DEV-MEMBER-CREATION.md) for the new contract, scanner setup, and deployment status. Waiver handling, checkout, and creation in other businesses remain disabled.
+
+The audit and local-lab implementation below describe the earlier compatibility work. The loopback lab remains available and its writer remains excluded from the desktop build.
 
 ## Try it
 
@@ -12,7 +14,7 @@ npm run dev:members
 
 Open **http://127.0.0.1:5174/lab/index.html**. Use synthetic names, IDs, and emails. Stop with Ctrl+C; records are discarded. Restart for a fresh environment. No Firebase sign-in is needed. Java 21 and a cached Firestore emulator JAR are required (already present on this workstation); `FIRESTORE_EMULATOR_JAR` can specify a local JAR. The script does not download tools, use the Firebase CLI login, load production configuration, or deploy anything.
 
-The normal `npm run dev` still opens the production-connected read-only desktop app. Its Create membership button remains disabled. The local form runs in a browser to keep its writer out of the desktop build entirely; it is the reusable React component intended for eventual desktop integration.
+The normal `npm run dev` opens the production-connected desktop app. Its creation buttons are enabled only for the owner in Dev System. The local form uses the same reusable component but a separate emulator writer that is excluded from the desktop build.
 
 Three synthetic membership products are seeded: Annual, Monthly, and Day. These are test fixtures, not a copy of the club's product catalog. The creator reads them from the emulator with the legacy access/membership filter. Production product names and durations have not been inspected or changed.
 
@@ -40,7 +42,7 @@ This is a source audit and synthetic compatibility test, not a certification of 
 | Scan ID                                   | Keyboard/paste capture of the old newline-delimited DAC/DAD/DCS/DAE/DBB/DAQ/DAJ fields; review before saving |
 | Waiver                                    | Omitted as requested; legacy `waiver_status` defaults to false                                               |
 
-The scan parser supports the format handled by the old screen. Physical scanner hardware and other barcode formats are not verified. Raw scans are cleared after applying, on parse failure, on cancellation, and on form reset, and never persisted or logged.
+The scan parser now handles US AAMVA DL/ID text, ANSI headers and DCU suffixes as well as the legacy DAE suffix. Scans are reviewed before applying; physical Tera HW0008 hardware still needs a local check. Raw scans are cleared after applying, on parse failure, on cancellation, and on form reset, and never persisted or logged.
 
 ## Legacy save flow and risks
 

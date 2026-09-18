@@ -1,8 +1,22 @@
-# Initial CERMS 5.0 security rules
+# CERMS 5.0 security rules
 
-Target: project `cerms-7af24`, named database `cerms` only. Source: `firebase/cerms.rules`. Deployment configuration `firebase.cerms.json` contains no `(default)` database, Storage, indexes, or Functions configuration. Never deploy these rules to the legacy database.
+## Current deployed feature rules
 
-## Access policy
+The user authorized all pending rules on September 18, 2026. Deployed content exactly matches `firebase/cerms.rules`. Read-only verification confirmed the legacy `(default)` release is unchanged and the existing member-list index is `READY`. See [current deployment evidence](CERMS-FEATURES-DEPLOYMENT.json).
+
+Dev reservations now live at `system/dev/memberIdentities/{key}` and `system/dev/memberNumbers/{key}`. Exactly two existing claims were relocated during a temporary creation pause; their fields were preserved, old collections verified empty, and no member documents changed. Final rules restore owner-only Dev creation with optional E.164 phone numbers. Owner-only Dev view logs are append-only, server-timestamped and tied to the member's business and authenticated staff identity. Catalog product/category reads and validated create/updates are owner-only within the selected business, with version checks for edits; deletion remains denied. No employee rights, other-profile access, Auth or Storage changes were made.
+
+The current rule suite passes 182 synthetic allow/deny checks. The historical policy and audit sections below describe the original read-only baseline; the explicitly scoped extensions above supersede its blanket write/subcollection denials. See `DEV-MEMBER-CREATION.md`, `MEMBER-LOG.md`, and `PRODUCTS.md` for feature boundaries.
+
+## Previously deployed Dev member creation extension
+
+The local rules now include the user-authorized Dev System creation flow, restricted to the designated owner with saved `access == "dev"` and an existing `system/dev`. It allows only validated, immutable member creation with two atomic reservations. It does not allow member updates/deletes, other business creation, product/system changes, or staff administration. The associated named-database configuration includes one `members(access ASC, creation_time DESC)` index for recent-member pagination. The user authorized deployment on September 18, 2026. The rules and index were deployed only to `cerms`; exact rule content and an unchanged legacy rules release were verified read-only. See `DEV-MEMBER-DEPLOYMENT.json` for that initial extension’s verification and index state. The baseline evidence below describes the prior deployment. See [Dev creation](DEV-MEMBER-CREATION.md) for the schema and checks.
+
+## Previously deployed baseline
+
+Target: project `cerms-7af24`, named database `cerms` only. Source: `firebase/cerms.rules`. Deployment configuration `firebase.cerms.json` contains no `(default)` database, Storage, or Functions configuration. The Dev extension adds a named `cerms` index manifest. Never deploy these rules to the legacy database.
+
+## Historical baseline access policy
 
 - Anonymous clients cannot read or write any documents.
 - Signed-in accounts can get/listen to their own `users/{uid}` document, but cannot list users or read other profiles, including through the owner account.
@@ -13,13 +27,13 @@ Target: project `cerms-7af24`, named database `cerms` only. Source: `firebase/ce
 
 These rules are a prototype baseline, not a guarantee of issue-free future features. Future member creation, orders, staff administration, and revised roles need explicit schemas and rules with tests before enabling writes. Existing query indexes may need separate configuration; the emulator does not prove production index availability. No system documents were imported; the system picker will be empty until systems are deliberately provisioned. Login uses the user's profile and does not require a system document to exist.
 
-## Validation
+## Historical baseline validation
 
 `npm run test:rules` starts a disposable loopback Firestore emulator restricted to `demo-cerms-rules`, loads the exact rules into its named `cerms` database, seeds synthetic fixtures locally, and runs 76 checks. It never uses live Auth credentials or live data. The emulator's owner token is only sent to its dynamically allocated loopback port.
 
 The tests cover own-profile reads with absent email/version; other-profile denial; user listing and self-provisioning denial; role, UID, version, access and permission-field mutation denial; invalid/missing staff profiles; club isolation; scoped and unscoped business queries; current recent-member, DNA, OR-name, DOB-IN, active-admission and history queries; business write denial; owner-only system listing; field pollution/type/size/path validation on owner updates; required rank removal; nonexistent-system switching; switching to an existing system; immediate loss of access to the prior club; and unknown/nested paths.
 
-## Adversarial review
+## Historical baseline adversarial review
 
 | Attack                                                                | Outcome                                                                                                                                                   |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -1,10 +1,17 @@
+import { normalizePhone, phoneLabel } from '../../../../domain/phone'
+import { dobLabel } from '../../lib/data'
 import { useEffect, useRef, useState } from 'react'
 import './CreateMemberForm.css'
+import IdScanInput from './IdScanInput'
+import MemberMatches from './MemberMatches'
+import type { Member } from '../../../../domain/legacy'
+import type { MembershipPage } from '../../../../data/membership-contracts'
 import {
   ageOn,
   emptyMemberDraft,
   idTypes,
-  parseMemberScan,
+  type MemberScan,
+  type CreatedMember,
   suffixes,
   type MemberCreator,
   type MemberDraft,
@@ -12,17 +19,47 @@ import {
 } from '../../../../domain/member-creation'
 
 /** Shared form: persistence is injected, never imported from Firebase. */
-export default function CreateMemberForm({ creator }: { creator: MemberCreator }) {
-  const [draft, setDraft] = useState(emptyMemberDraft)
+export default function CreateMemberForm({
+  creator,
+  allowImport = true,
+  startScanning = false,
+  onCreated,
+  onBusyChange,
+  initialScan,
+  lookupId,
+  onViewMember,
+  onViewCreated,
+}: {
+  creator: MemberCreator
+  onViewCreated?: (member: CreatedMember) => Promise<void>
+  initialScan?: MemberScan
+  lookupId?: (id: string) => Promise<MembershipPage>
+  onViewMember?: (member: Member) => void
+  allowImport?: boolean
+  startScanning?: boolean
+  onCreated?: () => void
+  onBusyChange?: (busy: boolean) => void
+}) {
+  const [draft, setDraft] = useState(() => ({ ...emptyMemberDraft(), ...initialScan?.draft }))
   const [options, setOptions] = useState<MembershipOption[]>([])
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [scanning, setScanning] = useState(false)
-  const [scan, setScan] = useState('')
+  const [scanning, setScanning] = useState(startScanning)
+  const [matches, setMatches] = useState<MembershipPage | null>(null)
+  const [lookingUp, setLookingUp] = useState(false)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const [scanReview, setScanReview] = useState<MemberScan | null>(initialScan ?? null)
   const [saved, setSaved] = useState(false)
+  const [created, setCreated] = useState<CreatedMember | null>(null)
   const requestId = useRef(crypto.randomUUID())
   const pending = useRef(false)
   useEffect(() => {
@@ -35,8 +72,7 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
         if (active) setOptions(value)
       })
       .catch(() => {
-        if (active)
-          setError('Unable to load membership types. Check the local test environment and retry.')
+        if (active) setError('Unable to load membership types. Check your connection and retry.')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -71,10 +107,12 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
     setDraft(emptyMemberDraft())
     requestId.current = crypto.randomUUID()
     setSaved(false)
+    setCreated(null)
     setSuccess('')
     setError('')
     setScanning(false)
-    setScan('')
+    setMatches(null)
+    setScanReview(null)
   }
   let age: number | null = null
   try {
@@ -87,16 +125,19 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
       className="create-member-form"
       onSubmit={async (event) => {
         event.preventDefault()
-        if (pending.current || saved) return
+        if (pending.current || saved || scanning || matches?.members.length || lookingUp) return
         pending.current = true
         setBusy(true)
+        onBusyChange?.(true)
         setError('')
         setSuccess('')
         try {
           const result = await creator.create(draft, requestId.current)
           setSuccess(`${result.name} created. Membership ID: ${result.number}.`)
           setSaved(true)
-          setScan('')
+          setCreated(result)
+          onCreated?.()
+          setMatches(null)
         } catch (failure) {
           setError(
             failure instanceof Error
@@ -106,45 +147,83 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
         } finally {
           pending.current = false
           setBusy(false)
+          onBusyChange?.(false)
         }
       }}
     >
-      <fieldset disabled={busy || saved}>
+      <fieldset disabled={busy || saved || lookingUp}>
         <legend>Guest information</legend>
         <button
           type="button"
           onClick={() => {
             setScanning(!scanning)
-            setScan('')
+            setMatches(null)
+            setScanReview(null)
           }}
         >
           {scanning ? 'Cancel scan' : 'Scan ID'}
         </button>
         {scanning && (
-          <div className="scan-panel">
-            <label>
-              Scanned ID data
-              <textarea autoFocus value={scan} onChange={(event) => setScan(event.target.value)} />
-            </label>
+          <IdScanInput
+            onCancel={() => setScanning(false)}
+            onBusyChange={(value) => {
+              setLookingUp(value)
+              onBusyChange?.(value)
+            }}
+            onDecoded={async (scanned) => {
+              const found = lookupId ? await lookupId(scanned.draft.governmentId!) : null
+              if (!mounted.current) return
+              setMatches(found)
+              if (!found?.members.length) setDraft((current) => ({ ...current, ...scanned.draft }))
+              setScanReview(scanned)
+              setScanning(false)
+              setError('')
+            }}
+          />
+        )}
+        {matches && onViewMember && <MemberMatches result={matches} onView={onViewMember} />}
+        {scanReview && (
+          <section className="scan-review" aria-label="Review scanned ID">
+            <h3>Review scanned ID</h3>
+            <dl>
+              <dt>Name</dt>
+              <dd>
+                {[
+                  scanReview.draft.firstName,
+                  scanReview.draft.middleName,
+                  scanReview.draft.lastName,
+                  scanReview.draft.suffix,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              </dd>
+              <dt>Date of birth</dt>
+              <dd>{dobLabel(scanReview.draft.birthDate)}</dd>
+              <dt>ID number</dt>
+              <dd>{scanReview.draft.governmentId}</dd>
+              <dt>Address state</dt>
+              <dd>{scanReview.draft.governmentIdType || 'Not decoded'}</dd>
+              <dt>ID expires</dt>
+              <dd>{scanReview.expirationDate || 'Not decoded'}</dd>
+            </dl>
+            {scanReview.warnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+            <p>
+              {matches?.members.length
+                ? 'Open the existing member instead of creating a duplicate.'
+                : 'Scanned details are filled in below. Review them against the physical ID before saving.'}
+            </p>
             <button
               type="button"
               onClick={() => {
-                try {
-                  const scanned = parseMemberScan(scan)
-                  setDraft((current) => ({ ...current, ...scanned }))
-                  setScan('')
-                  setScanning(false)
-                  setError('')
-                } catch (failure) {
-                  setError((failure as Error).message)
-                  setScan('')
-                }
+                setScanReview(null)
+                setMatches(null)
               }}
             >
-              Apply scan
+              Dismiss scan details
             </button>
-            <p>Scan or paste newline-delimited ID data, then review the populated fields.</p>
-          </div>
+          </section>
         )}
         <div className="creation-grid">
           {input('firstName', 'First name', 'text', true)}
@@ -166,6 +245,31 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
           </label>
           {input('birthDate', 'Date of birth', 'date', true)}
           {input('email', 'Email', 'email')}
+          <label>
+            Phone number (optional)
+            <input
+              type="tel"
+              autoComplete="tel"
+              maxLength={64}
+              value={draft.phone}
+              placeholder="(210) 555-0123"
+              onChange={(event) => {
+                event.target.setCustomValidity('')
+                change('phone', event.target.value)
+              }}
+              onBlur={(event) => {
+                try {
+                  const phone = normalizePhone(event.target.value)
+                  event.target.setCustomValidity('')
+                  change('phone', phone ? phoneLabel(phone) : '')
+                } catch (failure) {
+                  event.target.setCustomValidity((failure as Error).message)
+                  event.target.reportValidity()
+                }
+              }}
+            />
+            <small>US number, or include + and the country code.</small>
+          </label>
         </div>
         {age !== null && age < 21 && (
           <p role="status" className="inline-error">
@@ -175,7 +279,7 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
           </p>
         )}
       </fieldset>
-      <fieldset disabled={busy || saved}>
+      <fieldset disabled={busy || saved || lookingUp}>
         <legend>Membership</legend>
         <label>
           Type of membership
@@ -204,14 +308,16 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
             </button>
           </p>
         )}
-        <label className="creation-checkbox">
-          <input
-            type="checkbox"
-            checked={draft.importExisting}
-            onChange={(event) => change('importExisting', event.target.checked)}
-          />
-          Enter existing membership details
-        </label>
+        {allowImport && (
+          <label className="creation-checkbox">
+            <input
+              type="checkbox"
+              checked={draft.importExisting}
+              onChange={(event) => change('importExisting', event.target.checked)}
+            />
+            Enter existing membership details
+          </label>
+        )}
         {draft.importExisting && (
           <>
             <p>Optional overrides for importing a membership. Blank fields use automatic values.</p>
@@ -223,7 +329,7 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
           </>
         )}
       </fieldset>
-      <fieldset disabled={busy || saved}>
+      <fieldset disabled={busy || saved || lookingUp}>
         <legend>Identification and notes</legend>
         <div className="creation-grid">
           <label>
@@ -264,15 +370,53 @@ export default function CreateMemberForm({ creator }: { creator: MemberCreator }
       )}
       <div className="creation-actions">
         {saved ? (
-          <button type="button" onClick={reset}>
-            Create another member
-          </button>
+          <>
+            {created && onViewCreated && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  onBusyChange?.(true)
+                  setError('')
+                  try {
+                    await onViewCreated(created)
+                  } catch (failure) {
+                    setError(
+                      failure instanceof Error
+                        ? failure.message
+                        : 'Unable to open the member. Try again.',
+                    )
+                  } finally {
+                    setBusy(false)
+                    onBusyChange?.(false)
+                  }
+                }}
+              >
+                View member {created.name}
+              </button>
+            )}
+            <button type="button" disabled={busy} onClick={reset}>
+              Create another member
+            </button>
+          </>
         ) : (
           <>
-            <button className="primary" type="submit" disabled={busy || loading || !options.length}>
+            <button
+              className="primary"
+              type="submit"
+              disabled={
+                busy ||
+                lookingUp ||
+                loading ||
+                !options.length ||
+                scanning ||
+                !!matches?.members.length
+              }
+            >
               {busy ? 'Creating member…' : 'Create membership'}
             </button>
-            <button type="button" disabled={busy} onClick={reset}>
+            <button type="button" disabled={busy || lookingUp} onClick={reset}>
               Clear form
             </button>
           </>

@@ -11,9 +11,11 @@ export interface Member {
   waiver: boolean
   notes: readonly string[]
   dob: string
+  phone?: string
   email: string
   governmentId: string
   governmentIdState: string
+  createdBy?: string
   createdAt: number | null
   files: readonly { name: string; url: string }[]
 }
@@ -117,6 +119,8 @@ export function memberFromLegacy(id: string, doc: LegacyDocument, access: string
         ? [doc.notes]
         : [],
     dob: text(doc.dob),
+    phone: text(doc.phone),
+    createdBy: text(doc.createdBy),
     email: text(doc.email),
     governmentId: text(doc.idnum),
     governmentIdState: text(doc.idstate),

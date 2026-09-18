@@ -21,7 +21,7 @@ try {
   assert.equal(await page.getByLabel('Suffix', { exact: true }).locator('option').count(), 6)
   await page.getByRole('button', { name: 'Scan ID', exact: true }).click()
   await page.getByLabel('Scanned ID data').fill('invalid scan')
-  await page.getByRole('button', { name: 'Apply scan' }).click()
+  await page.getByRole('button', { name: 'Review scan' }).click()
   await page
     .getByRole('alert')
     .getByText(/Unable to read this scan/)
@@ -31,7 +31,8 @@ try {
   await page
     .getByLabel('Scanned ID data')
     .fill(`DACSCANNED\nDADMIDDLE\nDCSGUEST\nDAEJR\nDBB01021990\nDAQ${unique}\nDAJNY`)
-  await page.getByRole('button', { name: 'Apply scan' }).click()
+  await page.getByLabel('First name', { exact: true }).waitFor()
+  await page.waitForFunction(() => document.querySelector('input[required]')?.value === 'SCANNED')
   assert.equal(await page.getByLabel('First name', { exact: true }).inputValue(), 'SCANNED')
   assert.equal(await page.getByLabel('Date of birth').inputValue(), '1990-01-02')
   await page.getByLabel('Type of membership').selectOption('annual')

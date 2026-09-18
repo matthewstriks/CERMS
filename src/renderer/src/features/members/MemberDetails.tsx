@@ -1,3 +1,6 @@
+import MemberLog from './MemberLog'
+import { phoneLabel } from '../../../../domain/phone'
+import { dobLabel } from '../../lib/data'
 import { useEffect, useRef, useState } from 'react'
 import { X, UserRound, ExternalLink } from 'lucide-react'
 import type { Member } from '../../../../domain/legacy'
@@ -47,9 +50,10 @@ export default function MemberDetails({ member, onClose }: { member: Member; onC
   }, [member.id, reader, tab])
   const status = membershipStatus(member, Date.now())
   const fields = [
-    ['Date of birth', member.dob],
+    ['Date of birth', dobLabel(member.dob)],
     ['Membership number', member.number],
     ['Email', member.email],
+    ['Phone number', phoneLabel(member.phone)],
     ['Membership type', member.membership],
     ['Membership expires', dateLabel(member.expiresAt)],
     ['Government / state ID', member.governmentId],
@@ -102,56 +106,60 @@ export default function MemberDetails({ member, onClose }: { member: Member; onC
           {error}
         </p>
       )}
-      {tab === 'details' ? (
-        <>
-          <dl className="details">
-            {fields.map(([name, value]) => (
-              <div key={name}>
-                <dt>{name}</dt>
-                <dd>{value || 'Not recorded'}</dd>
-              </div>
+      <div hidden={tab !== 'details'}>
+        <dl className="details">
+          {fields.map(([name, value]) => (
+            <div key={name}>
+              <dt>{name}</dt>
+              <dd>{value || 'Not recorded'}</dd>
+            </div>
+          ))}
+        </dl>
+        <h3>Member notes</h3>
+        {member.notes.length ? (
+          member.notes.map((note, index) => (
+            <p key={index} className="note">
+              {note}
+            </p>
+          ))
+        ) : (
+          <p className="muted">No notes recorded.</p>
+        )}
+        <MemberLog
+          key={`${reader?.uid}:${reader?.club}:${member.id}`}
+          member={member}
+          reader={reader}
+        />
+        <h3>Files & signed waiver</h3>
+        {member.files.length ? (
+          <ul className="member-files">
+            {member.files.map((file, index) => (
+              <li key={index}>
+                <span>{file.name}</span>
+                <button
+                  disabled={!isMemberFileUrl(file.url)}
+                  title={
+                    isMemberFileUrl(file.url)
+                      ? 'Open existing file in your browser'
+                      : 'This file URL is outside the existing CERMS storage bucket'
+                  }
+                  onClick={() => {
+                    void window.desktop
+                      .openMemberFile(file.url)
+                      .catch(() => setError('This attachment could not be opened.'))
+                  }}
+                >
+                  View
+                  <ExternalLink size={14} />
+                </button>
+              </li>
             ))}
-          </dl>
-          <h3>Member notes</h3>
-          {member.notes.length ? (
-            member.notes.map((note, index) => (
-              <p key={index} className="note">
-                {note}
-              </p>
-            ))
-          ) : (
-            <p className="muted">No notes recorded.</p>
-          )}
-          <h3>Files & signed waiver</h3>
-          {member.files.length ? (
-            <ul className="member-files">
-              {member.files.map((file, index) => (
-                <li key={index}>
-                  <span>{file.name}</span>
-                  <button
-                    disabled={!isMemberFileUrl(file.url)}
-                    title={
-                      isMemberFileUrl(file.url)
-                        ? 'Open existing file in your browser'
-                        : 'This file URL is outside the existing CERMS storage bucket'
-                    }
-                    onClick={() => {
-                      void window.desktop
-                        .openMemberFile(file.url)
-                        .catch(() => setError('This attachment could not be opened.'))
-                    }}
-                  >
-                    View
-                    <ExternalLink size={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">No files recorded.</p>
-          )}
-        </>
-      ) : (
+          </ul>
+        ) : (
+          <p className="muted">No files recorded.</p>
+        )}
+      </div>
+      {tab === 'history' && (
         <>
           {!reader && (
             <p className="notice">

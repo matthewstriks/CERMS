@@ -67,3 +67,66 @@
   display: flex;
   gap: 12px;
 }
+.scan-review {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface, #f5f7fa);
+}
+.scan-review dl {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 8px;
+}
+.scan-review dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.scan-review button {
+  margin-right: 12px;
+}
+.member-create-dialog {
+  width: min(820px, calc(100vw - 32px));
+  max-height: 90vh;
+  overflow: auto;
+}
+.scan-matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.scan-matches li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+.scan-matches p {
+  margin: 4px 0;
+}
+
+.member-log {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.member-log summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.member-log-events {
+  padding-left: 1.3rem;
+}
+.member-log-events li {
+  margin-block: 1rem;
+  overflow-wrap: anywhere;
+}
+.member-log-events small,
+.member-log-events time {
+  display: block;
+  margin-top: 0.3rem;
+}
