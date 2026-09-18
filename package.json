@@ -1,73 +1,89 @@
 {
-  "name": "club-entertainment-rms-system",
-  "productName": "CERMS",
-  "version": "4.0.9",
-  "description": "Club Entertainment RMS Desktop Application",
-  "main": "src/main.js",
+  "name": "cerms-5",
+  "productName": "CERMS 5",
+  "version": "5.0.0-alpha.1",
+  "private": true,
+  "description": "Club Entertainment Record Management System",
+  "author": "RocMTSSolutions LLC.",
+  "main": "out/main/index.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "build": "npm run typecheck && electron-vite build",
+    "check": "npm run test && npm run build",
+    "test:smoke": "npm run build && node scripts/smoke.mjs",
+    "test:membership": "npm run build && node scripts/membership-smoke.mjs",
+    "package": "npm run build && electron-builder --dir --publish never",
+    "dist": "npm run build && electron-builder --publish never",
+    "test:admissions": "node scripts/admissions-emulator.mjs",
+    "dev:members": "node scripts/member-creation-emulator.mjs",
+    "test:member-creation": "node scripts/member-creation-emulator.mjs --test",
+    "test:about": "npm run build && node scripts/about-smoke.mjs",
+    "test:rules": "node scripts/test-firestore-rules.mjs"
+  },
+  "dependencies": {
+    "firebase": "12.19.0",
+    "lucide-react": "1.46.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "44.4.1",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "playwright": "1.63.0",
+    "prettier": "3.9.7",
+    "typescript": "7.0.2",
+    "vite": "7.3.6",
+    "vitest": "5.0.1"
+  },
   "build": {
-    "appId": "com.RocMTSSolutions.cerms",
-    "productName": "CERMS",
+    "appId": "com.rocmtssolutions.cerms5",
+    "productName": "CERMS 5",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business",
+      "icon": "resources/branding/icon.icns"
+    },
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "src/assets/cerms-icon.ico"
+      "icon": "resources/branding/icon.ico"
     },
-    "publish": [
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office",
+      "icon": "resources/branding/linux"
+    },
+    "extraResources": [
       {
-        "provider": "github",
-        "owner": "matthewstriks",
-        "repo": "cerms"
+        "from": "resources/branding/icon.png",
+        "to": "branding/icon.png"
       }
     ]
-  },
-  "scripts": {
-    "start": "electron-forge start",
-    "test": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "publish": "electron-forge publish",
-    "lint": "echo \"No linting configured\"",
-    "build": "electron-builder build --win --publish always"
-  },
-  "keywords": [],
-  "author": {
-    "name": "RocMTSSolutions LLC.",
-    "email": "matthew@rocmtssolutions.com"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/matthewstriks/CERMS.git"
-  },
-  "license": "MIT",
-  "dependencies": {
-    "@electron/remote": "^2.0.8",
-    "address": "^2.0.1",
-    "chart.js": "^3.8.0",
-    "date-fns": "^3.3.1",
-    "delay": "^5.0.0",
-    "electron-squirrel-startup": "^1.0.0",
-    "electron-updater": "^6.3.9",
-    "excel4node": "^1.8.0",
-    "fast-xml-parser": "^4.4.1",
-    "firebase": "^10.8.0",
-    "intuit-oauth": "^4.0.0",
-    "jquery": "^3.6.0",
-    "node-quickbooks": "^2.0.45",
-    "npm": "^10.2.0",
-    "tablesort": "^5.3.0",
-    "tablesorter": "^2.31.3",
-    "xlsx": "^0.18.5",
-    "xml2js": "^0.6.2"
-  },
-  "devDependencies": {
-    "@electron-forge/cli": "^6.2.1",
-    "@electron-forge/maker-deb": "^6.2.1",
-    "@electron-forge/maker-rpm": "^6.2.1",
-    "@electron-forge/maker-squirrel": "^6.2.1",
-    "@electron-forge/maker-zip": "^6.2.1",
-    "@electron-forge/plugin-auto-unpack-natives": "^6.2.1",
-    "electron": "^25.8.2",
-    "electron-builder": "^24.13.3"
   }
 }

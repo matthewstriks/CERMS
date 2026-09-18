@@ -1,0 +1,72 @@
+rules_version = '2';
+// CERMS 5.0 only. Deploy to the named cerms database, never (default).
+// users/{uid}: uid, displayName, access, rank; email/version may be absent.
+// All profile fields are immutable except the designated owner's access switch.
+// members/activity/orders: existing readers require access == users/{uid}.access.
+// system/{id}: existing owner-only picker; no client writes.
+// Rank does not grant permissions in this initial policy.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return database == 'cerms' && request.auth != null;
+    }
+    function ownsProfile(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function staff() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uid == request.auth.uid
+        && validSystemId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access);
+    }
+    function switcher() {
+      return staff() && request.auth.uid == 'c7D7AH07kgXmjn8tSiOgzHscLZ12';
+    }
+    function validSystemId(value) {
+      return value is string && value.size() > 0 && value.size() <= 1500
+        && value.matches('.*[^\\s].*') && !value.matches('.*[/].*')
+        && value != '.' && value != '..' && !value.matches('__.*__');
+    }
+    function ownClub() {
+      return staff() && resource.data.access ==
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access;
+    }
+    function validUser(data, uid) {
+      return data.keys().hasOnly(['uid', 'displayName', 'email', 'access', 'rank', 'version'])
+        && data.keys().hasAll(['uid', 'displayName', 'access', 'rank'])
+        && data.uid == uid && data.uid is string && data.uid.size() <= 128
+        && data.displayName is string && data.displayName.size() <= 256
+        && validSystemId(data.access)
+        && (data.rank is int || (data.rank is string && data.rank.size() <= 128))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 320))
+        && (!('version' in data) || (data.version is string && data.version.size() <= 128) || data.version is number);
+    }
+    match /users/{uid} {
+      allow get: if ownsProfile(uid);
+      allow list, create, delete: if false;
+      allow update: if ownsProfile(uid) && switcher()
+        && validUser(request.resource.data, uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['access'])
+        && exists(/databases/$(database)/documents/system/$(request.resource.data.access));
+    }
+    match /system/{systemId} {
+      allow read: if switcher();
+      allow write: if false;
+    }
+    match /members/{memberId} {
+      allow read: if ownClub();
+      allow write: if false;
+    }
+    match /activity/{visitId} {
+      allow read: if ownClub();
+      allow write: if false;
+    }
+    match /orders/{orderId} {
+      allow read: if ownClub();
+      allow write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

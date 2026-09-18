@@ -1,0 +1,9 @@
+{
+  "database": "cerms",
+  "deployedAt": "2026-09-18T17:00:12.081Z",
+  "ruleset": "projects/cerms-7af24/rulesets/86ddfbc1-ffd5-42c1-a743-9b47432315ce",
+  "previousRuleset": "projects/cerms-7af24/rulesets/45ddf465-f186-4a5a-96bc-e3aaaf462854",
+  "sha256": "08c34dde06fee637fc595c2e9a34270cc9a485454992d0fad3e64a104e276ced",
+  "defaultReleaseUnchanged": true,
+  "documentsMutated": 0
+}

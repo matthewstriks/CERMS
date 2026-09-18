@@ -1,0 +1,12 @@
+# CERMS logo
+
+`cerms-icon-v1.png` is the original generated raster logo for desktop and in-app branding. Generated using the built-in image-generation tool. The logo is integrated into the login/reset screen, sidebar, About window, and page icons. `cerms-logo.png` is the 256px UI asset. `icon.png` is the 1024px runtime/Dock asset, bundled through electron-builder extraResources. `icon.icns`, `icon.ico`, and `linux/` provide the packaged macOS, Windows, and Linux icons. All derivatives preserve the original artwork and transparency.
+
+Verification: unit tests, typecheck, production build, and login/About/membership smoke tests passed. A local unsigned macOS x64 app was packaged and its icon/resource files verified. Windows and Linux packaging are configured but were not built on those platforms. This local build is not signed, notarized, or published.
+
+## Generation prompt
+
+Use case: logo-brand.
+Create a finished, premium desktop app icon for CERMS, a club membership and venue operations application. Single icon, square 1024x1024 composition, no presentation board or device mockup.
+Design a distinctive sculptural geometric capital C monogram, a strong continuous thick ribbon with two precise angled terminals opening to the right. Sophisticated, confident, minimal silhouette; beautifully balanced negative space; instantly legible at small dock sizes. The ribbon has restrained dimensionality, crisp bevels and softly luminous satin green surfaces, with an elegant transition from pale sage at its upper face to rich emerald at its lower face. Avoid excessive gloss or chrome.
+Place the C centrally on a deep forest-green rounded-square app tile with refined soft corners, subtle bevel and delicate inset edge. Colors harmonize with the existing application's exact palette: primary #2f654b, deep forest #193c2d and #10291e, pale sage #b1c5b5, very restrained light accent #d2dda4. High contrast between the luminous sage/emerald monogram and dark forest tile. Icon fills about 88 percent of canvas, C fills about 62 percent of tile. Orthographic straight-on view, impeccable optical centering. Truly transparent background outside the tile, clean alpha edges. Understated luxury software brand, slick and contemporary, usable in desktop dock, login screen and sidebar. No text except the abstract C itself, no CERMS wordmark, no version number, no tiny details, no circuitry, no leaves, no shields, no extra symbols, no watermark, no cast shadow outside the tile. Deliver the finished isolated icon asset.

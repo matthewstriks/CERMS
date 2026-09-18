@@ -1,0 +1,13 @@
+.member-lab {
+  max-width: 1000px;
+  margin: 32px auto;
+  padding: 0 24px 40px;
+}
+.lab-notice {
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  background: #fff3cf;
+  border: 1px solid #d9c88e;
+  border-radius: 8px;
+  color: #594717;
+}

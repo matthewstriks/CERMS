@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "cerms",
+      "rules": "firebase/cerms.rules"
+    }
+  ]
+}
