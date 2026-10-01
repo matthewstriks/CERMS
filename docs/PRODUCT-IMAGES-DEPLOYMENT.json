@@ -1,0 +1,56 @@
+{
+  "database": "cerms",
+  "deployedAt": "2026-10-01T03:11:00.781Z",
+  "ruleset": "projects/cerms-7af24/rulesets/7d1654e8-e22c-454e-87b2-79482efbcbc0",
+  "previousRuleset": "projects/cerms-7af24/rulesets/2d9850b2-40fe-489c-9907-ad9a9a6c2735",
+  "sha256": "469a0a1c340478990bb2b070e3bdc595e033ee72fc85657aac5859b273680d1d",
+  "defaultReleaseUnchanged": true,
+  "legacyRuleset": "projects/cerms-7af24/rulesets/aca432a9-ef36-44cd-ba44-b689dedd0053",
+  "feature": "Product images; preserves deployed staff, membership and register rules",
+  "rulesChecks": 286,
+  "indexesModified": false,
+  "verifiedAt": "2026-10-01T03:11:06.778Z",
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "databaseConfigurationUnchanged": true,
+  "existingFunctionsUnchanged": true,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/uploadProductImage",
+      "state": "ACTIVE",
+      "runtime": "nodejs22",
+      "entryPoint": "uploadProductImage",
+      "uri": "https://uploadproductimage-wa32r7ghma-uc.a.run.app",
+      "updateTime": "2026-10-01T03:10:38.214238011Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/getProductImage",
+      "state": "ACTIVE",
+      "runtime": "nodejs22",
+      "entryPoint": "getProductImage",
+      "uri": "https://getproductimage-wa32r7ghma-uc.a.run.app",
+      "updateTime": "2026-10-01T03:10:32.905022842Z"
+    }
+  ],
+  "legacyStorageRulesUnchanged": true,
+  "legacyBucketConfigurationUnchanged": true,
+  "privateBucket": {
+    "name": "cerms-7af24-cerms5-product-images",
+    "created": true,
+    "location": "US-CENTRAL1",
+    "publicAccessPrevention": "enforced",
+    "uniformBucketLevelAccess": true,
+    "publicIamBindings": false,
+    "verifiedAt": "2026-10-01T03:08:41.601Z"
+  },
+  "existingFunctionCount": 5,
+  "imageServerTests": 2,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "productImagesDeployed": true,
+  "rulesSource": "firebase/releases/product-images-2026-09-30.rules",
+  "sourceSha256": {
+    "index.mjs": "4a68a245a658caebb453b3c8e2e25d895e4b60b084dcdd9287a274e9a6efacc9",
+    "product-images.mjs": "1acceb1d5517f2ee2a469d5f77481673c0a84b531563f2218574fdedb29a6b5b"
+  }
+}

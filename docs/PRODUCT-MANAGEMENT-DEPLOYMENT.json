@@ -1,0 +1,39 @@
+{
+  "database": "cerms",
+  "deployedAt": "2026-10-01T03:45:24.171Z",
+  "ruleset": "projects/cerms-7af24/rulesets/59f5a2b5-f588-4c7b-b1ca-f69de4a0bf09",
+  "previousRuleset": "projects/cerms-7af24/rulesets/8d285047-7c97-4abc-a3f1-849628a3373e",
+  "sha256": "0c067c474e081bd92b901ac4df8cf85c8bb92e6614abbaa019aecfc28bad25d5",
+  "defaultReleaseUnchanged": true,
+  "legacyRuleset": "projects/cerms-7af24/rulesets/aca432a9-ef36-44cd-ba44-b689dedd0053",
+  "feature": "All-product deletion with independent staff permission",
+  "rulesChecks": 303,
+  "indexesModified": false,
+  "verifiedAt": "2026-10-01T03:45:31.942Z",
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "databaseConfigurationUnchanged": true,
+  "legacyPosAndImageFunctionsUnchanged": true,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "runtime": "nodejs22",
+      "entryPoint": "createStaffAccount",
+      "uri": "https://createstaffaccount-wa32r7ghma-uc.a.run.app",
+      "updateTime": "2026-10-01T03:45:03.561003832Z"
+    }
+  ],
+  "legacyStorageRulesUnchanged": true,
+  "legacyBucketConfigurationUnchanged": true,
+  "updatedCermsStaffService": true,
+  "existingFunctionCount": 9,
+  "staffCompatibilityTests": 4,
+  "clientChecks": 11,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "allProductDeletionDeployed": true,
+  "rulesSource": "firebase/releases/products-2026-09-30.rules",
+  "staffAccountSourceSha256": "5e596bebcd57e7cdd189eaf7d146ebb2f548eff79cfc4dbcc4409ac4027f427e",
+  "featureSmoke": "Passed: edit non-membership product, cancel deletion, confirm deletion with exact updateTime; all network intercepted."
+}

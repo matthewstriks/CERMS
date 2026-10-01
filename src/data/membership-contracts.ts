@@ -1,3 +1,4 @@
+import type { StaffPermissions } from '../domain/staff-permissions'
 import type { Member } from '../domain/legacy'
 
 export type MemberSearchField = 'name' | 'dob' | 'id' | 'number' | 'type'
@@ -36,6 +37,7 @@ export interface MembershipReader {
   readonly uid: string
   readonly club: string
   readonly staffName: string
+  readonly permissions?: StaffPermissions
   list(query: MembershipQuery): Promise<MembershipPage>
   history(memberId: string): Promise<MembershipHistory>
   close(): void

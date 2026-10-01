@@ -22,6 +22,7 @@ export interface MembershipOption {
   id: string
   name: string
   durationSeconds: number
+  durationLabel?: string
 }
 export interface CreatedMember {
   id: string

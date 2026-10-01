@@ -1,0 +1,38 @@
+{
+  "database": "cerms",
+  "deployedAt": "2026-10-01T03:54:49.839Z",
+  "ruleset": "projects/cerms-7af24/rulesets/f8aad50a-1377-4907-9f22-616b5358d9e1",
+  "previousRuleset": "projects/cerms-7af24/rulesets/59f5a2b5-f588-4c7b-b1ca-f69de4a0bf09",
+  "sha256": "b6d54f466ae9128ded2f33d87dbdf235ef2387931b9237619aaa9db16c2f5f01",
+  "defaultReleaseUnchanged": true,
+  "legacyRuleset": "projects/cerms-7af24/rulesets/aca432a9-ef36-44cd-ba44-b689dedd0053",
+  "feature": "Permission-controlled closing of other staff registers",
+  "rulesChecks": 311,
+  "indexesModified": false,
+  "verifiedAt": "2026-10-01T03:54:52.518Z",
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "databaseConfigurationUnchanged": true,
+  "legacyPosAndImageFunctionsUnchanged": true,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "runtime": "nodejs22",
+      "entryPoint": "createStaffAccount",
+      "uri": "https://createstaffaccount-wa32r7ghma-uc.a.run.app",
+      "updateTime": "2026-10-01T03:54:21.933102881Z"
+    }
+  ],
+  "legacyStorageRulesUnchanged": true,
+  "legacyBucketConfigurationUnchanged": true,
+  "updatedCermsStaffService": true,
+  "existingFunctionCount": 9,
+  "staffCompatibilityTests": 4,
+  "clientChecks": 18,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "managerRegisterClosingDeployed": true,
+  "buildPassed": true,
+  "interceptedRegisterManagerFlowPassed": true
+}

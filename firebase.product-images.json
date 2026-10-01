@@ -1,0 +1,18 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "cerms-staff",
+      "ignore": [
+        "node_modules",
+        "*.test.mjs"
+      ]
+    }
+  ],
+  "firestore": [
+    {
+      "database": "cerms",
+      "rules": "firebase/releases/register-managers-2026-09-30.rules"
+    }
+  ]
+}

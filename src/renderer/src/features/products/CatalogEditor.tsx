@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import ProductImageEditor from './ProductImageEditor'
+import type { PreparedProductImage } from '../../../../data/firebase-product-images'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   durationUnits,
   parsePrice,
@@ -11,6 +13,86 @@ import {
 } from '../../../../domain/catalog'
 import type { CatalogClient } from '../../../../data/firebase-catalog'
 import type { CatalogKind } from '../../../../shared/catalog-policy'
+
+const optionHelp = {
+  active:
+    'Makes the product available in the checkout catalog. Turn off to hide it from sales without deleting it.',
+  favorite: 'Shows the product in checkout Favorites for quick access.',
+  taxable: 'Adds sales tax using the business’s configured tax rate at checkout.',
+  core: 'Protects the product so only staff with permission to manage core products can edit or remove it. Separate staff permissions are planned; catalog management is currently owner-only.',
+  rental:
+    'Treats the purchase as a rental/check-in, with a room or locker selection and an expiry based on the rental length and unit below.',
+  membership:
+    'Uses the length and unit below to grant or renew a membership. Adds time to a valid membership, or starts from now if it has expired.',
+  restricted: 'Limits the product’s checkout visibility to the staff user IDs entered below.',
+  payout:
+    'Treats the amount as money paid out from the register or card terminal. Enter a positive price; checkout will use a negative amount.',
+  askforprice:
+    'Prompts staff to enter the amount when adding the product to an order. The saved product price must be 0.',
+} as const
+
+function ProductOption({
+  option,
+  label,
+  checked,
+  onChange,
+}: {
+  option: keyof typeof optionHelp
+  label: string
+  checked: boolean
+  onChange(checked: boolean): void
+}) {
+  const tooltipId = useId()
+  const helpButton = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    function dismissOnClick(event: MouseEvent) {
+      if (!helpButton.current?.contains(event.target as Node)) setOpen(false)
+    }
+    function dismissOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        setOpen(false)
+      }
+    }
+    document.addEventListener('click', dismissOnClick, true)
+    document.addEventListener('keydown', dismissOnEscape, true)
+    return () => {
+      document.removeEventListener('click', dismissOnClick, true)
+      document.removeEventListener('keydown', dismissOnEscape, true)
+    }
+  }, [open])
+  return (
+    <div className="catalog-option">
+      <label>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        {label}
+      </label>
+      <button
+        ref={helpButton}
+        type="button"
+        className="catalog-option-help"
+        aria-label={`About ${label.toLowerCase()}`}
+        aria-expanded={open}
+        aria-controls={tooltipId}
+        aria-describedby={open ? tooltipId : undefined}
+        onClick={() => setOpen((current) => !current)}
+      >
+        ?
+      </button>
+      <span id={tooltipId} role="tooltip" className="catalog-option-tooltip" hidden={!open}>
+        {optionHelp[option]}
+      </span>
+    </div>
+  )
+}
+
 export default function CatalogEditor({
   kind,
   existing,
@@ -38,6 +120,9 @@ export default function CatalogEditor({
   )
   const [price, setPrice] = useState((product.priceCents / 100).toFixed(2))
   const [users, setUsers] = useState(product.restrictedUsers.join('\n'))
+  const [imagePreparing, setImagePreparing] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<PreparedProductImage | null>(null)
+  const uploadedImage = useRef<{ image: PreparedProductImage; path: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
   const [error, setError] = useState('')
@@ -75,7 +160,7 @@ export default function CatalogEditor({
       <form
         onSubmit={async (e) => {
           e.preventDefault()
-          if (pending.current) return
+          if (pending.current || imagePreparing) return
           setError('')
           try {
             const data =
@@ -97,6 +182,14 @@ export default function CatalogEditor({
               )
             pending.current = true
             setBusy(true)
+            if (kind === 'products' && selectedImage) {
+              if (uploadedImage.current?.image !== selectedImage)
+                uploadedImage.current = {
+                  image: selectedImage,
+                  path: await client.uploadImage(id.current, selectedImage),
+                }
+              ;(data as CatalogProduct).imagePath = uploadedImage.current.path
+            }
             const version = await client.save(kind, id.current, data, existing?.version ?? 0)
             onSaved({ id: id.current, version, data })
           } catch (failure) {
@@ -196,6 +289,17 @@ export default function CatalogEditor({
                   />
                 </label>
               </div>
+              <ProductImageEditor
+                client={client}
+                productId={id.current}
+                onPreparing={setImagePreparing}
+                imagePath={(existing?.data as CatalogProduct | undefined)?.imagePath}
+                onChange={(image) => {
+                  setSelectedImage(image)
+                  uploadedImage.current = null
+                  if (!image) field('imagePath', null)
+                }}
+              />
               <h3>Inventory</h3>
               <div className="catalog-form-grid">
                 {(['inventory', 'inventoryPar', 'invWarning'] as const).map((key, index) => (
@@ -219,16 +323,19 @@ export default function CatalogEditor({
                 automated email alerts are not enabled yet.
               </p>
               <h3>Product options</h3>
+              <p className="muted">
+                Click an option’s ? for details. Checkout behavior follows CERMS 4 and is planned
+                for CERMS 5; these settings currently save to the catalog.
+              </p>
               <div className="catalog-options">
                 {Object.entries(toggles).map(([key, label]) => (
-                  <label key={key}>
-                    <input
-                      type="checkbox"
-                      checked={product[key as keyof typeof toggles]}
-                      onChange={(e) => field(key as keyof typeof toggles, e.target.checked)}
-                    />
-                    {label}
-                  </label>
+                  <ProductOption
+                    key={key}
+                    option={key as keyof typeof toggles}
+                    label={label}
+                    checked={product[key as keyof typeof toggles]}
+                    onChange={(checked) => field(key as keyof typeof toggles, checked)}
+                  />
                 ))}
               </div>
               {(['rental', 'membership'] as const).map(
@@ -298,7 +405,7 @@ export default function CatalogEditor({
             <button type="button" onClick={onClose}>
               Cancel
             </button>
-            <button className="primary" type="submit">
+            <button className="primary" type="submit" disabled={imagePreparing}>
               {busy ? 'Saving…' : existing ? 'Save changes' : title}
             </button>
           </div>

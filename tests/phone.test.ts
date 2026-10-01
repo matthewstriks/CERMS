@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { normalizePhone, phoneLabel } from '../src/domain/phone'
 import { emptyMemberDraft, validateMemberDraft } from '../src/domain/member-creation'
-import { devMemberRecord, devMembership } from '../src/domain/dev-member'
+import { devMemberRecord } from '../src/domain/dev-member'
 import { devCreatorUid } from '../src/shared/dev-member-policy'
+
+const membership = { id: 'fixture-plan', name: 'Fixture membership', durationSeconds: 86400 }
 
 describe('optional member phones', () => {
   it('normalizes national and international numbers and formats display', () => {
@@ -27,7 +29,7 @@ describe('optional member phones', () => {
       birthDate: '1990-01-02',
       governmentId: 'FAKE',
       governmentIdType: 'TX',
-      membershipProductId: devMembership.id,
+      membershipProductId: membership.id,
     }
     const record = (phone: string) =>
       devMemberRecord(
@@ -36,6 +38,7 @@ describe('optional member phones', () => {
         123456789,
         'a'.repeat(64),
         'b'.repeat(64),
+        membership,
       )
     expect(record('')).not.toHaveProperty('phone')
     expect(record('210-555-0123')).toHaveProperty('phone', '+12105550123')

@@ -1,10 +1,52 @@
+import { hasStaffPermission, validStaffPermissions } from '../domain/staff-permissions'
+import { safeStaffId } from './staff-policy'
 import { validCategory, validProduct } from '../domain/catalog'
 import { devCreatorUid } from './dev-member-policy'
-// Temporary owner gate until the business-admin rank/permission mapping is defined.
-export const canManageCatalog = (uid: string, club: string, _rank?: unknown) =>
-  uid === devCreatorUid && /^[a-zA-Z0-9_-]{1,128}$/.test(club)
+// Saved business permissions are enforced again by the backend.
+export const canManageCatalog = (uid: string, club: string, permissions?: unknown) =>
+  hasStaffPermission(
+    uid,
+    'manageProducts',
+    validStaffPermissions(permissions) ? permissions : undefined,
+  ) && /^[a-zA-Z0-9_-]{1,128}$/.test(club)
+export const canDeleteProducts = (uid: string, club: string, permissions?: unknown) =>
+  hasStaffPermission(
+    uid,
+    'deleteProducts',
+    validStaffPermissions(permissions) ? permissions : undefined,
+  ) && /^[a-zA-Z0-9_-]{1,128}$/.test(club)
 export const catalogBase = 'projects/cerms-7af24/databases/cerms/documents'
 export type CatalogKind = 'products' | 'categories'
+export function deleteProductCommit(club: string, id: string, updateTime: string) {
+  return {
+    writes: [
+      { delete: `${catalogBase}/system/${club}/products/${id}`, currentDocument: { updateTime } },
+    ],
+  }
+}
+export function isDeleteProductCommit(body?: string): boolean {
+  try {
+    const p = JSON.parse(body ?? '{}'),
+      w = p.writes?.[0]
+    const match =
+      typeof w?.delete === 'string' &&
+      w.delete.match(
+        /^projects\/cerms-7af24\/databases\/cerms\/documents\/system\/([a-zA-Z0-9_-]{1,128})\/products\/([a-zA-Z0-9_-]{1,128})$/,
+      )
+    const time = w?.currentDocument?.updateTime
+    return (
+      !!match &&
+      typeof time === 'string' &&
+      /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(time) &&
+      Object.keys(p).join() === 'writes' &&
+      p.writes.length === 1 &&
+      Object.keys(w).sort().join() === 'currentDocument,delete' &&
+      Object.keys(w.currentDocument).join() === 'updateTime'
+    )
+  } catch {
+    return false
+  }
+}
 export function catalogCommit(
   club: string,
   kind: CatalogKind,
@@ -74,9 +116,15 @@ export function isCatalogCommit(body?: string): boolean {
     const decoded = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, decode(v)]))
     const { version, updatedBy, ...data } = decoded
     if (
+      kind === 'products' &&
+      typeof data.imagePath === 'string' &&
+      !data.imagePath.startsWith(`cerms5/catalog/${club}/products/${id}/`)
+    )
+      return false
+    if (
       !Number.isSafeInteger(version) ||
       version < 1 ||
-      updatedBy !== devCreatorUid ||
+      !safeStaffId(updatedBy) ||
       !(kind === 'products' ? validProduct(data) : validCategory(data))
     )
       return false

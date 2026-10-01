@@ -42,6 +42,7 @@ export default function CreateMemberForm({
 }) {
   const [draft, setDraft] = useState(() => ({ ...emptyMemberDraft(), ...initialScan?.draft }))
   const [options, setOptions] = useState<MembershipOption[]>([])
+  const selectedMembership = options.find((option) => option.id === draft.membershipProductId)
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -302,11 +303,15 @@ export default function CreateMemberForm({
         </label>
         {!loading && !options.length && (
           <p>
-            No membership types available.{' '}
+            No membership types available. Create an active membership product in Products, then
+            retry.{' '}
             <button type="button" onClick={() => setRevision((value) => value + 1)}>
               Retry
             </button>
           </p>
+        )}
+        {selectedMembership?.durationLabel && (
+          <p className="muted">Membership duration: {selectedMembership.durationLabel}</p>
         )}
         {allowImport && (
           <label className="creation-checkbox">

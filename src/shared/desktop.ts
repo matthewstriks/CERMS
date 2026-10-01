@@ -8,6 +8,12 @@ export interface AboutInfo extends AppInfo {
   author: string
 }
 export interface DesktopApi {
+  onNewOrder(callback: () => void): () => void
+  setNewOrderAvailable(available: boolean): Promise<void>
+  receiptPrinters(): Promise<{ name: string; displayName: string }[]>
+  printReceipt(request: { text: string; printer: string; width: 58 | 80 }): Promise<void>
+  onNewMember(callback: () => void): () => void
+  setNewMemberAvailable(available: boolean): Promise<void>
   openAbout(): Promise<void>
   getAboutInfo(): Promise<AboutInfo>
   closeAbout(): Promise<void>

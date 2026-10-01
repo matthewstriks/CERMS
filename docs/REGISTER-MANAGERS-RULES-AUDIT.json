@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Independent business-scoped closeOtherRegisters permission defaults off and cannot self-grant. Manager closes require authenticated UID and saved-profile name; own-register legacy close remains compatible. Exact update masks preserve owner, opening counts, claims and POS totals. Closed records are immutable. Synthetic rules checks cover missing/spoofed actor, unpermitted and cross-business attempts, manager success, immutable history and cashier reopening. Named database boundary is preserved.",
+  "findings": []
+}

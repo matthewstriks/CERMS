@@ -7,19 +7,22 @@ import {
   type DevMemberFields,
 } from '../shared/dev-member-policy'
 import {
-  devMembership,
   devMemberRecord,
   memberHash,
   normalizeGovernmentId,
   validateDevMember,
 } from '../domain/dev-member'
-import type { MemberCreator } from '../domain/member-creation'
+import type { MemberCreator, MembershipOption } from '../domain/member-creation'
+import { createCatalog } from './firebase-catalog'
+import { catalogMembershipOptions, catalogMembershipOption } from './catalog-memberships'
+import { validProduct } from '../domain/catalog'
 
 /** Deliberate owner-only creation in dev. Every write is create-only and atomically reserves its identity and number. */
 export function createDevMemberCreator(uid: string, club: string): MemberCreator {
   if (!canCreateDevMember(uid, club))
     throw new Error('Member creation is available only to the owner in Dev System.')
   const { auth, db } = getFirebaseServices()
+  let displayedOptions: MembershipOption[] | undefined
   async function checkSession() {
     if (auth.currentUser?.uid !== uid) throw new Error('Sign in again before creating a member.')
     const profile = await getDoc(doc(db, 'users', uid))
@@ -29,7 +32,10 @@ export function createDevMemberCreator(uid: string, club: string): MemberCreator
   return {
     async options() {
       await checkSession()
-      return [devMembership]
+      const products = await catalogMembershipOptions(createCatalog({ uid, club }), uid)
+      await checkSession()
+      displayedOptions = products
+      return products
     },
     async create(input, requestId) {
       if (!/^[a-f0-9-]{36}$/.test(requestId)) throw new Error('Invalid creation request.')
@@ -53,11 +59,40 @@ export function createDevMemberCreator(uid: string, club: string): MemberCreator
       }
       const prior = await priorResult()
       if (prior) return prior
+      async function selectedMembership() {
+        const snapshot = await getDoc(
+          doc(db, 'system', 'dev', 'products', draft.membershipProductId),
+        )
+        if (!snapshot.exists())
+          throw new Error(
+            'This membership product no longer exists. Reopen the form to choose another.',
+          )
+        const { version, updatedAt: _updatedAt, updatedBy: _updatedBy, ...data } = snapshot.data()
+        if (!Number.isSafeInteger(version) || version < 1 || !validProduct(data))
+          throw new Error('This membership product has an unsupported format.')
+        const option = catalogMembershipOption(snapshot.id, data, uid)
+        if (!option)
+          throw new Error(
+            'This product is no longer an active membership available to you. Reopen the form to choose another.',
+          )
+        const displayed = displayedOptions?.find((item) => item.id === option.id)
+        if (
+          displayedOptions &&
+          (!displayed ||
+            displayed.name !== option.name ||
+            displayed.durationSeconds !== option.durationSeconds)
+        )
+          throw new Error(
+            'This membership product changed. Reopen the form to review its current name and duration.',
+          )
+        return option
+      }
       if ((await getDoc(doc(db, 'system', 'dev', 'memberIdentities', identity))).exists())
         throw new Error('A member with this issuing state, ID and date of birth already exists.')
       for (let attempt = 0; attempt < 5; attempt++) {
+        const membership = await selectedMembership()
         const number = 100000000 + (crypto.getRandomValues(new Uint32Array(1))[0]! % 900000000)
-        const record = devMemberRecord(draft, uid, number, identity, fingerprint)
+        const record = devMemberRecord(draft, uid, number, identity, fingerprint, membership)
         const fields: DevMemberFields = {}
         for (const [key, value] of Object.entries(record)) {
           if (key === 'creation_time') continue

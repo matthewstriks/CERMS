@@ -1,0 +1,6 @@
+{
+  "score": 5,
+  "summary": "Scoped POS reads; client writes to receipts, register ledgers and POS settings denied on both create and update. The callable validates authenticated saved business access and POS permission; settings require the fixed owner UID. Receipt, ledger and inventory mutations share one transaction, including register-open and version reads. UUID/fingerprint checks prevent duplicate retry accounting. Permission maps retain legacy fields and allow only an optional boolean processSales. Legacy database, Auth logins and Storage are not changed.",
+  "findings": [],
+  "limitations": ["Admin SDK bypasses Firestore rules, so callable validation and fixed named-database selection are required.", "Payments are staff-recorded external transactions, not verified processor settlements.", "Physical receipt-printer output requires device/driver verification."]
+}

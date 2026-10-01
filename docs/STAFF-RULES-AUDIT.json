@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Prepared staff permissions reviewed against the Firebase rules auditor checklist. Owner authority is a fixed verified Auth UID plus saved business access; email/rank fields cannot elevate access. Only the owner can list scoped users and grant a fixed boolean permission map to another existing same-business user. Owner overrides, cross-business grants, self-grants and arbitrary fields are denied. Member/catalog/register actions enforce assigned rights at the backend, preserve their existing validation and ownership restrictions, and default-deny undefined collections. Profile creation and request markers are server-only. Focused synthetic checks cover creation/retry, existing-account protection and permission effects; the exact local rules passed the required emulator suite. The assessment is not deployment evidence and does not authorize changing legacy Firebase resources.",
+  "findings": []
+}

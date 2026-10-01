@@ -45,7 +45,7 @@ export default function CreateMemberDialog({
           Close
         </button>
       </div>
-      <p>Development membership · 365 days · No payment collected</p>
+      <p>Choose an active membership from Products. No payment is collected in this flow.</p>
       <CreateMemberForm
         creator={creator}
         allowImport={false}

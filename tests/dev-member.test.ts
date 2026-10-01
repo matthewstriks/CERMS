@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {
   devMemberRecord,
-  devMembership,
   memberHash,
   normalizeMemberSearch,
   validateDevMember,
@@ -14,6 +13,16 @@ import {
 } from '../src/shared/dev-member-policy'
 import { allowFirebaseRequest } from '../src/shared/firebase-policy'
 import { emptyMemberDraft } from '../src/domain/member-creation'
+import { productDefaults } from '../src/domain/catalog'
+const membership = { id: 'fixture-plan', name: 'Fixture Monthly', durationSeconds: 30 * 86400 }
+const catalogProduct = () => ({
+  ...productDefaults(),
+  name: membership.name,
+  cat: 'memberships',
+  membership: true,
+  membershipLengthRaw: 30,
+  membershipLengthType: 'day' as const,
+})
 const draft = () => ({
   ...emptyMemberDraft(),
   firstName: 'José',
@@ -21,10 +30,17 @@ const draft = () => ({
   birthDate: '1990-01-02',
   governmentId: '00123',
   governmentIdType: 'TX',
-  membershipProductId: devMembership.id,
+  membershipProductId: membership.id,
 })
 function payload() {
-  const record = devMemberRecord(draft(), devCreatorUid, 123456789, 'a'.repeat(64), 'b'.repeat(64))
+  const record = devMemberRecord(
+    draft(),
+    devCreatorUid,
+    123456789,
+    'a'.repeat(64),
+    'b'.repeat(64),
+    membership,
+  )
   const fields: DevMemberFields = {}
   for (const [key, value] of Object.entries(record)) {
     if (key === 'creation_time') continue
@@ -43,14 +59,21 @@ describe('dev member write boundary', () => {
   it('preserves original names/leading zeros and builds bounded stable search fields', () => {
     expect(normalizeMemberSearch('  JOSÉ   Guest ')).toBe('jose guest')
     expect(
-      devMemberRecord(draft(), devCreatorUid, 123456789, 'a'.repeat(64), 'b'.repeat(64)),
+      devMemberRecord(
+        draft(),
+        devCreatorUid,
+        123456789,
+        'a'.repeat(64),
+        'b'.repeat(64),
+        membership,
+      ),
     ).toMatchObject({
       access: 'dev',
       fname: 'José',
       searchFirst: 'jose',
       idnum: '00123',
       searchId: '00123',
-      productId: 'dev-annual',
+      productId: 'fixture-plan',
       schemaVersion: 2,
     })
     expect(() => validateDevMember({ ...draft(), importExisting: true })).toThrow('Import')
@@ -137,7 +160,11 @@ describe('dev member write boundary', () => {
 const mock = vi.hoisted(() => ({
   getDoc: vi.fn(),
   fetch: vi.fn(),
+  products: vi.fn(),
   uid: 'c7D7AH07kgXmjn8tSiOgzHscLZ12',
+}))
+vi.mock('../src/data/firebase-catalog', () => ({
+  createCatalog: () => ({ products: mock.products }),
 }))
 vi.mock('firebase/firestore/lite', () => ({
   doc: (_db: unknown, ...segments: string[]) => segments.join('/'),
@@ -153,13 +180,76 @@ import { createDevMemberCreator } from '../src/data/firebase-dev-member-creator'
 beforeEach(() => {
   mock.uid = devCreatorUid
   mock.getDoc.mockReset().mockImplementation(async (path: string) => ({
-    exists: () => path.startsWith('users/'),
-    data: () => ({ access: 'dev' }),
+    id: path.split('/').at(-1),
+    exists: () => path.startsWith('users/') || path === 'system/dev/products/fixture-plan',
+    data: () =>
+      path.startsWith('users/') ? { access: 'dev' } : { ...catalogProduct(), version: 1 },
   }))
   mock.fetch.mockReset().mockResolvedValue({ ok: true, status: 200 })
+  mock.products.mockReset().mockResolvedValue({ rows: [], more: false })
   vi.stubGlobal('fetch', mock.fetch)
 })
 describe('dev creator with synthetic intercepted responses', () => {
+  it('lists only catalog memberships with no placeholder fallback', async () => {
+    const creator = createDevMemberCreator(devCreatorUid, 'dev')
+    expect(await creator.options()).toEqual([])
+    mock.products.mockResolvedValue({
+      rows: [{ id: membership.id, version: 1, data: catalogProduct() }],
+      more: false,
+    })
+    expect(await creator.options()).toEqual([{ ...membership, durationLabel: '30 days' }])
+    expect(mock.fetch).not.toHaveBeenCalled()
+  })
+  it('stores the selected catalog name and configured expiration', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    await createDevMemberCreator(devCreatorUid, 'dev').create(draft(), crypto.randomUUID())
+    const fields = JSON.parse(mock.fetch.mock.calls[0]![1].body).writes[0].update.fields
+    expect(fields.productId.stringValue).toBe(membership.id)
+    expect(fields.membership_type.stringValue).toBe(membership.name)
+    expect(Number(fields.id_expiration.integerValue)).toBeGreaterThanOrEqual(
+      now + membership.durationSeconds,
+    )
+    expect(Number(fields.id_expiration.integerValue)).toBeLessThanOrEqual(
+      now + membership.durationSeconds + 2,
+    )
+  })
+  it.each([
+    { active: false },
+    { membership: false },
+    { restricted: true, restrictedUsers: ['someone-else'] },
+  ])('rejects an unavailable membership at save time: %j', async (change) => {
+    mock.getDoc.mockImplementation(async (path: string) => ({
+      id: path.split('/').at(-1),
+      exists: () => path.startsWith('users/') || path.includes('/products/'),
+      data: () =>
+        path.startsWith('users/')
+          ? { access: 'dev' }
+          : { ...catalogProduct(), ...change, version: 1 },
+    }))
+    await expect(
+      createDevMemberCreator(devCreatorUid, 'dev').create(draft(), crypto.randomUUID()),
+    ).rejects.toThrow('no longer an active membership')
+    expect(mock.fetch).not.toHaveBeenCalled()
+  })
+  it('rejects changed name or duration after choices were shown', async () => {
+    mock.products.mockResolvedValue({
+      rows: [{ id: membership.id, version: 1, data: { ...catalogProduct(), name: 'Old name' } }],
+      more: false,
+    })
+    const creator = createDevMemberCreator(devCreatorUid, 'dev')
+    await creator.options()
+    await expect(creator.create(draft(), crypto.randomUUID())).rejects.toThrow('product changed')
+    expect(mock.fetch).not.toHaveBeenCalled()
+  })
+  it('rejects missing catalog products instead of falling back to development membership', async () => {
+    await expect(
+      createDevMemberCreator(devCreatorUid, 'dev').create(
+        { ...draft(), membershipProductId: 'dev-annual' },
+        crypto.randomUUID(),
+      ),
+    ).rejects.toThrow('no longer exists')
+    expect(mock.fetch).not.toHaveBeenCalled()
+  })
   it('sends only a validated create commit after checking saved dev access', async () => {
     const creator = createDevMemberCreator(devCreatorUid, 'dev')
     const result = await creator.create(draft(), crypto.randomUUID())

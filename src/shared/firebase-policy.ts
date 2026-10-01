@@ -1,4 +1,13 @@
-import { isCatalogCommit } from './catalog-policy'
+import { posEndpoints, isPosRequest } from './pos-policy'
+import {
+  uploadProductImageEndpoint,
+  getProductImageEndpoint,
+  isProductImageRequest,
+} from './product-image-policy'
+import { isStaffPermissionCommit, isCreateStaffRequest, staffAccountEndpoint } from './staff-policy'
+import { isCatalogCommit, isDeleteProductCommit } from './catalog-policy'
+import { isRegisterCommit } from './register-policy'
+import { isMemberManagementCommit } from './member-management-policy'
 import { isMemberViewCommit } from './member-log-policy'
 import { isDevMemberCommit } from './dev-member-policy'
 /** Fixed to the existing CERMS project. This is configuration, not a credential. */
@@ -24,6 +33,12 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
   try {
     const url = new URL(rawUrl)
     if (url.protocol !== 'https:' || url.username || url.password || url.port) return false
+    if (Object.values(posEndpoints).some((endpoint) => endpoint === url.href))
+      return method === 'OPTIONS' || (method === 'POST' && isPosRequest(url.href, body))
+    if ([uploadProductImageEndpoint, getProductImageEndpoint].includes(url.href))
+      return method === 'OPTIONS' || (method === 'POST' && isProductImageRequest(url.href, body))
+    if (url.href === staffAccountEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isCreateStaffRequest(body))
     if (method === 'OPTIONS')
       return [
         'firestore.googleapis.com',
@@ -45,7 +60,11 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
           isAccessSwitchCommit(body) ||
           isDevMemberCommit(body) ||
           isMemberViewCommit(body) ||
-          isCatalogCommit(body)
+          isCatalogCommit(body) ||
+          isDeleteProductCommit(body) ||
+          isRegisterCommit(body) ||
+          isMemberManagementCommit(body) ||
+          isStaffPermissionCommit(body)
         )
       if (
         method === 'POST' &&
@@ -101,7 +120,7 @@ export function isMemberFileUrl(rawUrl: string): boolean {
   }
 }
 
-/** The sole allowed Firestore mutation: one existing user's access field, nothing else. */
+/** The access-switch exception changes one existing user's access field, nothing else. */
 export function isAccessSwitchCommit(body?: string): boolean {
   try {
     const payload = JSON.parse(body ?? '{}')

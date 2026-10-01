@@ -114,8 +114,9 @@ export function isDevMemberCommit(body?: string): boolean {
     if (
       f.access.stringValue !== 'dev' ||
       f.createdBy.stringValue !== devCreatorUid ||
-      f.productId.stringValue !== 'dev-annual' ||
-      f.membership_type.stringValue !== 'Development membership'
+      !/^[a-zA-Z0-9_-]{1,128}$/.test(f.productId.stringValue) ||
+      !f.membership_type.stringValue.trim() ||
+      f.membership_type.stringValue.length > 200
     )
       return false
     if (

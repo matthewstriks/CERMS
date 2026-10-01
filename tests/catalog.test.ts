@@ -50,7 +50,7 @@ describe('catalog network guard', () => {
   it.each([
     (p: any) => (p.writes[0].update.fields.priceCents = { doubleValue: 1.1 }),
     (p: any) => (p.writes[0].update.fields.active = { stringValue: 'true' }),
-    (p: any) => (p.writes[0].update.fields.updatedBy = { stringValue: 'staff' }),
+    (p: any) => (p.writes[0].update.fields.updatedBy = { stringValue: 'invalid/uid' }),
     (p: any) => (p.writes[0].update.fields.extra = { stringValue: 'bad' }),
     (p: any) => (p.writes[0].currentDocument.exists = true),
     (p: any) => (p.writes[0].updateTransforms[0].fieldPath = 'creation_time'),

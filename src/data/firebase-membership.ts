@@ -1,3 +1,5 @@
+import { readStaffPermissions } from './firebase-staff-permissions'
+import { noStaffPermissions } from '../domain/staff-permissions'
 import { normalizeMemberSearch, normalizeGovernmentId } from '../domain/dev-member'
 import { initializeApp } from 'firebase/app'
 import {
@@ -118,6 +120,9 @@ export async function loadMembershipSession(): Promise<MembershipReader> {
   }
   const access: string = fields.access
   const uid = user.uid
+  const permissions = await readStaffPermissions(uid, access).catch(() => ({
+    ...noStaffPermissions,
+  }))
   let closed = false
   const cursors = new Map<string, { snapshot: QueryDocumentSnapshot; fingerprint: string }>()
   async function assertSession() {
@@ -131,6 +136,7 @@ export async function loadMembershipSession(): Promise<MembershipReader> {
   return {
     uid,
     club: access,
+    permissions,
     staffName: typeof fields.displayName === 'string' ? fields.displayName : 'CERMS staff',
     close() {
       closed = true

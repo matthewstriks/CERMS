@@ -4,6 +4,8 @@ export function applicationMenu(
   platform: NodeJS.Platform,
   openAbout: () => void,
   development: boolean,
+  newMember: () => void,
+  newOrder: () => void,
 ): MenuItemConstructorOptions[] {
   const about: MenuItemConstructorOptions = {
     id: 'about-cerms',
@@ -32,6 +34,21 @@ export function applicationMenu(
     {
       label: 'File',
       submenu: [
+        {
+          id: 'new-member',
+          label: 'New Member…',
+          accelerator: 'CommandOrControl+Shift+N',
+          enabled: false,
+          click: newMember,
+        },
+        {
+          id: 'new-order',
+          label: 'New Order…',
+          accelerator: 'CommandOrControl+Shift+O',
+          enabled: false,
+          click: newOrder,
+        },
+        { type: 'separator' },
         { role: 'close' },
         ...(platform === 'darwin' ? [] : [{ role: 'quit' } as MenuItemConstructorOptions]),
       ],

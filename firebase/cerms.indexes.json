@@ -7,6 +7,14 @@
         { "fieldPath": "access", "order": "ASCENDING" },
         { "fieldPath": "creation_time", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "registers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "openedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

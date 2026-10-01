@@ -1,11 +1,6 @@
-import { validateMemberDraft, type MemberDraft } from './member-creation'
+import { validateMemberDraft, type MemberDraft, type MembershipOption } from './member-creation'
 import { encodeLegacyMember } from '../data/member-creation-legacy'
 
-export const devMembership = {
-  id: 'dev-annual',
-  name: 'Development membership',
-  durationSeconds: 365 * 86400,
-}
 export function normalizeMemberSearch(value: string): string {
   return value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().trim().replace(/\s+/g, ' ')
 }
@@ -23,8 +18,8 @@ export function validateDevMember(input: MemberDraft): MemberDraft {
   const draft = validateMemberDraft(input)
   if (draft.importExisting) throw new Error('Import overrides are not enabled for Dev System.')
   if (!draft.governmentIdType) throw new Error('Choose the issuing state or ID type.')
-  if (draft.membershipProductId !== devMembership.id)
-    throw new Error('Choose the development membership.')
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(draft.membershipProductId))
+    throw new Error('Choose an active membership product.')
   return draft
 }
 export function devMemberRecord(
@@ -33,9 +28,10 @@ export function devMemberRecord(
   number: number,
   identityKey: string,
   fingerprint: string,
+  membership: MembershipOption,
   now = new Date(),
 ) {
-  const legacy = encodeLegacyMember(draft, devMembership, {
+  const legacy = encodeLegacyMember(draft, membership, {
     club: 'dev',
     staffName: 'Dev staff',
     now,
@@ -45,7 +41,7 @@ export function devMemberRecord(
     ...legacy,
     schemaVersion: 2,
     createdBy: uid,
-    productId: devMembership.id,
+    productId: membership.id,
     identityKey,
     fingerprint,
     searchFirst: normalizeMemberSearch(draft.firstName),

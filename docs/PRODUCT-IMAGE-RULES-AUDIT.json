@@ -1,0 +1,13 @@
+{
+  "score": 5,
+  "summary": "Product-image review: create and update share the same optional-field validator, require the exact business/product path, and preserve existing catalog authorization. Unknown fields, cross-business paths and cross-product paths are denied. Server functions authorize saved cerms business access and catalog permissions, bound file bytes/pixels, decode and normalize supported raster formats, and create immutable files only within the cerms5/catalog prefix. Image reads verify the current product attachment. Shared Storage rules and legacy paths are unchanged. Synthetic server, desktop and rules checks passed; this review is not deployment evidence.",
+  "findings": [],
+  "deploymentIsolationReview": {
+    "legacyBucket": "cerms-7af24.appspot.com",
+    "finding": "Legacy Storage rules allow public reads and writes. Preserve these rules for legacy compatibility; do not use the bucket for new protected images.",
+    "newBucket": "cerms-7af24-cerms5-product-images",
+    "publicAccessPrevention": "enforced",
+    "uniformBucketLevelAccess": true,
+    "legacyStorageExtension": "Existing finalization extension is attached only to the old bucket; new uploads do not trigger it."
+  }
+}

@@ -1321,3 +1321,8 @@ dd {
     grid-template-columns: 1fr;
   }
 }
+
+button.danger {
+  color: #9b2929;
+  border-color: #d8a8a8;
+}

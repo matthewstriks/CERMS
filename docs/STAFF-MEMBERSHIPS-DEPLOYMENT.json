@@ -1,0 +1,38 @@
+{
+  "database": "cerms",
+  "deployedAt": "2026-10-01T03:05:08.976Z",
+  "ruleset": "projects/cerms-7af24/rulesets/2d9850b2-40fe-489c-9907-ad9a9a6c2735",
+  "previousRuleset": "projects/cerms-7af24/rulesets/40cfb1ba-8ba5-468b-bfa4-32912a5bdfb3",
+  "sha256": "622cfa5025cd8e3b9345e5fea2a598baf996002586b309f496c50f26c0afb5db",
+  "defaultReleaseUnchanged": true,
+  "legacyRuleset": "projects/cerms-7af24/rulesets/aca432a9-ef36-44cd-ba44-b689dedd0053",
+  "feature": "Staff permissions, catalog-backed Dev membership creation, member edit/delete and membership-product deletion",
+  "rulesChecks": 282,
+  "indexesModified": false,
+  "verifiedAt": "2026-10-01T03:06:06.061Z",
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "databaseConfigurationUnchanged": true,
+  "existingFunctionsUnchanged": true,
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+    "state": "ACTIVE",
+    "runtime": "nodejs22",
+    "entryPoint": "createStaffAccount",
+    "uri": "https://createstaffaccount-wa32r7ghma-uc.a.run.app",
+    "updateTime": "2026-10-01T03:04:39.418566045Z"
+  },
+  "existingFunctionCount": 4,
+  "staffServerTests": 4,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "productImagesDeployed": false,
+  "rulesSource": "firebase/releases/staff-memberships-2026-09-30.rules",
+  "staffSourceSha256": "aea0bbe8aa05a0d9cf0f47462dced046704633124bc215acc46c60cc113b921d",
+  "staffEntryPointSha256": "bbf2f97d04db125796a67cd72d13335588d9034f790c93786c3edeeacc3f8f6a",
+  "verificationNotes": [
+    "Database configuration comparison excludes the rolling earliestVersionTime and etag.",
+    "Function event filter order normalized; all existing function configuration, revisions and update times match.",
+    "No production callable invocation or live test writes."
+  ]
+}

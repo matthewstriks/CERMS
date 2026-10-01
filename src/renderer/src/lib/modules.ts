@@ -132,6 +132,14 @@ export const modules = [
     features: ['Legacy calendar prototype only', 'Event storage and workflows still need design'],
   },
   {
+    id: 'staff',
+    label: 'Users & permissions',
+    icon: Users,
+    group: 'Administration',
+    description: 'Staff login accounts and business permissions.',
+    features: [],
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: Settings2,

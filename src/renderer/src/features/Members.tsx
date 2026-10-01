@@ -1,3 +1,4 @@
+import { hasStaffPermission } from '../../../domain/staff-permissions'
 import { dobLabel } from '../lib/data'
 import type { MemberScan } from '../../../domain/member-creation'
 import ScanMemberDialog from './members/ScanMemberDialog'
@@ -13,8 +14,14 @@ import { searchDescription } from '../../../data/membership-search'
 import { canCreateDevMember } from '../../../shared/dev-member-policy'
 import CreateMemberDialog from './members/CreateMemberDialog'
 import MemberDetails from './members/MemberDetails'
+import ManageMemberDialog from './members/ManageMemberDialog'
+import { canManageMembers } from '../../../shared/member-management-policy'
 
-function LiveMembers() {
+interface MembersProps {
+  createRequested?: boolean
+  onCreateHandled?: () => void
+}
+function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
   const session = useMembershipSession(),
     reader = session.reader!
   const [draft, setDraft] = useState(''),
@@ -29,7 +36,15 @@ function LiveMembers() {
     [selected, setSelected] = useState<Member | null>(null)
   const [creating, setCreating] = useState<{ scan?: MemberScan } | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [managing, setManaging] = useState<{ member: Member; mode: 'edit' | 'delete' } | null>(null)
+  const [notice, setNotice] = useState('')
+  const canManage = canManageMembers(reader.uid, reader.club, reader.permissions)
   const canCreate = canCreateDevMember(reader.uid, reader.club)
+  useEffect(() => {
+    if (!createRequested) return
+    if (canCreate) setCreating((current) => current ?? {})
+    onCreateHandled?.()
+  }, [createRequested, canCreate, onCreateHandled])
   const cursor = pages[pages.length - 1]
   useEffect(() => {
     let active = true
@@ -166,16 +181,16 @@ function LiveMembers() {
                 <tbody>
                   {page.members.map((member) => {
                     const state = membershipStatus(member, Date.now())
+                    const nameParts = member.name.trim().split(/\s+/)
+                    const firstName = member.firstName?.trim() || nameParts[0]
+                    const lastName =
+                      member.lastName?.trim() || (nameParts.length > 1 ? nameParts.at(-1) : '')
                     return (
                       <tr key={member.id}>
                         <td>
                           <div className="person">
                             <span className="avatar">
-                              {member.name
-                                .split(' ')
-                                .map((part) => part[0])
-                                .slice(0, 2)
-                                .join('')}
+                              {[firstName?.[0], lastName?.[0]].join('').toUpperCase()}
                             </span>
                             <div>
                               <strong>{member.name}</strong>
@@ -253,8 +268,10 @@ function LiveMembers() {
           </>
         )}
       </section>
+      {notice && <p role="status">{notice}</p>}
       <p className="page-note">
-        Editing, renewals, check-in, and deletion are not implemented yet.
+        {canManage ? 'Open a member to view your available actions. ' : ''}Renewal checkout and
+        check-in are not implemented yet.
       </p>
       {scanning && (
         <ScanMemberDialog
@@ -285,12 +302,45 @@ function LiveMembers() {
           onCreated={refresh}
         />
       )}
-      {selected && <MemberDetails member={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <MemberDetails
+          member={selected}
+          onClose={() => setSelected(null)}
+          onEdit={
+            hasStaffPermission(reader.uid, 'editMembers', reader.permissions)
+              ? () => {
+                  setManaging({ member: selected, mode: 'edit' })
+                  setSelected(null)
+                }
+              : undefined
+          }
+          onDelete={
+            hasStaffPermission(reader.uid, 'deleteMembers', reader.permissions)
+              ? () => {
+                  setManaging({ member: selected, mode: 'delete' })
+                  setSelected(null)
+                }
+              : undefined
+          }
+        />
+      )}
+      {managing && (
+        <ManageMemberDialog
+          {...managing}
+          reader={reader}
+          onClose={() => setManaging(null)}
+          onSaved={() => {
+            setNotice(managing.mode === 'delete' ? 'Member deleted.' : 'Member changes saved.')
+            setManaging(null)
+            refresh()
+          }}
+        />
+      )}
     </>
   )
 }
-export default function Members() {
+export default function Members(props: MembersProps) {
   const session = useMembershipSession()
-  if (session.reader) return <LiveMembers key={session.reader.club} />
+  if (session.reader) return <LiveMembers key={session.reader.club} {...props} />
   return null
 }

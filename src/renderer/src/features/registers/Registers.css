@@ -1,0 +1,80 @@
+.register-own {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block: 1rem;
+  padding: 1.25rem;
+}
+.register-own h2 {
+  margin-top: 0;
+}
+.register-dialog {
+  width: min(760px, calc(100vw - 2rem));
+}
+.register-dialog fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.register-dialog legend {
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.register-denominations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 1.5rem;
+}
+.register-denominations label {
+  display: grid;
+  grid-template-columns: 1fr 5.5rem 5rem;
+  gap: 0.5rem;
+  align-items: center;
+}
+.register-denominations input,
+.register-closing-note textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: inherit;
+  font: inherit;
+}
+.register-denominations small {
+  text-align: right;
+  color: var(--muted);
+}
+.register-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem;
+  margin-block: 1rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.register-total strong {
+  font-size: 1.3rem;
+}
+.register-closing-note {
+  display: grid;
+  gap: 0.5rem;
+}
+.register-closing-note textarea {
+  min-height: 80px;
+}
+.register-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .register-denominations {
+    grid-template-columns: 1fr;
+  }
+  .register-own {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

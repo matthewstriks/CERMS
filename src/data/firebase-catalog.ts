@@ -1,3 +1,5 @@
+import { productImageClient } from './firebase-product-images'
+import { readStaffPermissions } from './firebase-staff-permissions'
 import {
   collection,
   doc,
@@ -13,8 +15,10 @@ import { getFirebaseServices } from './firebase-membership'
 import type { MembershipReader } from './membership-contracts'
 import {
   canManageCatalog,
+  canDeleteProducts,
   catalogCommit,
   isCatalogCommit,
+  deleteProductCommit,
   type CatalogKind,
 } from '../shared/catalog-policy'
 import {
@@ -24,16 +28,22 @@ import {
   type CatalogProduct,
   type CatalogRecord,
 } from '../domain/catalog'
-export function createCatalog(reader: MembershipReader) {
+import { readVersionedDocument } from './firebase-versioned-document'
+export function createCatalog(reader: Pick<MembershipReader, 'uid' | 'club'>) {
   const { auth, db } = getFirebaseServices()
   let cursor: QueryDocumentSnapshot | undefined
-  async function session() {
+  async function session(write: boolean | 'delete' = false) {
     if (auth.currentUser?.uid !== reader.uid) throw new Error('Sign in again to manage products.')
     const profile = await getDoc(doc(db, 'users', reader.uid))
+    const permissions = await readStaffPermissions(reader.uid, reader.club)
     if (
       !profile.exists() ||
       profile.data().access !== reader.club ||
-      !canManageCatalog(reader.uid, reader.club, profile.data().rank) ||
+      !(write === 'delete'
+        ? canDeleteProducts(reader.uid, reader.club, permissions)
+        : canManageCatalog(reader.uid, reader.club, permissions) ||
+          (!write &&
+            (permissions.editMembers || permissions.processSales || permissions.deleteProducts))) ||
       auth.currentUser?.uid !== reader.uid
     )
       throw new Error(
@@ -50,6 +60,36 @@ export function createCatalog(reader: MembershipReader) {
     return { id: snapshot.id, version, data: data as T }
   }
   return {
+    ...productImageClient(reader),
+    async removeProduct(id: string, priorVersion: number): Promise<void> {
+      await session('delete')
+      const path = `system/${reader.club}/products/${id}`
+      const before = await readVersionedDocument(path)
+      if (!before) return
+      if (Number(before.fields.version?.integerValue) !== priorVersion)
+        throw new Error('This product changed. Refresh the catalog before deleting it.')
+      await session('delete')
+      let response: Response | undefined
+      try {
+        response = await fetch(
+          'https://firestore.googleapis.com/v1/projects/cerms-7af24/databases/cerms/documents:commit',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await auth.currentUser!.getIdToken()}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(deleteProductCommit(reader.club, id, before.updateTime)),
+          },
+        )
+      } catch {
+        /* Confirm an uncertain deletion below. */
+      }
+      if (response?.ok || !(await readVersionedDocument(path))) return
+      throw new Error(
+        'Deletion was not confirmed. The product may have changed or deletion may not be permitted. Refresh and try again.',
+      )
+    },
     async categories(): Promise<CatalogRecord<CatalogCategory>[]> {
       await session()
       const rows: CatalogRecord<CatalogCategory>[] = []
@@ -95,7 +135,7 @@ export function createCatalog(reader: MembershipReader) {
       data: CatalogProduct | CatalogCategory,
       priorVersion: number,
     ): Promise<number> {
-      await session()
+      await session(true)
       const version = priorVersion + 1
       const body = JSON.stringify(
         catalogCommit(reader.club, kind, id, { ...data }, version, reader.uid),

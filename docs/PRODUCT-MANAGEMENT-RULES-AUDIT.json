@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "All product types may be deleted only by the owner or staff with saved business-scoped deleteProducts permission. Existing manageProducts grants create/edit and no longer grants deletion alone. Delete-only permission enables scoped catalog reads without create/update privileges. Optional boolean permission retains compatibility with existing maps, unknown permission keys stay denied, and category deletion stays denied. Product deletion does not mutate sale snapshots, members, registers or Storage. Client deletion retains exact updateTime preconditions. Synthetic verification only.",
+  "findings": []
+}

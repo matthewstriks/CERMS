@@ -1,6 +1,7 @@
 import { _electron as electron, expect } from 'playwright/test'
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
+import { membershipProduct, catalogFields } from './fixtures/catalog.mjs'
 
 // Every HTTPS request is intercepted. These tests never send credentials or records to Firebase.
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
@@ -17,6 +18,7 @@ let denyProfileReload = false
 let commitCount = 0
 let devCreateCount = 0
 let catalogWriteCount = 0
+let managementWriteCount = 0
 let logCount = 0
 let logQueries = 0
 let denyLogOnce = false
@@ -25,6 +27,11 @@ let denyMemberScan = false
 const devDocuments = new Map()
 const ownerUid = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 const base = 'projects/cerms-7af24/databases/cerms/documents/'
+const membershipFixturePath = base + 'system/dev/products/fixture-plan'
+devDocuments.set(membershipFixturePath, {
+  name: membershipFixturePath,
+  fields: catalogFields(membershipProduct()),
+})
 const str = (stringValue) => ({ stringValue })
 const integer = (value) => ({ integerValue: String(value) })
 function withDocumentTimes(value) {
@@ -35,7 +42,7 @@ function withDocumentTimes(value) {
   )
   if (result.name?.startsWith?.(base) && result.fields) {
     result.createTime = '2026-01-01T00:00:00Z'
-    result.updateTime = '2026-01-01T00:00:00Z'
+    result.updateTime ??= '2026-01-01T00:00:00Z'
   }
   return result
 }
@@ -140,6 +147,44 @@ try {
     }
     if (url.hostname === 'firestore.googleapis.com' && url.pathname.endsWith(':commit')) {
       const body = request.postDataJSON()
+      if (
+        body.writes[0]?.delete ||
+        (body.writes[0]?.update?.name.includes('/members/') && body.writes[0]?.updateMask)
+      ) {
+        assert.equal(fixtureUid, ownerUid)
+        for (const write of body.writes) {
+          const name = write.delete ?? write.update.name
+          const before = devDocuments.get(name)
+          if (write.currentDocument?.updateTime)
+            assert.equal(
+              write.currentDocument.updateTime,
+              before?.updateTime ?? '2026-01-01T00:00:00Z',
+            )
+          if (write.currentDocument?.exists === false) assert.equal(before, undefined)
+        }
+        managementWriteCount++
+        for (const write of body.writes) {
+          if (write.delete) devDocuments.delete(write.delete)
+          else {
+            const before = devDocuments.get(write.update.name)
+            devDocuments.set(write.update.name, {
+              name: write.update.name,
+              fields: {
+                ...(write.updateMask ? before?.fields : {}),
+                ...write.update.fields,
+                ...(write.updateTransforms
+                  ? { updatedAt: { timestampValue: '2026-09-30T12:00:00Z' } }
+                  : {}),
+              },
+              updateTime: `2026-09-30T12:00:${String(managementWriteCount).padStart(2, '0')}Z`,
+            })
+          }
+        }
+        return respond({
+          writeResults: body.writes.map(() => ({ updateTime: '2026-09-30T12:00:00Z' })),
+          commitTime: '2026-09-30T12:00:00Z',
+        })
+      }
       if (/\/system\/[^/]+\/(products|categories)\//.test(body.writes[0]?.update?.name ?? '')) {
         const write = body.writes[0]
         assert.equal(activeClub, 'dev')
@@ -519,14 +564,7 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Change system', exact: true }).count(), 0)
   await page.getByRole('link', { name: 'Products', exact: true }).click()
   await page.getByRole('heading', { name: 'Business admin access required' }).waitFor()
-  for (const label of [
-    'Point of sale',
-    'Registers',
-    'History',
-    'Reports & analytics',
-    'Messages',
-    'Events',
-  ]) {
+  for (const label of ['Point of sale', 'History', 'Reports & analytics', 'Messages', 'Events']) {
     await page.getByRole('link', { name: label, exact: true }).click()
     await page.getByRole('heading', { name: 'Not implemented yet', exact: true }).waitFor()
     assert.equal(await page.locator('table').count(), 0)
@@ -789,9 +827,7 @@ try {
   assert.equal(devCreateCount, 0, 'No-match lookup does not create automatically')
   await scanDialog.getByRole('button', { name: 'Create membership with this ID' }).click()
   const createDialog = page.getByRole('dialog', { name: 'Create member · Dev System' })
-  await createDialog
-    .getByRole('option', { name: 'Development membership' })
-    .waitFor({ state: 'attached' })
+  await createDialog.getByRole('option', { name: 'Fixture Monthly' }).waitFor({ state: 'attached' })
   assert.equal(await createDialog.getByLabel('Enter existing membership details').count(), 0)
   await expect(createDialog.getByLabel('First name', { exact: true })).toHaveValue('SYNTHETIC')
   await expect(createDialog.getByLabel('ID number', { exact: true })).toHaveValue('FAKE-DEV-001')
@@ -800,7 +836,9 @@ try {
   await page.keyboard.press('Escape')
   await expect(createDialog).toBeVisible()
   await expect(createDialog.getByLabel('Scanned ID data')).toHaveCount(0)
-  await createDialog.getByLabel('Type of membership').selectOption('dev-annual')
+  await expect(createDialog.getByRole('option', { name: 'Development membership' })).toHaveCount(0)
+  await createDialog.getByLabel('Type of membership').selectOption('fixture-plan')
+  await expect(createDialog).toContainText('Membership duration: 30 days')
   const phone = createDialog.getByLabel('Phone number (optional)')
   await phone.fill('123')
   await phone.blur()
@@ -813,6 +851,17 @@ try {
   await createDialog.getByRole('button', { name: 'Create membership', exact: true }).click()
   await createDialog.getByText(/SYNTHETIC GUEST created/).waitFor()
   assert.equal(devCreateCount, 1)
+  const createdMember = [...devDocuments.values()].find((document) =>
+    document.name.startsWith(base + 'members/'),
+  )
+  assert.equal(createdMember.fields.productId.stringValue, 'fixture-plan')
+  assert.equal(createdMember.fields.membership_type.stringValue, 'Fixture Monthly')
+  assert.ok(
+    Math.abs(
+      Number(createdMember.fields.id_expiration.integerValue) -
+        (Math.floor(Date.now() / 1000) + 30 * 86400),
+    ) < 10,
+  )
   await createDialog
     .getByRole('button', { name: 'View member SYNTHETIC GUEST', exact: true })
     .click()
@@ -920,6 +969,61 @@ try {
   denyMemberScan = false
   await scanDialog.getByRole('button', { name: 'Close', exact: true }).click()
 
+  // Edit, stale-write protection, identity move, and confirmed deletion use synthetic records.
+  await page.getByRole('button', { name: 'View SYNTHETIC GUEST', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit member', exact: true }).click()
+  const manageDialog = page.getByRole('dialog', { name: 'Edit member', exact: true })
+  await expect(manageDialog.getByLabel('First name', { exact: true })).toHaveValue('SYNTHETIC')
+  const expiresBefore = createdMember.fields.id_expiration.integerValue
+  const oldIdentity = createdMember.fields.identityKey.stringValue
+  await manageDialog.getByLabel('First name', { exact: true }).fill('EDITED')
+  await manageDialog.getByLabel('ID number', { exact: true }).fill('SYNTHETIC-NEW-ID')
+  await manageDialog.getByLabel('Membership type', { exact: true }).selectOption('fixture-plan')
+  await page.screenshot({ path: 'artifacts/member-edit-fixtures.png', fullPage: true })
+  await manageDialog.getByRole('button', { name: 'Save member changes', exact: true }).click()
+  await expect(manageDialog).toHaveCount(0)
+  assert.equal(managementWriteCount, 1)
+  const editedMember = devDocuments.get(createdMember.name)
+  assert.equal(editedMember.fields.id_expiration.integerValue, expiresBefore)
+  assert.equal(devDocuments.has(base + 'system/dev/memberIdentities/' + oldIdentity), false)
+  assert.ok(
+    devDocuments.has(
+      base + 'system/dev/memberIdentities/' + editedMember.fields.identityKey.stringValue,
+    ),
+  )
+  assert.deepEqual(editedMember.fields.notes, createdMember.fields.notes)
+  await page.getByRole('button', { name: 'View EDITED GUEST', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit member', exact: true }).click()
+  await expect(manageDialog.getByLabel('First name', { exact: true })).toHaveValue('EDITED')
+  editedMember.updateTime = '2026-09-30T14:00:00Z'
+  await manageDialog.getByLabel('First name', { exact: true }).fill('STALE')
+  await manageDialog.getByRole('button', { name: 'Save member changes', exact: true }).click()
+  await expect(manageDialog.getByRole('alert')).toContainText('changed since you opened')
+  assert.equal(managementWriteCount, 1)
+  await manageDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'View EDITED GUEST', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete member', exact: true }).click()
+  const deleteMember = page.getByRole('dialog', { name: 'Delete member', exact: true })
+  await deleteMember.getByRole('button', { name: 'Cancel', exact: true }).click()
+  assert.ok(devDocuments.has(createdMember.name))
+  await page.getByRole('button', { name: 'View EDITED GUEST', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete member', exact: true }).click()
+  await deleteMember.getByRole('button', { name: 'Delete permanently', exact: true }).click()
+  await expect(deleteMember).toHaveCount(0)
+  assert.equal(managementWriteCount, 2)
+  assert.equal(devDocuments.has(createdMember.name), false)
+  assert.equal(
+    devDocuments.has(
+      base + 'system/dev/memberIdentities/' + editedMember.fields.identityKey.stringValue,
+    ),
+    false,
+  )
+  assert.ok(
+    devDocuments.has(
+      base + 'system/dev/memberNumbers/' + createdMember.fields.id_number.integerValue,
+    ),
+  )
+
   await page.getByRole('link', { name: 'Products', exact: true }).click()
   await page.getByRole('button', { name: 'Create category', exact: true }).click()
   const categoryDialog = page.getByRole('dialog', { name: 'Create category' })
@@ -948,12 +1052,23 @@ try {
   await productDialog.getByRole('button', { name: 'Create product', exact: true }).click()
   await expect(productDialog).toHaveCount(0)
   assert.equal(catalogWriteCount, 2)
-  const catalogProduct = [...devDocuments.values()].find((d) =>
-    d.name.includes('/system/dev/products/'),
+  const catalogProduct = [...devDocuments.values()].find(
+    (d) => d.name.includes('/system/dev/products/') && d.fields.barcode?.stringValue === '000123',
   )
   assert.equal(catalogProduct.fields.priceCents.integerValue, '299')
   assert.equal(catalogProduct.fields.inventory.integerValue, '0')
   assert.equal(catalogProduct.fields.barcode.stringValue, '000123')
+  await page.getByRole('link', { name: 'Members', exact: true }).click()
+  await page.getByRole('button', { name: 'Create membership', exact: true }).click()
+  await expect(
+    createDialog.getByRole('option', { name: 'Guest towel', exact: true }),
+  ).toHaveJSProperty('disabled', false)
+  await expect(
+    createDialog.getByRole('option', { name: 'Development membership', exact: true }),
+  ).toHaveCount(0)
+  await createDialog.getByRole('button', { name: 'Close', exact: true }).click()
+  assert.equal(catalogWriteCount, 2, 'Loading membership choices cannot write catalog data')
+  await page.getByRole('link', { name: 'Products', exact: true }).click()
   await page.getByLabel('Search products', { exact: true }).fill('000123')
   await page.getByRole('button', { name: 'Edit product Guest towel', exact: true }).click()
   const editProduct = page.getByRole('dialog', { name: 'Edit product', exact: true })
@@ -985,6 +1100,22 @@ try {
   await editCategory.getByRole('button', { name: 'Save changes', exact: true }).click()
   await expect(editCategory).toHaveCount(0)
   assert.equal(catalogWriteCount, 4)
+  await page.getByRole('button', { name: 'Products', exact: true }).click()
+  await page.getByLabel('Status', { exact: true }).selectOption('active')
+  await page.getByLabel('Search products', { exact: true }).fill('')
+  await page
+    .getByRole('button', { name: 'Delete membership product Fixture Monthly', exact: true })
+    .click()
+  const deleteProduct = page.getByRole('dialog', { name: 'Delete membership product', exact: true })
+  await deleteProduct.getByRole('button', { name: 'Cancel', exact: true }).click()
+  assert.ok(devDocuments.has(membershipFixturePath))
+  await page
+    .getByRole('button', { name: 'Delete membership product Fixture Monthly', exact: true })
+    .click()
+  await deleteProduct.getByRole('button', { name: 'Delete permanently', exact: true }).click()
+  await expect(deleteProduct).toHaveCount(0)
+  assert.equal(devDocuments.has(membershipFixturePath), false)
+  assert.equal(managementWriteCount, 3)
   await page.screenshot({ path: 'artifacts/catalog-fixtures.png', fullPage: true })
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await page.getByRole('heading', { name: 'Sign in to CERMS' }).waitFor()

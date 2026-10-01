@@ -1,0 +1,36 @@
+{
+  "database": "cerms",
+  "deployedAt": "2026-10-01T02:24:17.551Z",
+  "ruleset": "projects/cerms-7af24/rulesets/40cfb1ba-8ba5-468b-bfa4-32912a5bdfb3",
+  "previousRuleset": "projects/cerms-7af24/rulesets/459d1ec8-8ca8-46ab-b5a6-5337e1f28223",
+  "sha256": "18c802c7302d62745e48dd1f511b1567d960d34ccb68134bf84b1f45f6ed60fb",
+  "defaultReleaseUnchanged": true,
+  "legacyRuleset": "projects/cerms-7af24/rulesets/aca432a9-ef36-44cd-ba44-b689dedd0053",
+  "feature": "Business-scoped registers only",
+  "rulesChecks": 42,
+  "indexOperation": "projects/cerms-7af24/databases/cerms/operations/S01vcFVpSmdBQ0lDDCoDIDBiYWM4YTYyYTY3NS0xNTU4LWY3NjQtNmI5NC1jMWRkZjZhYSQac2VuaWxlcGlwCQpBEg",
+  "index": {
+    "name": "projects/cerms-7af24/databases/cerms/collectionGroups/registers/indexes/CICAgJiUpoMK",
+    "queryScope": "COLLECTION",
+    "fields": [
+      {
+        "fieldPath": "status",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "openedAt",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "state": "READY",
+    "density": "SPARSE_ALL"
+  },
+  "verifiedAt": "2026-10-01T02:28:25.018Z",
+  "defaultIndexesUnchanged": true,
+  "legacyIndexCount": 28,
+  "existingCermsIndexesUnchanged": true
+}

@@ -1,4 +1,10 @@
+import {posRuleChecks} from './pos-rule-checks.mjs'
+import { productImageRuleChecks } from './product-image-rule-checks.mjs'
+import { staffRuleChecks } from './staff-rule-checks.mjs'
 import assert from 'node:assert/strict'
+import { registerRuleChecks } from './register-rule-checks.mjs'
+import { membershipProduct, catalogFields } from './fixtures/catalog.mjs'
+import { memberManagementRuleChecks } from './member-management-rule-checks.mjs'
 import { spawn } from 'node:child_process'
 import { mkdtemp, readdir, rm, readFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
@@ -147,7 +153,7 @@ try {
       })
   }
   const userPath = base + '/users/staff'
-  for (const uid of [undefined, 'other', owner])
+  for (const uid of [undefined, 'other'])
     await check('Other/anonymous profile read', userPath, { uid }, false)
   await check('Own profile without email/version', userPath, { uid: 'staff' }, true)
   await check(
@@ -196,7 +202,8 @@ try {
       false,
     )
     for (const uid of ['staff', owner])
-      for (const method of ['PATCH', 'DELETE'])
+      for (const method of ['PATCH', 'DELETE']) {
+        if (collection === 'members' && uid === owner && method === 'DELETE') continue
         await check(
           'Business mutation',
           base + '/' + collection + '/a',
@@ -207,6 +214,7 @@ try {
           },
           false,
         )
+      }
   }
   const qcases = [
     query('members', [eq('access', str('club-a'))], {
@@ -319,6 +327,7 @@ try {
   await seed('users/' + owner, { ...fields(owner), access: str('dev') })
   await seed('users/dev-staff', { ...fields('dev-staff'), access: str('dev') })
   const devId = '11111111-1111-4111-8111-111111111111'
+  await seed('system/dev/products/fixture-plan', catalogFields(membershipProduct()))
   const devBody = () => {
     const strings = {
       access: 'dev',
@@ -328,12 +337,12 @@ try {
       mname: '',
       suffix: '',
       dob: '1990-01-02',
-      membership_type: 'Development membership',
+      membership_type: 'Fixture Monthly',
       idnum: 'FAKE-001',
       idstate: 'TX',
       email: '',
       createdBy: owner,
-      productId: 'dev-annual',
+      productId: 'fixture-plan',
       identityKey: 'a'.repeat(64),
       fingerprint: 'b'.repeat(64),
       searchFirst: 'synthetic',
@@ -348,7 +357,7 @@ try {
     Object.assign(data, {
       schemaVersion: { integerValue: '2' },
       id_number: { integerValue: '123456789' },
-      id_expiration: { integerValue: String(Math.floor(Date.now() / 1000) + 365 * 86400) },
+      id_expiration: { integerValue: String(Math.floor(Date.now() / 1000) + 30 * 86400) },
       dna: { booleanValue: false },
       checkedIn: { booleanValue: false },
       waiver_status: { booleanValue: false },
@@ -373,6 +382,34 @@ try {
       ],
     }
   }
+  for (const change of [
+    { active: false },
+    { membership: false },
+    { restricted: true, restrictedUsers: ['someone-else'] },
+    { name: 'Changed membership' },
+    { membershipLengthRaw: 60 },
+  ]) {
+    await seed(
+      'system/dev/products/fixture-plan',
+      catalogFields({ ...membershipProduct(), ...change }),
+    )
+    await check(
+      'Unavailable or changed membership product denied',
+      base + ':commit',
+      { uid: owner, method: 'POST', body: devBody() },
+      false,
+    )
+  }
+  await seed('system/dev/products/fixture-plan', catalogFields(membershipProduct()))
+  const removedPlaceholder = devBody()
+  removedPlaceholder.writes[0].update.fields.productId = str('dev-annual')
+  removedPlaceholder.writes[0].update.fields.membership_type = str('Development membership')
+  await check(
+    'Removed development placeholder denied',
+    base + ':commit',
+    { uid: owner, method: 'POST', body: removedPlaceholder },
+    false,
+  )
   for (const uid of [undefined, 'staff', 'dev-staff'])
     await check(
       'Dev create rejects other identities',
@@ -869,7 +906,7 @@ try {
   )
   await check('Catalog owner read', productPath, { uid: owner }, true)
   await check('Catalog employee read denied', productPath, { uid: 'staff' }, false)
-  await check('Product deletion denied', productPath, { uid: owner, method: 'DELETE' }, false)
+  await check('Owner product deletion allowed', productPath, { uid: owner, method: 'DELETE' }, true)
   await check('Category deletion denied', catPath, { uid: owner, method: 'DELETE' }, false)
   const catalogQuery = {
     structuredQuery: {
@@ -893,6 +930,11 @@ try {
   )
   await seed('users/' + owner, { ...fields(owner), access: str('dev') })
   await check('Catalog previous business revoked', productPath, { uid: owner }, false)
+  await registerRuleChecks({ base, seed, check, call, fields, str })
+  await memberManagementRuleChecks({ base, seed, check, call, fields, str, owner })
+  await staffRuleChecks({ base, seed, check, fields, str, owner })
+  await productImageRuleChecks({ base, seed, check, fields, str, owner })
+  await posRuleChecks({ base, seed, check, fields, str, owner })
   console.log(
     `Firestore rules passed ${checks} allow/deny checks using exact rules on named cerms in isolated ${project}.`,
   )

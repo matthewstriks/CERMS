@@ -1,0 +1,61 @@
+{
+  "database": "cerms",
+  "deployedAt": "2026-10-01T03:37:21.050Z",
+  "ruleset": "projects/cerms-7af24/rulesets/8d285047-7c97-4abc-a3f1-849628a3373e",
+  "previousRuleset": "projects/cerms-7af24/rulesets/7d1654e8-e22c-454e-87b2-79482efbcbc0",
+  "sha256": "fd08c7a91b153a17978e3123d2ce1407cdb6454a9af6c838d722e7ddda40e8b1",
+  "defaultReleaseUnchanged": true,
+  "legacyRuleset": "projects/cerms-7af24/rulesets/aca432a9-ef36-44cd-ba44-b689dedd0053",
+  "feature": "POS read isolation and optional cashier permission; server-only sales, totals and settings",
+  "rulesChecks": 299,
+  "indexesModified": false,
+  "verifiedAt": "2026-10-01T03:37:26.888Z",
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "databaseConfigurationUnchanged": true,
+  "legacyAndImageFunctionsUnchanged": true,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "runtime": "nodejs22",
+      "entryPoint": "completeSale",
+      "uri": "https://completesale-wa32r7ghma-uc.a.run.app",
+      "updateTime": "2026-10-01T03:36:43.312790329Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/savePosSettings",
+      "state": "ACTIVE",
+      "runtime": "nodejs22",
+      "entryPoint": "savePosSettings",
+      "uri": "https://savepossettings-wa32r7ghma-uc.a.run.app",
+      "updateTime": "2026-10-01T03:36:46.798294704Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "runtime": "nodejs22",
+      "entryPoint": "createStaffAccount",
+      "uri": "https://createstaffaccount-wa32r7ghma-uc.a.run.app",
+      "updateTime": "2026-10-01T03:36:46.291514200Z"
+    }
+  ],
+  "legacyStorageRulesUnchanged": true,
+  "legacyBucketConfigurationUnchanged": true,
+  "updatedCermsStaffService": true,
+  "existingFunctionCount": 7,
+  "posServerTests": 4,
+  "staffCompatibilityTests": 4,
+  "clientChecks": 6,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "posDeployed": true,
+  "rulesSource": "firebase/releases/pos-2026-09-30.rules",
+  "sourceSha256": {
+    "index.mjs": "f3c3ff8b29df6e874d19b1e4a160ffd3c58773e62a198eca78203802e4d69b31",
+    "pos.mjs": "679e4f7ba14c3be5a3610e87e6f0eadfdbd3d97e99145072e212c8a368769dbf",
+    "staff-account.mjs": "5e87254afc7e8f7f13c6f4a9cd00e24fde21771f8138a6d683ea8710ec962f97"
+  },
+  "desktopSmoke": "Passed: category/barcode lookup, split tender/change, response-loss retry after navigating away, receipt printing/reopen, settings and closing register. Network intercepted and printer stubbed.",
+  "physicalPrinterTested": false
+}

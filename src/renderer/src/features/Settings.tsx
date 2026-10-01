@@ -1,3 +1,4 @@
+import { ownerUid } from '../../../domain/staff-permissions'
 import { useState } from 'react'
 import { useQuery } from '../lib/data'
 import { QueryState, SectionTitle } from '../components/ui'
@@ -22,7 +23,7 @@ export default function Settings() {
           </div>
           <div>
             <dt>Membership access</dt>
-            <dd>Read only</dd>
+            <dd>{reader?.uid === ownerUid ? 'Owner · Full access' : 'See Users & permissions'}</dd>
           </div>
         </dl>
       </section>
@@ -62,8 +63,11 @@ export default function Settings() {
       </section>
       <section className="panel settings-card full-width">
         <SectionTitle title="Administration" />
+        <p>
+          <a href="#staff">Manage users & permissions</a>
+        </p>
         <div className="settings-roadmap">
-          {['Staff & permissions', 'Club preferences', 'Integrations'].map((title) => (
+          {['Club preferences', 'Integrations'].map((title) => (
             <div key={title}>
               <h3>{title}</h3>
               <p>Not implemented yet.</p>

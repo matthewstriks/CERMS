@@ -3,13 +3,20 @@ import { useMembershipSession } from '../lib/membership-session'
 import { money } from '../lib/data'
 import { Badge } from '../components/ui'
 import { createCatalog } from '../../../data/firebase-catalog'
-import { canManageCatalog, type CatalogKind } from '../../../shared/catalog-policy'
+import {
+  canManageCatalog,
+  canDeleteProducts,
+  type CatalogKind,
+} from '../../../shared/catalog-policy'
 import type { CatalogCategory, CatalogProduct, CatalogRecord } from '../../../domain/catalog'
 import CatalogEditor from './products/CatalogEditor'
+import DeleteConfirmation from '../components/DeleteConfirmation'
 import './products/Products.css'
 export default function Products() {
   const { reader } = useMembershipSession()
-  const allowed = !!reader && canManageCatalog(reader.uid, reader.club)
+  const canEdit = !!reader && canManageCatalog(reader.uid, reader.club, reader.permissions)
+  const canDelete = !!reader && canDeleteProducts(reader.uid, reader.club, reader.permissions)
+  const allowed = canEdit || canDelete
   const client = useMemo(
     () => (reader && allowed ? createCatalog(reader) : null),
     [reader, allowed],
@@ -25,6 +32,7 @@ export default function Products() {
   const [category, setCategory] = useState('')
   const [status, setStatus] = useState('all')
   const [tab, setTab] = useState<CatalogKind>('products')
+  const [deleting, setDeleting] = useState<CatalogRecord<CatalogProduct> | null>(null)
   const [editor, setEditor] = useState<{
     kind: CatalogKind
     existing?: CatalogRecord<CatalogProduct | CatalogCategory>
@@ -70,10 +78,7 @@ export default function Products() {
     return (
       <section className="panel">
         <h2>Business admin access required</h2>
-        <p>
-          Product management is currently restricted to the owner while business permissions are
-          being configured.
-        </p>
+        <p>Ask the owner to enable product editing or deletion for your staff account.</p>
       </section>
     )
   const names = new Map(categories.map((c) => [c.id, c.data.name]))
@@ -109,7 +114,7 @@ export default function Products() {
         </button>
         <button
           className="primary"
-          disabled={!loaded || busy || (tab === 'products' && !categories.length)}
+          disabled={!canEdit || !loaded || busy || (tab === 'products' && !categories.length)}
           onClick={() => setEditor({ kind: tab })}
         >
           Create {tab === 'products' ? 'product' : 'category'}
@@ -127,7 +132,9 @@ export default function Products() {
           {!categories.length && (
             <div className="notice">
               Create a category first to organize your products.{' '}
-              <button onClick={() => setEditor({ kind: 'categories' })}>Create category</button>
+              <button disabled={!canEdit} onClick={() => setEditor({ kind: 'categories' })}>
+                Create category
+              </button>
             </div>
           )}
           <div className="catalog-filters">
@@ -218,10 +225,19 @@ export default function Products() {
                         onClick={() =>
                           setEditor({ kind: 'products', existing: { id, version, data: p } })
                         }
+                        disabled={!canEdit}
                         aria-label={`Edit product ${p.name}`}
                       >
                         Edit product
                       </button>
+                      {canDelete && (
+                        <button
+                          aria-label={`Delete product ${p.name}`}
+                          onClick={() => setDeleting({ id, version, data: p })}
+                        >
+                          Delete product
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -272,6 +288,7 @@ export default function Products() {
                   <td>
                     <button
                       onClick={() => setEditor({ kind: 'categories', existing: c })}
+                      disabled={!canEdit}
                       aria-label={`Edit category ${c.data.name}`}
                     >
                       Edit category
@@ -283,6 +300,20 @@ export default function Products() {
           </table>
           {!categories.length && <p className="empty">No categories yet.</p>}
         </div>
+      )}
+      {deleting && (
+        <DeleteConfirmation
+          title="Delete product"
+          name={deleting.data.name}
+          description="It will no longer be available for new sales or memberships. Saved receipts, member records and payment history will remain unchanged."
+          onClose={() => setDeleting(null)}
+          onDelete={() => client.removeProduct(deleting.id, deleting.version)}
+          onDeleted={() => {
+            setProducts((rows) => rows.filter((row) => row.id !== deleting.id))
+            setDeleting(null)
+            setNotice('Product deleted.')
+          }}
+        />
       )}
       {editor && (
         <CatalogEditor

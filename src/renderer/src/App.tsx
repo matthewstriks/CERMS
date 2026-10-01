@@ -1,5 +1,6 @@
+import { hasStaffPermission } from '../../domain/staff-permissions'
 import BrandLogo from './components/BrandLogo'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronRight, LogOut } from 'lucide-react'
 import { modules } from './lib/modules'
 import type { ModuleId } from './lib/modules'
@@ -7,10 +8,15 @@ import { Badge } from './components/ui'
 import { useQuery } from './lib/data'
 import SystemSwitcher from './components/SystemSwitcher'
 import { canSwitchSystems } from '../../shared/firebase-policy'
+import { canManageMembers } from '../../shared/member-management-policy'
+import { canCreateDevMember } from '../../shared/dev-member-policy'
 import { useMembershipSession } from './lib/membership-session'
 const Activity = lazy(() => import('./features/Activity'))
 const Members = lazy(() => import('./features/Members'))
 const Products = lazy(() => import('./features/Products'))
+const Registers = lazy(() => import('./features/Registers'))
+const PointOfSale = lazy(() => import('./features/PointOfSale'))
+const Staff = lazy(() => import('./features/Staff'))
 const Settings = lazy(() => import('./features/Settings'))
 
 function readRoute(): ModuleId {
@@ -21,6 +27,41 @@ export default function App() {
   const membership = useMembershipSession()
   const info = useQuery(() => window.desktop.getAppInfo(), [])
   const [route, setRoute] = useState<ModuleId>(readRoute)
+  const [newMemberRequested, setNewMemberRequested] = useState(false)
+  const consumeNewMember = useCallback(() => setNewMemberRequested(false), [])
+  const canCreateMember = canCreateDevMember(
+    membership.reader?.uid ?? '',
+    membership.reader?.club ?? '',
+  )
+  useEffect(() => {
+    const unsubscribe = window.desktop.onNewMember(() => {
+      // Keep an open form's draft intact, and never stack native dialogs.
+      if (!canCreateMember || membership.switching || document.querySelector('dialog[open]')) return
+      setNewMemberRequested(true)
+      window.location.hash = 'members'
+      setRoute('members')
+    })
+    void window.desktop.setNewMemberAvailable(canCreateMember && !membership.switching)
+    return () => {
+      unsubscribe()
+      void window.desktop.setNewMemberAvailable(false)
+    }
+  }, [canCreateMember, membership.switching])
+  const canUsePos =
+    !!membership.reader &&
+    hasStaffPermission(membership.reader.uid, 'processSales', membership.reader.permissions)
+  useEffect(() => {
+    const unsubscribe = window.desktop.onNewOrder(() => {
+      if (!canUsePos || membership.switching || document.querySelector('dialog[open]')) return
+      window.location.hash = 'sales'
+      setRoute('sales')
+    })
+    void window.desktop.setNewOrderAvailable(canUsePos && !membership.switching)
+    return () => {
+      unsubscribe()
+      void window.desktop.setNewOrderAvailable(false)
+    }
+  }, [canUsePos, membership.switching])
   const title = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
     const sync = () => setRoute(readRoute())
@@ -32,7 +73,20 @@ export default function App() {
     document.title = `CERMS · ${modules.find((module) => module.id === route)?.label}`
   }, [route])
   const current = modules.find((module) => module.id === route) ?? modules[0]
-  const readOnlyPage = route === 'members' || route === 'activity' || route === 'overview'
+  const staffNameParts = (membership.reader?.staffName ?? '').trim().split(/\s+/)
+  const staffInitials = (
+    (staffNameParts[0]?.[0] ?? '') +
+    (staffNameParts.length > 1 ? (staffNameParts.at(-1)?.[0] ?? '') : '')
+  ).toUpperCase()
+  const readOnlyPage =
+    (route === 'members' &&
+      !canManageMembers(
+        membership.reader?.uid ?? '',
+        membership.reader?.club ?? '',
+        membership.reader?.permissions,
+      )) ||
+    route === 'activity' ||
+    route === 'overview'
   return (
     <div className="app-layout">
       <a
@@ -82,9 +136,7 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="avatar staff-avatar">
-            {membership.reader?.staffName.slice(0, 2).toUpperCase()}
-          </div>
+          <div className="avatar staff-avatar">{staffInitials}</div>
           <div>
             <strong>{membership.reader?.staffName}</strong>
             <small>Staff account</small>
@@ -135,9 +187,18 @@ export default function App() {
             {route === 'overview' || route === 'activity' ? (
               <Activity showRentalAlerts={route === 'overview'} />
             ) : route === 'members' ? (
-              <Members />
+              <Members createRequested={newMemberRequested} onCreateHandled={consumeNewMember} />
+            ) : route === 'sales' || route === 'history' ? (
+              <PointOfSale
+                key={`${membership.reader?.uid}:${membership.reader?.club}:${route}`}
+                historyOnly={route === 'history'}
+              />
             ) : route === 'products' ? (
               <Products key={`${membership.reader?.uid}:${membership.reader?.club}`} />
+            ) : route === 'registers' ? (
+              <Registers key={`${membership.reader?.uid}:${membership.reader?.club}`} />
+            ) : route === 'staff' ? (
+              <Staff key={`${membership.reader?.uid}:${membership.reader?.club}`} />
             ) : route === 'settings' ? (
               <Settings />
             ) : (

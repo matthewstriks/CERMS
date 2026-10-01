@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Historical review of the owner-only member management implementation. The subsequent staff permission model is reviewed in STAFF-RULES-AUDIT.json and documented in STAFF-PERMISSIONS.md. Neither review is deployment evidence.",
+  "findings": []
+}

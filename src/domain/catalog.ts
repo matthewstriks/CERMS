@@ -1,3 +1,4 @@
+import { validProductImagePath } from '../shared/product-image-policy'
 export const durationUnits = {
   hour: 3600,
   day: 86400,
@@ -7,6 +8,7 @@ export const durationUnits = {
 } as const
 export type DurationUnit = keyof typeof durationUnits
 export interface CatalogProduct {
+  imagePath?: string | null
   name: string
   desc: string
   cat: string
@@ -85,9 +87,16 @@ export function validCategory(value: unknown): value is CatalogCategory {
 }
 export function validProduct(value: unknown): value is CatalogProduct {
   const d = value as CatalogProduct
-  if (!d || Object.keys(d).sort().join() !== Object.keys(productDefaults()).sort().join())
+  if (
+    !d ||
+    Object.keys(d)
+      .filter((k) => k !== 'imagePath')
+      .sort()
+      .join() !== Object.keys(productDefaults()).sort().join()
+  )
     return false
   if (
+    ('imagePath' in d && d.imagePath !== null && !validProductImagePath(d.imagePath)) ||
     !text(d.name, 200, true) ||
     !text(d.desc, 4000) ||
     !text(d.cat, 128, true) ||

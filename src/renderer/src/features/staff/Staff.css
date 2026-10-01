@@ -1,0 +1,40 @@
+.staff-dialog {
+  width: min(650px, calc(100vw - 2rem));
+}
+.staff-fields {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.staff-fields label {
+  display: grid;
+  gap: 0.35rem;
+}
+.staff-fields input {
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+.staff-permissions {
+  display: grid;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+.staff-permissions label {
+  display: flex;
+  align-items: start;
+  gap: 0.65rem;
+}
+.staff-permissions input {
+  margin-top: 0.3rem;
+}
+.staff-permissions strong,
+.staff-permissions small {
+  display: block;
+}
+.staff-permissions small,
+.staff-fields small {
+  color: var(--muted);
+  margin-top: 0.2rem;
+}

@@ -14,7 +14,17 @@ import type { MembershipHistory } from '../../../../data/membership-contracts'
 function dateTime(value: number | null): string {
   return value === null ? 'Not recorded' : new Date(value).toLocaleString()
 }
-export default function MemberDetails({ member, onClose }: { member: Member; onClose(): void }) {
+export default function MemberDetails({
+  member,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  member: Member
+  onClose(): void
+  onEdit?(): void
+  onDelete?(): void
+}) {
   const dialog = useRef<HTMLDialogElement>(null)
   const { reader } = useMembershipSession()
   const [tab, setTab] = useState<'details' | 'history'>('details')
@@ -72,7 +82,7 @@ export default function MemberDetails({ member, onClose }: { member: Member; onC
       }}
     >
       <div className="dialog-heading">
-        <Badge>Read only</Badge>
+        <Badge>{onEdit ? 'Member record' : 'Read only'}</Badge>
         <button className="icon-button" aria-label="Close member details" onClick={onClose}>
           <X size={20} />
         </button>
@@ -232,9 +242,15 @@ export default function MemberDetails({ member, onClose }: { member: Member; onC
         </>
       )}
       <div className="notice">
-        Editing, renewal, check-in, deletion, and file changes are not implemented yet.
+        Renewal checkout, check-in, and file changes are not implemented yet.
       </div>
       <div className="dialog-actions">
+        {onEdit && <button onClick={onEdit}>Edit member</button>}
+        {onDelete && (
+          <button className="danger" onClick={onDelete}>
+            Delete member
+          </button>
+        )}
         <button onClick={onClose}>Close</button>
       </div>
     </dialog>

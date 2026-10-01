@@ -1,3 +1,4 @@
+import { printReceipt } from './receipt-printing'
 import {
   app,
   BrowserWindow,
@@ -111,12 +112,23 @@ async function createWindow(): Promise<void> {
     },
   })
   mainWindow = window
+  window.webContents.on('did-start-navigation', (event) => {
+    if (!event.isMainFrame || event.isSameDocument) return
+    const item = Menu.getApplicationMenu()?.getMenuItemById('new-member')
+    if (item) item.enabled = false
+    const orderItem = Menu.getApplicationMenu()?.getMenuItemById('new-order')
+    if (orderItem) orderItem.enabled = false
+  })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', (event) => event.preventDefault())
   window.webContents.on('will-attach-webview', (event) => event.preventDefault())
   window.on('ready-to-show', () => window.show())
   window.on('closed', () => {
     mainWindow = null
+    const item = Menu.getApplicationMenu()?.getMenuItemById('new-member')
+    if (item) item.enabled = false
+    const orderItem = Menu.getApplicationMenu()?.getMenuItemById('new-order')
+    if (orderItem) orderItem.enabled = false
     aboutWindow?.close()
   })
   if (devUrl) await window.loadURL(devUrl)
@@ -132,6 +144,7 @@ app
       {
         urls: [
           'https://*.googleapis.com/*',
+          'https://us-central1-cerms-7af24.cloudfunctions.net/*',
           'https://*.firebaseio.com/*',
           'https://*.firebasedatabase.app/*',
         ],
@@ -142,6 +155,7 @@ app
             details.url,
             details.method,
             details.url.includes('/accounts:sendOobCode') ||
+              details.url.startsWith('https://us-central1-cerms-7af24.cloudfunctions.net/') ||
               new URL(details.url).pathname.endsWith('/documents:commit')
               ? details.uploadData?.map((part) => part.bytes?.toString('utf8') ?? '').join('')
               : undefined,
@@ -184,6 +198,32 @@ app
             )
           },
           !app.isPackaged,
+          () => {
+            if (
+              !mainWindow ||
+              mainWindow.isDestroyed() ||
+              !Menu.getApplicationMenu()?.getMenuItemById('new-member')?.enabled ||
+              !isTrustedRenderer(mainWindow.webContents.getURL(), devUrl)
+            )
+              return
+            if (mainWindow.isMinimized()) mainWindow.restore()
+            mainWindow.show()
+            mainWindow.focus()
+            mainWindow.webContents.send('member:new')
+          },
+          () => {
+            if (
+              mainWindow &&
+              !mainWindow.isDestroyed() &&
+              Menu.getApplicationMenu()?.getMenuItemById('new-order')?.enabled &&
+              isTrustedRenderer(mainWindow.webContents.getURL(), devUrl)
+            ) {
+              if (mainWindow.isMinimized()) mainWindow.restore()
+              mainWindow.show()
+              mainWindow.focus()
+              mainWindow.webContents.send('order:new')
+            }
+          },
         ),
       ),
     )
@@ -199,9 +239,32 @@ app
         isTrustedRenderer(event.senderFrame.url, devUrl)
       )
     }
+    ipcMain.handle('receipt:printers', async (event) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      return (await mainWindow!.webContents.getPrintersAsync()).map(({ name, displayName }) => ({
+        name,
+        displayName,
+      }))
+    })
+    ipcMain.handle('receipt:print', async (event, request: unknown) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      await printReceipt(mainWindow!, request)
+    })
     ipcMain.handle('app:open-about', async (event) => {
       if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
       await openAbout()
+    })
+    ipcMain.handle('order:new-available', (event, available: unknown) => {
+      if (!trustedWindow(event, mainWindow) || typeof available !== 'boolean')
+        throw new Error('Untrusted request')
+      const item = Menu.getApplicationMenu()?.getMenuItemById('new-order')
+      if (item) item.enabled = available
+    })
+    ipcMain.handle('member:new-available', (event, available: unknown) => {
+      if (!trustedWindow(event, mainWindow) || typeof available !== 'boolean')
+        throw new Error('Untrusted request')
+      const item = Menu.getApplicationMenu()?.getMenuItemById('new-member')
+      if (item) item.enabled = available
     })
     ipcMain.handle('app:about-info', (event): AboutInfo => {
       if (!trustedWindow(event, aboutWindow)) throw new Error('Untrusted request')

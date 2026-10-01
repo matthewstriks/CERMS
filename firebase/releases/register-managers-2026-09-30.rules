@@ -1,0 +1,417 @@
+rules_version = '2';
+// CERMS 5.0 only. Deploy to the named cerms database, never (default).
+// users/{uid}: uid, displayName, access, rank; email/version may be absent.
+// All profile fields are immutable except the designated owner's access switch.
+// members/activity/orders: existing readers require access == users/{uid}.access.
+// system/{id}: existing owner-only picker; no client writes.
+// Rank does not grant permissions in this initial policy.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return database == 'cerms' && request.auth != null;
+    }
+    function ownsProfile(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function staff() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uid == request.auth.uid
+        && validSystemId(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access);
+    }
+    function switcher() {
+      return staff() && request.auth.uid == 'c7D7AH07kgXmjn8tSiOgzHscLZ12';
+    }
+    function validSystemId(value) {
+      return value is string && value.size() > 0 && value.size() <= 1500
+        && value.matches('.*[^\\s].*') && !value.matches('.*[/].*')
+        && value != '.' && value != '..' && !value.matches('__.*__');
+    }
+    function ownClub() {
+      return staff() && resource.data.access ==
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access;
+    }
+    function businessStaff(systemId) {
+      return staff() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access == systemId
+        && exists(/databases/$(database)/documents/system/$(systemId));
+    }
+    function businessPermission(systemId, permission) {
+      let path = /databases/$(database)/documents/system/$(systemId)/staffPermissions/$(request.auth.uid);
+      return businessStaff(systemId) && (switcher()
+        || (!exists(path) && permission in ['openRegisters','closeRegisters'])
+        || (exists(path) && get(path).data.permissions.get(permission,false) == true));
+    }
+    function staffAdministrator(systemId) {
+      return switcher() && businessStaff(systemId);
+    }
+    function validStaffPermissions(p) {
+      return p is map && p.keys().hasOnly(['closeOtherRegisters','deleteProducts','processSales','editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
+        && p.keys().hasAll(['editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
+        && p.editMembers is bool && p.deleteMembers is bool && p.manageProducts is bool
+        && p.openRegisters is bool && p.closeRegisters is bool && p.get('processSales',false) is bool && p.get('deleteProducts',false) is bool && p.get('closeOtherRegisters',false) is bool;
+    }
+    match /system/{systemId}/staffPermissions/{uid} {
+      allow get: if businessStaff(systemId) && (request.auth.uid == uid || switcher());
+      allow list: if staffAdministrator(systemId) && request.query.limit <= 50;
+      allow create, update: if staffAdministrator(systemId) && uid != 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
+        && get(/databases/$(database)/documents/users/$(uid)).data.uid == uid
+        && get(/databases/$(database)/documents/users/$(uid)).data.access == systemId
+        && request.resource.data.keys().hasOnly(['permissions','updatedBy','updatedAt'])
+        && request.resource.data.keys().hasAll(['permissions','updatedBy','updatedAt'])
+        && validStaffPermissions(request.resource.data.permissions)
+        && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    // Account setup requests are server-only; profiles cannot be self-provisioned.
+    match /system/{systemId}/staffAccountRequests/{requestId} {
+      allow read, write: if false;
+    }
+    function validUser(data, uid) {
+      return data.keys().hasOnly(['uid', 'displayName', 'email', 'access', 'rank', 'version'])
+        && data.keys().hasAll(['uid', 'displayName', 'access', 'rank'])
+        && data.uid == uid && data.uid is string && data.uid.size() <= 128
+        && data.displayName is string && data.displayName.size() <= 256
+        && validSystemId(data.access)
+        && (data.rank is int || (data.rank is string && data.rank.size() <= 128))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 320))
+        && (!('version' in data) || (data.version is string && data.version.size() <= 128) || data.version is number);
+    }
+    // Dev-only creates: legacy display fields plus versioned search/audit metadata.
+    // Atomic companion reservations have only access and memberId; all are immutable.
+    function devCreator() {
+      return switcher()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access == 'dev'
+        && exists(/databases/$(database)/documents/system/dev);
+    }
+    function shortText(value, maximum) {
+      return value is string && value.size() <= maximum;
+    }
+    function adultDob(value) {
+      let parts = value.split('-');
+      let birth = timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+      let years = request.time.year() - birth.year();
+      return birth <= request.time && years <= 125 && (years > 18 || (years == 18
+        && (request.time.month() > birth.month() || (request.time.month() == birth.month() && request.time.day() >= birth.day()))));
+    }
+    function membershipSeconds(p) {
+      let units = {'hour':3600, 'day':86400, 'week':604800, 'month':2628000, 'year':31540000};
+      let seconds = int(p.membershipLengthRaw * units[p.membershipLengthType]);
+      return seconds < 1 ? 1 : seconds;
+    }
+    function validDevMembership(d) {
+      let p = get(/databases/$(database)/documents/system/dev/products/$(d.productId)).data;
+      let expires = int(request.time.toMillis() / 1000) + membershipSeconds(p);
+      return p.active == true && p.membership == true
+        && (!p.restricted || request.auth.uid in p.restrictedUsers)
+        && shortText(d.membership_type,200) && d.membership_type == p.name
+        && catalogDuration(p.membershipLengthRaw,p.membershipLengthType)
+        && d.id_expiration is int && d.id_expiration >= expires - 60 && d.id_expiration <= expires + 60;
+    }
+    function validDevMember(d) {
+      return d.keys().hasOnly(['phone','access','name','fname','lname','mname','suffix','dob','membership_type','idnum','idstate','email','createdBy','productId','identityKey','fingerprint','searchFirst','searchLast','searchName','searchId','searchEmail','dna','checkedIn','waiver_status','id_number','id_expiration','schemaVersion','notes','creation_time'])
+        && d.keys().hasAll(['access','name','fname','lname','mname','suffix','dob','membership_type','idnum','idstate','email','createdBy','productId','identityKey','fingerprint','searchFirst','searchLast','searchName','searchId','searchEmail','dna','checkedIn','waiver_status','id_number','id_expiration','schemaVersion','notes','creation_time'])
+        && d.access == 'dev' && d.createdBy == request.auth.uid && d.schemaVersion == 2
+        && shortText(d.fname,200) && d.fname.size() > 0 && shortText(d.lname,200) && d.lname.size() > 0
+        && shortText(d.mname,200) && d.suffix in ['','II','III','IV','JR.','SR.']
+        && d.name == d.fname + ' ' + d.lname
+        && d.dob is string && d.dob.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && adultDob(d.dob)
+        && shortText(d.idnum,200) && d.idnum.size() > 0
+        && d.idstate in ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','military','passport','other']
+        && (!('phone' in d) || (d.phone is string && d.phone.matches('[+][1-9][0-9]{7,14}')))
+        && shortText(d.email,320) && shortText(d.searchEmail,320)
+        && shortText(d.searchFirst,500) && shortText(d.searchLast,500) && shortText(d.searchName,500) && shortText(d.searchId,500)
+        && d.identityKey is string && d.identityKey.matches('[a-f0-9]{64}')
+        && d.fingerprint is string && d.fingerprint.matches('[a-f0-9]{64}')
+        && d.productId is string && d.productId.matches('[a-zA-Z0-9_-]{1,128}') && validDevMembership(d)
+        && d.id_number is int && d.id_number >= 100000000 && d.id_number <= 999999999
+        && d.creation_time == request.time && d.dna == false && d.checkedIn == false && d.waiver_status == false
+        && d.notes is list && d.notes.size() <= 1 && (d.notes.size() == 0 || shortText(d.notes[0],10200));
+    }
+    function devReservations(d, memberId) {
+      let identityPath = /databases/$(database)/documents/system/dev/memberIdentities/$(d.identityKey);
+      let numberPath = /databases/$(database)/documents/system/dev/memberNumbers/$(string(d.id_number));
+      return !exists(identityPath) && !exists(numberPath)
+        && getAfter(identityPath).data.memberId == memberId
+        && getAfter(numberPath).data.memberId == memberId;
+    }
+    function validDevClaim(d) {
+      return d.keys().hasOnly(['access','memberId']) && d.keys().hasAll(['access','memberId'])
+        && d.access == 'dev' && d.memberId is string && d.memberId.matches('[a-f0-9-]{36}');
+    }
+    function claimedMember(d, key, identity) {
+      let memberPath = /databases/$(database)/documents/members/$(d.memberId);
+      let member = getAfter(memberPath).data;
+      return !exists(memberPath) && member.access == 'dev' && member.createdBy == request.auth.uid
+        && (identity ? member.identityKey == key : string(member.id_number) == key);
+    }
+    function movingMemberIdentity(d, key) {
+      let path = /databases/$(database)/documents/members/$(d.memberId);
+      let before = get(path).data;
+      let after = getAfter(path).data;
+      return before.access == 'dev' && before.schemaVersion == 2 && before.identityKey != key
+        && after.identityKey == key && after.access == 'dev'
+        && !existsAfter(/databases/$(database)/documents/system/dev/memberIdentities/$(before.identityKey));
+    }
+    function releasingMemberIdentity(d, key) {
+      let path = /databases/$(database)/documents/members/$(d.memberId);
+      let before = get(path).data;
+      return before.access == 'dev' && before.schemaVersion == 2 && before.identityKey == key
+        && (!existsAfter(path) || (getAfter(path).data.identityKey != key
+          && getAfter(/databases/$(database)/documents/system/dev/memberIdentities/$(getAfter(path).data.identityKey)).data.memberId == d.memberId));
+    }
+    match /system/{systemId}/memberIdentities/{key} {
+      allow get: if systemId == 'dev' && (devCreator() || businessPermission('dev','editMembers') || businessPermission('dev','deleteMembers'));
+      allow create: if systemId == 'dev' && key.matches('[a-f0-9]{64}') && validDevClaim(request.resource.data)
+        && ((devCreator() && claimedMember(request.resource.data,key,true)) || (businessPermission('dev','editMembers') && movingMemberIdentity(request.resource.data,key)));
+      allow delete: if systemId == 'dev' && (businessPermission('dev','editMembers') || businessPermission('dev','deleteMembers')) && releasingMemberIdentity(resource.data,key);
+      allow list, update: if false;
+    }
+    match /system/{systemId}/memberNumbers/{key} {
+      allow get: if systemId == 'dev' && devCreator();
+      allow create: if systemId == 'dev' && devCreator() && validDevClaim(request.resource.data) && claimedMember(request.resource.data,key,false);
+      allow list, update, delete: if false;
+    }
+    // Append-only Dev view events; actor identity/name and timestamp are server-validated.
+    function logMember(systemId, memberId) {
+      return systemId == 'dev' && devCreator()
+        && get(/databases/$(database)/documents/members/$(memberId)).data.access == systemId;
+    }
+    function validMemberView(d) {
+      return d.keys().hasOnly(['type','actorUid','actorName','schemaVersion','occurredAt'])
+        && d.keys().hasAll(['type','actorUid','actorName','schemaVersion','occurredAt'])
+        && d.type == 'member.viewed' && d.schemaVersion == 1
+        && d.actorUid == request.auth.uid
+        && shortText(d.actorName,256) && d.actorName.size() > 0
+        && d.actorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+        && d.occurredAt == request.time;
+    }
+    match /system/{systemId}/memberLogs/{memberId}/events/{eventId} {
+      allow get: if logMember(systemId,memberId);
+      allow list: if logMember(systemId,memberId) && request.query.limit <= 50;
+      allow create: if logMember(systemId,memberId) && eventId.matches('[a-f0-9-]{36}') && validMemberView(request.resource.data);
+      allow update, delete: if false;
+    }
+    // Catalog rights are assigned by the owner within the current business.
+    function catalogAdmin(systemId) {
+      return businessPermission(systemId,'manageProducts');
+    }
+    function catalogReader(systemId) {
+      return businessPermission(systemId,'deleteProducts') || businessPermission(systemId,'processSales') || catalogAdmin(systemId) || businessPermission(systemId,'editMembers') || (systemId == 'dev' && devCreator());
+    }
+    function catalogMeta(d) {
+      return d.version is int && d.version >= 1 && d.version <= 1000000000
+        && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
+    function catalogQuantity(v) {
+      return v == null || (v is int && v >= 0 && v <= 1000000000);
+    }
+    function catalogDuration(n,u) {
+      return n is number && n > 0 && n <= 1000 && u in ['hour','day','week','month','year'];
+    }
+    function validCategory(d) {
+      return d.keys().hasOnly(['name','desc','color','version','updatedBy','updatedAt'])
+        && d.keys().hasAll(['name','desc','color','version','updatedBy','updatedAt'])
+        && shortText(d.name,200) && d.name.matches('.*[^\\s].*') && shortText(d.desc,4000)
+        && d.color is string && d.color.matches('#[a-fA-F0-9]{6}') && catalogMeta(d);
+    }
+    function validProductImage(d,systemId,productId) {
+      return !('imagePath' in d) || d.imagePath == null || (d.imagePath is string
+        && d.imagePath.matches('cerms5/catalog/[a-zA-Z0-9_-]{1,128}/products/[a-zA-Z0-9_-]{1,128}/[a-f0-9]{64}[.]webp')
+        && d.imagePath.split('/')[2] == systemId && d.imagePath.split('/')[4] == productId);
+    }
+    function validProduct(d,systemId,productId) {
+      return d.keys().hasOnly(['imagePath','name','desc','cat','barcode','priceCents','inventory','inventoryPar','invWarning','favorite','taxable','active','core','rental','membership','restricted','payout','askforprice','rentalLengthRaw','rentalLengthType','membershipLengthRaw','membershipLengthType','restrictedUsers','version','updatedBy','updatedAt'])
+        && d.keys().hasAll(['name','desc','cat','barcode','priceCents','inventory','inventoryPar','invWarning','favorite','taxable','active','core','rental','membership','restricted','payout','askforprice','rentalLengthRaw','rentalLengthType','membershipLengthRaw','membershipLengthType','restrictedUsers','version','updatedBy','updatedAt'])
+        && validProductImage(d,systemId,productId) && catalogMeta(d) && shortText(d.name,200) && d.name.matches('.*[^\\s].*') && shortText(d.desc,4000) && shortText(d.barcode,200)
+        && d.cat is string && d.cat.matches('[a-zA-Z0-9_-]{1,128}')
+        && exists(/databases/$(database)/documents/system/$(systemId)/categories/$(d.cat))
+        && d.priceCents is int && d.priceCents >= 0 && d.priceCents <= 999999999
+        && catalogQuantity(d.inventory) && catalogQuantity(d.inventoryPar) && catalogQuantity(d.invWarning)
+        && d.favorite is bool && d.taxable is bool && d.active is bool && d.core is bool
+        && d.rental is bool && d.membership is bool && d.restricted is bool && d.payout is bool && d.askforprice is bool
+        && (!d.askforprice || d.priceCents == 0)
+        && catalogDuration(d.rentalLengthRaw,d.rentalLengthType) && catalogDuration(d.membershipLengthRaw,d.membershipLengthType)
+        && d.restrictedUsers is list && d.restrictedUsers.size() <= 100
+        && d.restrictedUsers.toSet().size() == d.restrictedUsers.size()
+        && (d.restricted ? (d.restrictedUsers.size() > 0 && d.restrictedUsers.join(',').matches('[a-zA-Z0-9_-]{1,128}(,[a-zA-Z0-9_-]{1,128}){0,99}')) : d.restrictedUsers.size() == 0);
+    }
+    match /system/{systemId}/categories/{categoryId} {
+      allow get: if catalogReader(systemId);
+      allow list: if catalogReader(systemId) && request.query.limit <= 100;
+      allow create: if catalogAdmin(systemId) && categoryId.matches('[a-zA-Z0-9_-]{1,128}') && validCategory(request.resource.data) && request.resource.data.version == 1;
+      allow update: if catalogAdmin(systemId) && validCategory(request.resource.data) && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
+    match /system/{systemId}/products/{productId} {
+      allow get: if catalogReader(systemId);
+      allow list: if catalogReader(systemId) && request.query.limit <= 100;
+      allow create: if catalogAdmin(systemId) && productId.matches('[a-zA-Z0-9_-]{1,128}') && validProduct(request.resource.data,systemId,productId) && request.resource.data.version == 1;
+      allow update: if catalogAdmin(systemId) && validProduct(request.resource.data,systemId,productId) && request.resource.data.version == resource.data.version + 1;
+      allow delete: if businessPermission(systemId,'deleteProducts');
+    }
+    // POS writes are server-only. Saved receipts and totals cannot be edited by clients.
+    match /system/{systemId}/sales/{saleId} {
+      allow get: if businessStaff(systemId);
+      allow list: if businessStaff(systemId) && request.query.limit <= 50;
+      allow write: if false;
+    }
+    match /system/{systemId}/registerTotals/{registerId} {
+      allow get: if businessStaff(systemId);
+      allow list, write: if false;
+    }
+    match /system/{systemId}/posSettings/{settingsId} {
+      allow get: if businessStaff(systemId) && settingsId == 'default';
+      allow list, write: if false;
+    }
+    // Registers: immutable opening counts, owner-only one-time closing counts.
+    // Counts are integer quantities (0..10,000), totals are integer USD cents.
+    // registerOwners/{uid} points to the last register, preventing two concurrent opens.
+    function registerStaff(systemId) {
+      return staff() && systemId.matches('[a-zA-Z0-9_-]{1,128}')
+        && request.auth.uid.matches('[a-zA-Z0-9_-]{1,128}')
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.access == systemId
+        && exists(/databases/$(database)/documents/system/$(systemId));
+    }
+    function validCashCounts(c) {
+      return c is map && c.keys().size() == 13
+        && c.keys().hasOnly(['bill100','bill50','bill20','bill10','bill5','bill2','bill1','coin100','coin50','coin25','coin10','coin5','coin1'])
+        && c.bill100 is int && c.bill100 >= 0 && c.bill100 <= 10000
+        && c.bill50 is int && c.bill50 >= 0 && c.bill50 <= 10000
+        && c.bill20 is int && c.bill20 >= 0 && c.bill20 <= 10000
+        && c.bill10 is int && c.bill10 >= 0 && c.bill10 <= 10000
+        && c.bill5 is int && c.bill5 >= 0 && c.bill5 <= 10000
+        && c.bill2 is int && c.bill2 >= 0 && c.bill2 <= 10000
+        && c.bill1 is int && c.bill1 >= 0 && c.bill1 <= 10000
+        && c.coin100 is int && c.coin100 >= 0 && c.coin100 <= 10000
+        && c.coin50 is int && c.coin50 >= 0 && c.coin50 <= 10000
+        && c.coin25 is int && c.coin25 >= 0 && c.coin25 <= 10000
+        && c.coin10 is int && c.coin10 >= 0 && c.coin10 <= 10000
+        && c.coin5 is int && c.coin5 >= 0 && c.coin5 <= 10000
+        && c.coin1 is int && c.coin1 >= 0 && c.coin1 <= 10000;
+    }
+    function cashCents(c) {
+      return c.bill100*10000 + c.bill50*5000 + c.bill20*2000 + c.bill10*1000 + c.bill5*500 + c.bill2*200 + c.bill1*100
+        + c.coin100*100 + c.coin50*50 + c.coin25*25 + c.coin10*10 + c.coin5*5 + c.coin1;
+    }
+    function validRegister(d, verifyOpening) {
+      return d.keys().hasOnly(['closedByUid','closedByName','schemaVersion','status','ownerUid','ownerName','openingCounts','openingTotalCents','openedAt','closingCounts','closingTotalCents','closedAt','closeNote'])
+        && d.keys().hasAll(['schemaVersion','status','ownerUid','ownerName','openingCounts','openingTotalCents','openedAt','closingCounts','closingTotalCents','closedAt','closeNote'])
+        && d.schemaVersion == 1 && d.schemaVersion is int
+        && d.ownerUid is string && d.ownerUid.matches('[a-zA-Z0-9_-]{1,128}') && shortText(d.ownerName,256)
+        // On close the diff guard preserves the already-validated opening values.
+        && (!verifyOpening || (validCashCounts(d.openingCounts) && d.openingTotalCents is int && d.openingTotalCents == cashCents(d.openingCounts)))
+        && d.openedAt is timestamp && shortText(d.closeNote,2000)
+        && ((d.status == 'open' && !d.keys().hasAny(['closedByUid','closedByName']) && d.closingCounts == null && d.closingTotalCents == null && d.closedAt == null && d.closeNote == '')
+          || (d.status == 'closed' && validCashCounts(d.closingCounts) && d.closingTotalCents is int
+            && d.closingTotalCents == cashCents(d.closingCounts) && d.closedAt is timestamp && d.closedAt >= d.openedAt));
+    }
+    function previousRegisterClosed(systemId, uid) {
+      let path = /databases/$(database)/documents/system/$(systemId)/registerOwners/$(uid);
+      return !exists(path) || get(/databases/$(database)/documents/system/$(systemId)/registers/$(get(path).data.registerId)).data.status == 'closed';
+    }
+    function validRegisterOwner(d, systemId, uid) {
+      let registerPath = /databases/$(database)/documents/system/$(systemId)/registers/$(d.registerId);
+      return d.keys().hasOnly(['registerId']) && d.keys().hasAll(['registerId'])
+        && d.registerId is string && d.registerId.matches('[a-f0-9-]{36}')
+        && !exists(registerPath) && getAfter(registerPath).data.ownerUid == uid && getAfter(registerPath).data.status == 'open';
+    }
+    match /system/{systemId}/registers/{registerId} {
+      allow get: if registerStaff(systemId);
+      allow list: if registerStaff(systemId) && request.query.limit <= 50;
+      allow create: if registerStaff(systemId) && businessPermission(systemId,'openRegisters') && registerId.matches('[a-f0-9-]{36}')
+        && validRegister(request.resource.data, true) && request.resource.data.status == 'open'
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+        && request.resource.data.openedAt == request.time && previousRegisterClosed(systemId, request.auth.uid)
+        && getAfter(/databases/$(database)/documents/system/$(systemId)/registerOwners/$(request.auth.uid)).data.registerId == registerId;
+      allow update: if registerStaff(systemId)
+        && ((resource.data.ownerUid == request.auth.uid && businessPermission(systemId,'closeRegisters'))
+          || (resource.data.ownerUid != request.auth.uid && businessPermission(systemId,'closeOtherRegisters')))
+        && ((!request.resource.data.keys().hasAny(['closedByUid','closedByName']) && resource.data.ownerUid == request.auth.uid)
+          || (request.resource.data.closedByUid == request.auth.uid
+            && request.resource.data.closedByName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName))
+        && resource.data.status == 'open' && request.resource.data.status == 'closed'
+        && validRegister(request.resource.data, false) && request.resource.data.closedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','closingCounts','closingTotalCents','closedAt','closeNote','closedByUid','closedByName']);
+      allow delete: if false;
+    }
+    match /system/{systemId}/registerOwners/{uid} {
+      allow get: if registerStaff(systemId) && request.auth.uid == uid;
+      allow create, update: if registerStaff(systemId) && businessPermission(systemId,'openRegisters') && request.auth.uid == uid
+        && validRegisterOwner(request.resource.data, systemId, uid) && previousRegisterClosed(systemId, uid);
+      allow list, delete: if false;
+    }
+    match /users/{uid} {
+      allow get: if ownsProfile(uid) || (switcher() && ownClub());
+      allow list: if switcher() && ownClub() && request.query.limit <= 50;
+      allow create, delete: if false;
+      allow update: if ownsProfile(uid) && switcher()
+        && validUser(request.resource.data, uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['access'])
+        && exists(/databases/$(database)/documents/system/$(request.resource.data.access));
+    }
+    match /system/{systemId} {
+      allow read: if switcher();
+      allow write: if false;
+    }
+    function memberManager(permission) {
+      return ownClub() && businessPermission(resource.data.access,permission)
+        && exists(/databases/$(database)/documents/system/$(resource.data.access));
+    }
+    function editedMembershipProduct(d) {
+      let p = get(/databases/$(database)/documents/system/$(d.access)/products/$(d.productId)).data;
+      return p.active == true && p.membership == true && (!p.restricted || request.auth.uid in p.restrictedUsers)
+        && d.membership_type == p.name;
+    }
+    function validMemberEdit(d, before) {
+      return d.diff(before).affectedKeys().hasOnly(['fname','mname','lname','suffix','name','dob','idnum','idstate','email','phone','membership_type','productId','id_expiration','dna','tag','searchFirst','searchLast','searchName','searchId','searchEmail','updatedBy','updatedAt','identityKey'])
+        && d.keys().hasAll(['fname','mname','lname','suffix','name','dob','idnum','idstate','email','phone','membership_type','id_expiration','dna','tag','searchFirst','searchLast','searchName','searchId','searchEmail','updatedBy','updatedAt'])
+        && shortText(d.fname,200) && d.fname.size() > 0 && shortText(d.lname,200) && d.lname.size() > 0
+        && shortText(d.mname,200) && d.suffix in ['','II','III','IV','JR.','SR.'] && d.name == d.fname + ' ' + d.lname
+        && d.dob is string && d.dob.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}') && adultDob(d.dob)
+        && shortText(d.idnum,200) && d.idnum.size() > 0
+        && d.idstate in ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','military','passport','other']
+        && shortText(d.email,320) && d.phone is string && (d.phone == '' || d.phone.matches('[+][1-9][0-9]{7,14}'))
+        && shortText(d.membership_type,200) && d.membership_type.size() > 0
+        && d.id_expiration is int && d.id_expiration >= 0 && d.id_expiration <= 253402300799 && d.dna is bool && d.tag is bool
+        && shortText(d.searchFirst,500) && shortText(d.searchLast,500) && shortText(d.searchName,500) && shortText(d.searchId,500) && shortText(d.searchEmail,320)
+        && d.updatedBy == request.auth.uid && d.updatedAt == request.time
+        && ((d.membership_type == before.membership_type && d.get('productId',null) == before.get('productId',null))
+          || (d.productId is string && d.productId.matches('[a-zA-Z0-9_-]{1,128}') && editedMembershipProduct(d)));
+    }
+    function memberIdentityEdit(d, before, memberId) {
+      return (before.access == 'dev' && before.get('schemaVersion',0) == 2)
+        ? ((d.identityKey == before.identityKey && d.dob == before.dob && d.idstate == before.idstate && d.searchId == before.searchId)
+          || (d.identityKey is string && d.identityKey.matches('[a-f0-9]{64}') && d.identityKey != before.identityKey
+            && !exists(/databases/$(database)/documents/system/dev/memberIdentities/$(d.identityKey))
+            && getAfter(/databases/$(database)/documents/system/dev/memberIdentities/$(d.identityKey)).data.memberId == memberId
+            && get(/databases/$(database)/documents/system/dev/memberIdentities/$(before.identityKey)).data.memberId == memberId
+            && !existsAfter(/databases/$(database)/documents/system/dev/memberIdentities/$(before.identityKey))))
+        : d.get('identityKey',null) == before.get('identityKey',null);
+    }
+    function memberIdentityDelete(before, memberId) {
+      return !(before.access == 'dev' && before.get('schemaVersion',0) == 2)
+        || (get(/databases/$(database)/documents/system/dev/memberIdentities/$(before.identityKey)).data.memberId == memberId
+          && !existsAfter(/databases/$(database)/documents/system/dev/memberIdentities/$(before.identityKey)));
+    }
+    match /members/{memberId} {
+      allow read: if ownClub();
+      allow get: if devCreator() && !exists(/databases/$(database)/documents/members/$(memberId));
+      allow create: if devCreator() && memberId.matches('[a-f0-9-]{36}')
+        && validDevMember(request.resource.data) && devReservations(request.resource.data,memberId);
+      allow update: if memberManager('editMembers') && validMemberEdit(request.resource.data,resource.data) && memberIdentityEdit(request.resource.data,resource.data,memberId);
+      allow delete: if memberManager('deleteMembers') && resource.data.get('checkedIn',false) != true && memberIdentityDelete(resource.data,memberId);
+    }
+    match /activity/{visitId} {
+      allow read: if ownClub();
+      allow write: if false;
+    }
+    match /orders/{orderId} {
+      allow read: if ownClub();
+      allow write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
