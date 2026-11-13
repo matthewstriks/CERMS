@@ -1,5 +1,7 @@
 # Dev System member creation
 
+Current checkout flow: [linked membership and rental checkout](MEMBER-CHECKOUT.md) supersedes the earlier separate member-creation/payment flow. Members and rental visits are now fulfilled atomically with their linked order; direct desktop member creation is blocked.
+
 Deployment baseline: the user authorized deploying all then-pending rules on September 18, 2026. That baseline was deployed to `cerms`, including business-scoped reservations, optional phone numbers, Dev activity logs and business catalog administration. Both existing Dev reservations were moved under `system/dev` during a temporary creation pause; no member documents were changed. Read-only verification confirmed exact rule content, the member-list index `READY`, and unchanged legacy `(default)` rules. See [current deployment evidence](CERMS-FEATURES-DEPLOYMENT.json); [initial deployment evidence](DEV-MEMBER-DEPLOYMENT.json) is retained for history. No live member records were created for testing.
 
 Open CERMS 5.0, sign in as the designated owner, deliberately select Dev System, then open Members → Create membership or Scan ID. Only UID `c7D7AH07kgXmjn8tSiOgzHscLZ12` with saved `access: "dev"` can create. Creation controls remain disabled for other businesses and ordinary accounts; read-only Scan ID lookup is available to signed-in member readers. The creator rechecks saved access before submitting; rules enforce that boundary independently. No automatic system switch occurs.

@@ -16,6 +16,7 @@ import CreateMemberDialog from './members/CreateMemberDialog'
 import MemberDetails from './members/MemberDetails'
 import ManageMemberDialog from './members/ManageMemberDialog'
 import { canManageMembers } from '../../../shared/member-management-policy'
+import { startMemberOrder } from '../lib/order-start'
 
 interface MembersProps {
   createRequested?: boolean
@@ -39,7 +40,19 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
   const [managing, setManaging] = useState<{ member: Member; mode: 'edit' | 'delete' } | null>(null)
   const [notice, setNotice] = useState('')
   const canManage = canManageMembers(reader.uid, reader.club, reader.permissions)
-  const canCreate = canCreateDevMember(reader.uid, reader.club)
+  const canSell = hasStaffPermission(reader.uid, 'processSales', reader.permissions)
+  const canCreate = canCreateDevMember(reader.uid, reader.club) && canSell
+  function order(member: Member, rentalsOnly = false) {
+    try {
+      startMemberOrder(reader, {
+        member: { id: member.id, name: member.name },
+        cart: [],
+        rentalsOnly,
+      })
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Unable to open order.')
+    }
+  }
   useEffect(() => {
     if (!createRequested) return
     if (canCreate) setCreating((current) => current ?? {})
@@ -99,7 +112,7 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
       </div>
       <p className="page-note" id="membership-unavailable">
         {canCreate
-          ? 'Scan an ID to find a member, or create a development membership. No checkout charge is recorded.'
+          ? 'New memberships are created after successful checkout.'
           : 'Member creation is available only to the owner in Dev System.'}
       </p>
       <form
@@ -218,14 +231,25 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
                           </Badge>
                         </td>
                         <td>
-                          <button
-                            className="text-button"
-                            aria-label={`View ${member.name}`}
-                            onClick={() => setSelected(member)}
-                          >
-                            View
-                            <ChevronRight size={15} />
-                          </button>
+                          <div className="member-row-actions">
+                            {canSell && (
+                              <>
+                                <button onClick={() => order(member)}>Create order</button>
+                                <button
+                                  disabled={state !== 'Active'}
+                                  onClick={() => order(member, true)}
+                                >
+                                  Check in
+                                </button>
+                              </>
+                            )}
+                            <button
+                              aria-label={`View ${member.name}`}
+                              onClick={() => setSelected(member)}
+                            >
+                              View
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -270,8 +294,8 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
       </section>
       {notice && <p role="status">{notice}</p>}
       <p className="page-note">
-        {canManage ? 'Open a member to view your available actions. ' : ''}Renewal checkout and
-        check-in are not implemented yet.
+        {canManage ? 'Open a member to view your available actions. ' : ''}Check in selects rentals
+        for checkout. Rentals start only after the order succeeds.
       </p>
       {scanning && (
         <ScanMemberDialog

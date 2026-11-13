@@ -1,0 +1,38 @@
+{
+  "feature": "Multiple pending memberships and individually assigned rentals in member-switchable orders",
+  "database": "cerms",
+  "verifiedAt": "2026-10-12T02:17:34.681Z",
+  "ruleset": "projects/cerms-7af24/rulesets/e0edcdd3-1454-47f9-a9b2-e862545fd5d9",
+  "previousRuleset": "projects/cerms-7af24/rulesets/e0edcdd3-1454-47f9-a9b2-e862545fd5d9",
+  "sha256": "417cb1f40e364e4cf76949a47dcf3b25c1b1b09cdfd62d8257278c28c9f852a1",
+  "rulesChecks": 311,
+  "serverCheckoutChecks": 12,
+  "rulesUnchanged": true,
+  "interceptedGroupCheckoutPassed": true,
+  "serverSourceSha256": "1f2c7054f2e93d6b2209303a71c9d27bf93527aa94b83fe35a960900179fc8de",
+  "interceptedMemberCheckoutPassed": true,
+  "defaultRulesAndStorageRulesUnchanged": true,
+  "bothDatabaseConfigurationsUnchanged": true,
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "legacyBucketUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-10-12T02:16:37.739263605Z",
+      "entryPoint": "completeSale"
+    }
+  ],
+  "buildPassed": true,
+  "clientTests": 172,
+  "interceptedPosRegressionPassed": true,
+  "interceptedSingleMemberCheckoutPassed": true,
+  "databaseComparisonExcludedRollingFields": [
+    "earliestVersionTime",
+    "etag"
+  ]
+}

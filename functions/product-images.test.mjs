@@ -87,3 +87,64 @@ test('rejects unauthorized uploads and invalid image bytes without writing files
   })
   assert.equal(f.files.size, 0)
 })
+
+test('POS staff may read only attached active permitted images; upload and management rights remain separate', async () => {
+  const f = fixture(),
+    uid = 'cashier'
+  const png = await sharp({ create: { width: 40, height: 40, channels: 3, background: '#32876b' } })
+    .png()
+    .toBuffer()
+  const { imagePath } = await uploadImage(
+    {
+      auth: { uid: owner },
+      data: {
+        business: 'club-a',
+        productId: 'product',
+        mimeType: 'image/png',
+        base64: png.toString('base64'),
+      },
+    },
+    f.deps,
+  )
+  const product = { imagePath, active: true, restricted: false }
+  f.docs.set('system/club-a/products/product', product)
+  f.docs.set('users/' + uid, { uid, access: 'club-a' })
+  f.docs.set('system/club-a/staffPermissions/' + uid, { permissions: { processSales: true } })
+  const read = { auth: { uid }, data: { business: 'club-a', productId: 'product', imagePath } }
+  assert.equal((await getImage(read, f.deps)).mimeType, 'image/webp')
+  await assert.rejects(
+    uploadImage(
+      {
+        auth: { uid },
+        data: {
+          business: 'club-a',
+          productId: 'product',
+          mimeType: 'image/png',
+          base64: png.toString('base64'),
+        },
+      },
+      f.deps,
+    ),
+    { code: 'permission-denied' },
+  )
+  product.restricted = true
+  product.restrictedUsers = ['other']
+  await assert.rejects(getImage(read, f.deps), { code: 'permission-denied' })
+  product.restrictedUsers = [uid]
+  assert.equal((await getImage(read, f.deps)).mimeType, 'image/webp')
+  product.active = false
+  await assert.rejects(getImage(read, f.deps), { code: 'permission-denied' })
+  f.docs.get('system/club-a/staffPermissions/' + uid).permissions = { manageProducts: true }
+  assert.equal(
+    (await getImage(read, f.deps)).mimeType,
+    'image/webp',
+    'Catalog manager can preview inactive products',
+  )
+  f.docs.get('users/' + uid).access = 'foreign'
+  await assert.rejects(getImage(read, f.deps), { code: 'permission-denied' })
+  f.docs.get('users/' + uid).access = 'club-a'
+  f.docs.get('system/club-a/staffPermissions/' + uid).permissions = {}
+  await assert.rejects(getImage(read, f.deps), { code: 'permission-denied' })
+  await assert.rejects(getImage({ ...read, auth: undefined }, f.deps), { code: 'unauthenticated' })
+  assert.equal(f.files.size, 1, 'Reads and denied uploads never mutate objects')
+})

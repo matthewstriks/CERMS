@@ -29,8 +29,14 @@ export default function CreateMemberForm({
   lookupId,
   onViewMember,
   onViewCreated,
+  onCheckout,
+  checkoutLabel = 'Continue to checkout',
+  initialProductId,
 }: {
   creator: MemberCreator
+  onCheckout?: (draft: MemberDraft, requestId: string) => Promise<void>
+  checkoutLabel?: string
+  initialProductId?: string
   onViewCreated?: (member: CreatedMember) => Promise<void>
   initialScan?: MemberScan
   lookupId?: (id: string) => Promise<MembershipPage>
@@ -40,7 +46,11 @@ export default function CreateMemberForm({
   onCreated?: () => void
   onBusyChange?: (busy: boolean) => void
 }) {
-  const [draft, setDraft] = useState(() => ({ ...emptyMemberDraft(), ...initialScan?.draft }))
+  const [draft, setDraft] = useState(() => ({
+    ...emptyMemberDraft(),
+    membershipProductId: initialProductId ?? '',
+    ...initialScan?.draft,
+  }))
   const [options, setOptions] = useState<MembershipOption[]>([])
   const selectedMembership = options.find((option) => option.id === draft.membershipProductId)
   const [loading, setLoading] = useState(true)
@@ -133,6 +143,10 @@ export default function CreateMemberForm({
         setError('')
         setSuccess('')
         try {
+          if (onCheckout) {
+            await onCheckout(draft, requestId.current)
+            return
+          }
           const result = await creator.create(draft, requestId.current)
           setSuccess(`${result.name} created. Membership ID: ${result.number}.`)
           setSaved(true)
@@ -419,7 +433,13 @@ export default function CreateMemberForm({
                 !!matches?.members.length
               }
             >
-              {busy ? 'Creating member…' : 'Create membership'}
+              {onCheckout
+                ? busy
+                  ? 'Opening checkout…'
+                  : checkoutLabel
+                : busy
+                  ? 'Creating member…'
+                  : 'Create membership'}
             </button>
             <button type="button" disabled={busy || lookingUp} onClick={reset}>
               Clear form

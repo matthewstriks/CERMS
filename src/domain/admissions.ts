@@ -2,6 +2,7 @@ import { activityFromLegacy, unixSecondsToMillis } from './legacy'
 import type { Activity, LegacyDocument } from './legacy'
 
 export interface Admission extends Activity {
+  editRevision: number
   rentalEnabled: boolean
   rentalStartedAt: number | null
   notes: string
@@ -25,6 +26,7 @@ export function admissionFromLegacy(id: string, data: LegacyDocument, access: st
   const rental = Array.isArray(data.lockerRoomStatus) ? data.lockerRoomStatus : []
   return {
     ...activity,
+    editRevision: Number.isSafeInteger(data.editRevision) ? Number(data.editRevision) : 0,
     active: activity.active && data.goingInactive !== true,
     rentalEnabled: rental[0] === true,
     rentalStartedAt: unixSecondsToMillis(rental[4]),

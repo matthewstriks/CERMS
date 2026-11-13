@@ -1,6 +1,7 @@
 import { _electron as electron, expect } from 'playwright/test'
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
+import { devMemberRecord, emptyMemberDraft } from '../functions/checkout-domain.mjs'
 import { membershipProduct, catalogFields } from './fixtures/catalog.mjs'
 
 // Every HTTPS request is intercepted. These tests never send credentials or records to Firebase.
@@ -564,7 +565,7 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Change system', exact: true }).count(), 0)
   await page.getByRole('link', { name: 'Products', exact: true }).click()
   await page.getByRole('heading', { name: 'Business admin access required' }).waitFor()
-  for (const label of ['Point of sale', 'History', 'Reports & analytics', 'Messages', 'Events']) {
+  for (const label of ['Reports & analytics', 'Messages', 'Events']) {
     await page.getByRole('link', { name: label, exact: true }).click()
     await page.getByRole('heading', { name: 'Not implemented yet', exact: true }).waitFor()
     assert.equal(await page.locator('table').count(), 0)
@@ -843,27 +844,54 @@ try {
   await phone.fill('123')
   await phone.blur()
   assert.equal(await phone.evaluate((node) => node.checkValidity()), false)
-  await createDialog.getByRole('button', { name: 'Create membership', exact: true }).click()
+  await createDialog.getByRole('button', { name: 'Continue to checkout', exact: true }).click()
   assert.equal(devCreateCount, 0, 'Invalid phone blocks save')
   await phone.fill('2105550123')
   await phone.blur()
   await expect(phone).toHaveValue('(210) 555-0123')
-  await createDialog.getByRole('button', { name: 'Create membership', exact: true }).click()
-  await createDialog.getByText(/SYNTHETIC GUEST created/).waitFor()
-  assert.equal(devCreateCount, 1)
-  const createdMember = [...devDocuments.values()].find((document) =>
-    document.name.startsWith(base + 'members/'),
+  // Checkout fulfillment is exercised by pos-smoke --members. This suite seeds only
+  // synthetic completed-member data to continue scan/log/edit/delete coverage.
+  await createDialog.getByRole('button', { name: 'Close', exact: true }).click()
+  assert.equal(devCreateCount, 0, 'Member form never sends a direct creation commit')
+  const memberPath = base + 'members/11111111-1111-4111-8111-111111111111'
+  const completedRecord = devMemberRecord(
+    {
+      ...emptyMemberDraft(),
+      firstName: 'SYNTHETIC',
+      lastName: 'GUEST',
+      birthDate: '1990-01-02',
+      governmentId: 'FAKE-DEV-001',
+      governmentIdType: 'TX',
+      phone: '+12105550123',
+      membershipProductId: 'fixture-plan',
+    },
+    ownerUid,
+    123456789,
+    'a'.repeat(64),
+    'b'.repeat(64),
+    { id: 'fixture-plan', name: 'Fixture Monthly', durationSeconds: 30 * 86400 },
   )
-  assert.equal(createdMember.fields.productId.stringValue, 'fixture-plan')
-  assert.equal(createdMember.fields.membership_type.stringValue, 'Fixture Monthly')
-  assert.ok(
-    Math.abs(
-      Number(createdMember.fields.id_expiration.integerValue) -
-        (Math.floor(Date.now() / 1000) + 30 * 86400),
-    ) < 10,
-  )
-  await createDialog
-    .getByRole('button', { name: 'View member SYNTHETIC GUEST', exact: true })
+  const createdMember = {
+    name: memberPath,
+    fields: {
+      ...catalogFields({ ...completedRecord, creation_time: null }),
+      creation_time: { timestampValue: new Date().toISOString() },
+    },
+  }
+  devDocuments.set(memberPath, createdMember)
+  devDocuments.set(base + 'system/dev/memberIdentities/' + 'a'.repeat(64), {
+    name: base + 'system/dev/memberIdentities/' + 'a'.repeat(64),
+    fields: { access: str('dev'), memberId: str(memberPath.split('/').at(-1)) },
+  })
+  devDocuments.set(base + 'system/dev/memberNumbers/123456789', {
+    name: base + 'system/dev/memberNumbers/123456789',
+    fields: { access: str('dev'), memberId: str(memberPath.split('/').at(-1)) },
+  })
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'SYNTHETIC GUEST' })
+    .getByRole('button', { name: 'View SYNTHETIC GUEST', exact: true })
     .click()
   await expect(createDialog).toHaveCount(0)
   await expect(page.getByRole('dialog')).toHaveCount(1)
@@ -919,7 +947,7 @@ try {
   await scanDialog.getByRole('button', { name: 'View member SYNTHETIC GUEST', exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('SYNTHETIC GUEST')
   await page.keyboard.press('Escape')
-  assert.equal(devCreateCount, 1)
+  assert.equal(devCreateCount, 0)
 
   devDocuments.delete(secondMatchName)
   // Scanning while creating reports the duplicate, blocks apply/save, and links to it.
@@ -928,7 +956,7 @@ try {
   await createDialog.getByLabel('Scanned ID data').fill(barcode)
   await createDialog.getByText('A member with this ID already exists', { exact: true }).waitFor()
   await expect(
-    createDialog.getByRole('button', { name: 'Create membership', exact: true }),
+    createDialog.getByRole('button', { name: 'Continue to checkout', exact: true }),
   ).toBeDisabled()
   denyLogOnce = true
   await createDialog
@@ -944,7 +972,7 @@ try {
   await expect.poll(() => logCount).toBe(3)
   await page.keyboard.press('Escape')
   await page.screenshot({ path: 'artifacts/member-scan-duplicate-fixtures.png', fullPage: true })
-  assert.equal(devCreateCount, 1)
+  assert.equal(devCreateCount, 0)
 
   await page.getByRole('button', { name: 'Scan ID', exact: true }).click()
   await scanDialog.getByLabel('Scanned ID data').fill('DAQPARTIAL\nDACGUEST')
@@ -1103,15 +1131,11 @@ try {
   await page.getByRole('button', { name: 'Products', exact: true }).click()
   await page.getByLabel('Status', { exact: true }).selectOption('active')
   await page.getByLabel('Search products', { exact: true }).fill('')
-  await page
-    .getByRole('button', { name: 'Delete membership product Fixture Monthly', exact: true })
-    .click()
-  const deleteProduct = page.getByRole('dialog', { name: 'Delete membership product', exact: true })
+  await page.getByRole('button', { name: 'Delete product Fixture Monthly', exact: true }).click()
+  const deleteProduct = page.getByRole('dialog', { name: 'Delete product', exact: true })
   await deleteProduct.getByRole('button', { name: 'Cancel', exact: true }).click()
   assert.ok(devDocuments.has(membershipFixturePath))
-  await page
-    .getByRole('button', { name: 'Delete membership product Fixture Monthly', exact: true })
-    .click()
+  await page.getByRole('button', { name: 'Delete product Fixture Monthly', exact: true }).click()
   await deleteProduct.getByRole('button', { name: 'Delete permanently', exact: true }).click()
   await expect(deleteProduct).toHaveCount(0)
   assert.equal(devDocuments.has(membershipFixturePath), false)

@@ -1,7 +1,8 @@
 rules_version = '2';
 // CERMS 5.0 only. Deploy to the named cerms database, never (default).
 // users/{uid}: uid, displayName, access, rank; email/version may be absent.
-// All profile fields are immutable except the designated owner's access switch.
+// Desktop profile writes remain limited to the designated owner access switch.
+// Optional themePreference is updated only by the authenticated appearance service.
 // members/activity/orders: existing readers require access == users/{uid}.access.
 // system/{id}: existing owner-only picker; no client writes.
 // Rank does not grant permissions in this initial policy.
@@ -67,8 +68,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     function validUser(data, uid) {
-      return data.keys().hasOnly(['uid', 'displayName', 'email', 'access', 'rank', 'version'])
+      return data.keys().hasOnly(['uid', 'displayName', 'email', 'access', 'rank', 'version', 'themePreference'])
         && data.keys().hasAll(['uid', 'displayName', 'access', 'rank'])
+        && (!('themePreference' in data) || data.themePreference in ['light', 'dark'])
         && data.uid == uid && data.uid is string && data.uid.size() <= 128
         && data.displayName is string && data.displayName.size() <= 256
         && validSystemId(data.access)
@@ -397,8 +399,7 @@ service cloud.firestore {
     match /members/{memberId} {
       allow read: if ownClub();
       allow get: if devCreator() && !exists(/databases/$(database)/documents/members/$(memberId));
-      allow create: if devCreator() && memberId.matches('[a-f0-9-]{36}')
-        && validDevMember(request.resource.data) && devReservations(request.resource.data,memberId);
+      allow create: if false; // New memberships are server-owned checkout fulfillment.
       allow update: if memberManager('editMembers') && validMemberEdit(request.resource.data,resource.data) && memberIdentityEdit(request.resource.data,resource.data,memberId);
       allow delete: if memberManager('deleteMembers') && resource.data.get('checkedIn',false) != true && memberIdentityDelete(resource.data,memberId);
     }

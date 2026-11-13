@@ -1,7 +1,6 @@
 import { getFirebaseServices } from './firebase-membership'
 import { requireStaffPermission } from './firebase-staff-permissions'
 import {
-  maxProductImageBytes,
   productImageTypes,
   validProductImagePath,
   uploadProductImageEndpoint,
@@ -16,25 +15,52 @@ export interface PreparedProductImage {
 export async function prepareProductImage(file: File): Promise<PreparedProductImage> {
   if (!productImageTypes.includes(file.type as (typeof productImageTypes)[number]))
     throw new Error('Choose a JPEG, PNG or WebP image.')
-  if (!file.size || file.size > maxProductImageBytes)
-    throw new Error('Choose an image no larger than 5 MB.')
   const bitmap = await createImageBitmap(file).catch(() => {
     throw new Error('This image could not be opened. Choose another file.')
   })
-  const pixels = bitmap.width * bitmap.height
-  bitmap.close()
-  if (pixels > 16000000) throw new Error('Choose an image with no more than 16 megapixels.')
+  let optimized: Blob
+  try {
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('This image could not be prepared. Try again.')
+    let side = 1024
+    while (true) {
+      const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height))
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      optimized = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (blob) =>
+            blob
+              ? resolve(blob)
+              : reject(new Error('This image could not be prepared. Try another file.')),
+          'image/webp',
+          0.85,
+        ),
+      )
+      // Optimize the display copy rather than placing restrictions on the source file.
+      if (optimized.size <= 512 * 1024 || side === 1) break
+      side = Math.max(1, Math.floor(side * 0.75))
+    }
+  } finally {
+    bitmap.close()
+  }
   const preview = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
     reader.onerror = () => reject(new Error('The image could not be read.'))
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(optimized)
   })
-  return { base64: preview.slice(preview.indexOf(',') + 1), mimeType: file.type, preview }
+  return { base64: preview.slice(preview.indexOf(',') + 1), mimeType: optimized.type, preview }
 }
 export function productImageClient(reader: { uid: string; club: string }) {
   async function call(url: string, data: unknown) {
-    await requireStaffPermission(reader.uid, reader.club, 'manageProducts')
+    await requireStaffPermission(
+      reader.uid,
+      reader.club,
+      url === getProductImageEndpoint ? ['manageProducts', 'processSales'] : 'manageProducts',
+    )
     const body = JSON.stringify({ data })
     if (!isProductImageRequest(url, body)) throw new Error('Invalid product image request.')
     const user = getFirebaseServices().auth.currentUser

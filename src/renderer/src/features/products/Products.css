@@ -128,7 +128,7 @@
   place-items: center;
   overflow: hidden;
   color: var(--muted);
-  background: #f5f7f6;
+  background: var(--surface-soft, #f5f7f6);
 }
 .catalog-image-preview img {
   width: 100%;

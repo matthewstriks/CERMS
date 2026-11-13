@@ -1,3 +1,8 @@
+import { hasStaffPermission } from '../../../domain/staff-permissions'
+import { createPos } from '../../../data/firebase-pos'
+import { createCatalog } from '../../../data/firebase-catalog'
+import type { CatalogProduct, CatalogRecord } from '../../../domain/catalog'
+import { startMemberOrder } from '../lib/order-start'
 import { useEffect, useRef, useState } from 'react'
 import { Clock3, Search, X } from 'lucide-react'
 import { Badge } from '../components/ui'
@@ -139,7 +144,7 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
             <thead>
               <tr>
                 <th>Member</th>
-                <th>Rental / location</th>
+                <th>Rental / Assigned Room/Number</th>
                 <th>Arrival</th>
                 <th>Time remaining</th>
                 <th>Status</th>
@@ -206,9 +211,12 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
         )}
       </section>
       <p className="page-note">
-        Check-in, checkout, renewal, rental editing, and waitlist changes are not implemented yet.
+        Start rental check-in from Members. Visits and assigned rooms/numbers appear after
+        successful checkout.
       </p>
-      {detail && <VisitDetails visit={detail} now={now} onClose={() => setSelected(null)} />}
+      {detail && (
+        <VisitDetails key={detail.id} visit={detail} now={now} onClose={() => setSelected(null)} />
+      )}
     </>
   )
 }
@@ -221,6 +229,106 @@ function VisitDetails({
   now: number
   onClose(): void
 }) {
+  const { reader } = useMembershipSession()
+  const canEdit =
+    !!reader &&
+    hasStaffPermission(reader.uid, 'processSales', reader.permissions) &&
+    visit.rentalEnabled
+  const [room, setRoom] = useState(visit.location)
+  const [notes, setNotes] = useState(visit.notes)
+  const [inside, setInside] = useState(visit.inside)
+  const [waiting, setWaiting] = useState(visit.waiting)
+  const [revision, setRevision] = useState(visit.editRevision)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState('')
+  const [products, setProducts] = useState<CatalogRecord<CatalogProduct>[]>([])
+  const [productId, setProductId] = useState('')
+  useEffect(() => {
+    if (!reader || !canEdit) return
+    let active = true
+    const catalog = createCatalog(reader)
+    void (async () => {
+      let page = await catalog.products(true),
+        all = page.rows
+      while (page.more) {
+        page = await catalog.products()
+        all.push(...page.rows)
+        if (all.length > 10000) throw new Error('Catalog exceeds 10,000 products.')
+      }
+      if (active) {
+        const rentals = all.filter(
+          (p) =>
+            p.data.active &&
+            p.data.rental &&
+            !p.data.payout &&
+            (!p.data.restricted || p.data.restrictedUsers.includes(reader.uid)),
+        )
+        setProducts(rentals)
+        setProductId(rentals.find((p) => p.data.name === visit.rental)?.id ?? rentals[0]?.id ?? '')
+      }
+    })().catch((e) => {
+      if (active) setError(e instanceof Error ? e.message : 'Could not load renewal products.')
+    })
+    return () => {
+      active = false
+    }
+  }, [reader, canEdit, visit.rental])
+  const dirty =
+    room !== visit.location ||
+    notes !== visit.notes ||
+    inside !== visit.inside ||
+    waiting !== visit.waiting
+  async function save() {
+    if (!reader || busy) return
+    setBusy(true)
+    setError('')
+    setSaved('')
+    try {
+      await createPos(reader).updateRental({
+        visitId: visit.id,
+        expectedRevision: revision,
+        assignedRoom: room,
+        notes,
+        inside,
+        waiting,
+      })
+      setRevision(revision + 1)
+      setSaved('Rental details saved.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Rental could not be saved.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  function renew() {
+    if (!reader) return
+    const product = products.find((p) => p.id === productId)
+    if (!product) return
+    try {
+      const started = startMemberOrder(reader, {
+        member: { id: visit.memberId, name: visit.memberName },
+        cart: [
+          {
+            product,
+            quantity: 1,
+            unitPriceCents: product.data.priceCents,
+            rentals: [
+              {
+                id: crypto.randomUUID(),
+                assignedRoom: visit.location,
+                memberId: visit.memberId,
+                renewalVisitId: visit.id,
+              },
+            ],
+          },
+        ],
+      })
+      if (started) onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start renewal.')
+    }
+  }
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const node = dialog.current
@@ -228,10 +336,18 @@ function VisitDetails({
     return () => node?.close()
   }, [])
   return (
-    <dialog ref={dialog} className="member-dialog" aria-labelledby="visit-title" onCancel={onClose}>
+    <dialog
+      ref={dialog}
+      className="member-dialog rental-dialog"
+      aria-labelledby="visit-title"
+      onCancel={(event) => {
+        if (busy) event.preventDefault()
+        else onClose()
+      }}
+    >
       <div className="dialog-heading">
-        <Badge>Read only</Badge>
-        <button aria-label="Close visit details" onClick={onClose}>
+        <Badge>{canEdit ? 'Manage rental' : 'Read only'}</Badge>
+        <button aria-label="Close visit details" disabled={busy} onClick={onClose}>
           <X size={18} />
         </button>
       </div>
@@ -257,10 +373,102 @@ function VisitDetails({
           </div>
         ))}
       </dl>
-      <h3>Visit notes</h3>
-      <p className="visit-notes">{visit.notes || 'No notes recorded.'}</p>
+      {canEdit ? (
+        <>
+          <fieldset disabled={busy}>
+            <legend>Edit active rental</legend>
+            <label>
+              Assigned Room/Number
+              <input
+                value={room}
+                maxLength={120}
+                onChange={(e) => {
+                  setRoom(e.target.value)
+                  setSaved('')
+                }}
+              />
+            </label>
+            <label>
+              Visit notes
+              <textarea
+                aria-label="Visit notes"
+                value={notes}
+                maxLength={1000}
+                onChange={(e) => {
+                  setNotes(e.target.value)
+                  setSaved('')
+                }}
+              />
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={inside}
+                onChange={(e) => {
+                  setInside(e.target.checked)
+                  setSaved('')
+                }}
+              />{' '}
+              Inside (off = outside)
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={waiting}
+                onChange={(e) => {
+                  setWaiting(e.target.checked)
+                  setSaved('')
+                }}
+              />{' '}
+              On waitlist
+            </label>
+            <button className="primary" disabled={!room.trim()} onClick={() => void save()}>
+              Save rental changes
+            </button>
+          </fieldset>
+          <fieldset disabled={busy}>
+            <legend>Renew rental</legend>
+            <label>
+              Rental product
+              <select
+                aria-label="Rental product"
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.data.name} · {p.data.rentalLengthRaw} {p.data.rentalLengthType} · $
+                    {(p.data.priceCents / 100).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>
+              Time is added only after successful checkout. Active rentals keep their remaining
+              time; overdue rentals restart from checkout time.
+            </p>
+            {dirty && <p>Save your changes or reopen the visit before renewing.</p>}
+            <button disabled={!productId || dirty} onClick={renew}>
+              Renew in order
+            </button>
+          </fieldset>
+          {saved && <p role="status">{saved}</p>}
+          {error && (
+            <p className="inline-error" role="alert">
+              {error}
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          <h3>Visit notes</h3>
+          <p className="visit-notes">{visit.notes || 'No notes recorded.'}</p>
+        </>
+      )}
       <div className="dialog-actions">
-        <button onClick={onClose}>Close</button>
+        <button disabled={busy} onClick={onClose}>
+          Close
+        </button>
       </div>
     </dialog>
   )

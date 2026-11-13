@@ -3,7 +3,7 @@ import sharp from 'sharp'
 const owner = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 const pathPattern =
   /^cerms5\/catalog\/[a-zA-Z0-9_-]{1,128}\/products\/[a-zA-Z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/
-async function authorize(request, { db, fail }) {
+async function authorize(request, { db, fail }, posRead = false) {
   const uid = request.auth?.uid,
     d = request.data
   if (!uid) fail('unauthenticated', 'Sign in before accessing product images.')
@@ -25,16 +25,18 @@ async function authorize(request, { db, fail }) {
     !business.exists
   )
     fail('permission-denied', 'Your business access changed.')
-  if (uid !== owner) {
+  let canManage = uid === owner
+  if (!canManage) {
     const permissions = await db.doc(`system/${d.business}/staffPermissions/${uid}`).get()
-    if (!permissions.exists || permissions.data().permissions?.manageProducts !== true)
+    canManage = permissions.data()?.permissions?.manageProducts === true
+    if (!canManage && !(posRead && permissions.data()?.permissions?.processSales === true))
       fail('permission-denied', 'Product management permission is required.')
   }
-  return d
+  return { data: d, uid, canManage }
 }
 export async function uploadImage(request, deps) {
   const { bucket, fail } = deps,
-    d = await authorize(request, deps)
+    { data: d } = await authorize(request, deps)
   if (
     Object.keys(d).sort().join() !== 'base64,business,mimeType,productId' ||
     !['image/jpeg', 'image/png', 'image/webp'].includes(d.mimeType) ||
@@ -66,14 +68,12 @@ export async function uploadImage(request, deps) {
   // Re-check saved authorization after image processing and never overwrite an object.
   await authorize(request, deps)
   try {
-    await bucket
-      .file(imagePath)
-      .save(output, {
-        resumable: false,
-        contentType: 'image/webp',
-        preconditionOpts: { ifGenerationMatch: 0 },
-        metadata: { cacheControl: 'private, max-age=3600' },
-      })
+    await bucket.file(imagePath).save(output, {
+      resumable: false,
+      contentType: 'image/webp',
+      preconditionOpts: { ifGenerationMatch: 0 },
+      metadata: { cacheControl: 'private, max-age=3600' },
+    })
   } catch (error) {
     if (Number(error.code) !== 412) throw error
   }
@@ -81,7 +81,7 @@ export async function uploadImage(request, deps) {
 }
 export async function getImage(request, deps) {
   const { db, bucket, fail } = deps,
-    d = await authorize(request, deps)
+    { data: d, uid, canManage } = await authorize(request, deps, true)
   if (
     Object.keys(d).sort().join() !== 'business,imagePath,productId' ||
     typeof d.imagePath !== 'string' ||
@@ -92,6 +92,12 @@ export async function getImage(request, deps) {
   const product = await db.doc(`system/${d.business}/products/${d.productId}`).get()
   if (!product.exists || product.data().imagePath !== d.imagePath)
     fail('not-found', 'This product image is no longer attached.')
+  if (
+    !canManage &&
+    (product.data().active !== true ||
+      (product.data().restricted === true && !product.data().restrictedUsers?.includes(uid)))
+  )
+    fail('permission-denied', 'This product is unavailable in point of sale.')
   const file = bucket.file(d.imagePath),
     [metadata] = await file.getMetadata()
   if (metadata.contentType !== 'image/webp' || Number(metadata.size) > 1024 * 1024)

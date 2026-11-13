@@ -1,3 +1,4 @@
+import { themeEndpoint, isThemeRequest } from './theme-policy'
 import { posEndpoints, isPosRequest } from './pos-policy'
 import {
   uploadProductImageEndpoint,
@@ -9,7 +10,6 @@ import { isCatalogCommit, isDeleteProductCommit } from './catalog-policy'
 import { isRegisterCommit } from './register-policy'
 import { isMemberManagementCommit } from './member-management-policy'
 import { isMemberViewCommit } from './member-log-policy'
-import { isDevMemberCommit } from './dev-member-policy'
 /** Fixed to the existing CERMS project. This is configuration, not a credential. */
 export const firebaseProjectId = 'cerms-7af24'
 export const firebaseDatabaseId = 'cerms'
@@ -33,6 +33,8 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
   try {
     const url = new URL(rawUrl)
     if (url.protocol !== 'https:' || url.username || url.password || url.port) return false
+    if (url.href === themeEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isThemeRequest(body))
     if (Object.values(posEndpoints).some((endpoint) => endpoint === url.href))
       return method === 'OPTIONS' || (method === 'POST' && isPosRequest(url.href, body))
     if ([uploadProductImageEndpoint, getProductImageEndpoint].includes(url.href))
@@ -58,7 +60,6 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
       if (method === 'POST' && url.pathname === base + ':commit')
         return (
           isAccessSwitchCommit(body) ||
-          isDevMemberCommit(body) ||
           isMemberViewCommit(body) ||
           isCatalogCommit(body) ||
           isDeleteProductCommit(body) ||

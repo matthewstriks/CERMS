@@ -1,3 +1,4 @@
+import { UpdateSettings } from '../components/AppUpdates'
 import { ownerUid } from '../../../domain/staff-permissions'
 import { useState } from 'react'
 import { useQuery } from '../lib/data'
@@ -60,6 +61,7 @@ export default function Settings() {
           About CERMS
         </button>
         {aboutError && <p role="alert">{aboutError}</p>}
+        <UpdateSettings />
       </section>
       <section className="panel settings-card full-width">
         <SectionTitle title="Administration" />

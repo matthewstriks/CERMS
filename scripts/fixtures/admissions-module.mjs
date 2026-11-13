@@ -5,6 +5,7 @@ export function subscribeAdmissions(session, receive) {
   const owner = { club: session.club, active: true, stops: previous?.stops ?? 0 }
   window.__admissionsFixture = owner
   const base = {
+    editRevision: 0,
     active: true,
     rentalEnabled: true,
     rentalStartedAt: Date.now() - 60000,

@@ -54,6 +54,10 @@ scripts/smoke.mjs       Desktop launch/navigation smoke test
 docs/                   Existing system map and rewrite decisions
 ```
 
+## Windows / Mac releases and automatic updates
+
+The desktop now builds a Windows NSIS `.exe` and a universal Mac `.dmg`/update ZIP. GitHub version tags build and publish complete releases, with background updates for Windows and optional signed Mac releases. Signing is deferred for the first Mac previews. See [installer downloads, GitHub setup and the release guide](docs/DESKTOP-RELEASES.md).
+
 ## Checks and packaging
 
 ```sh

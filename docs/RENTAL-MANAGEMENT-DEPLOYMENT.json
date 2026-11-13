@@ -1,0 +1,35 @@
+{
+  "feature": "Active rental room/notes edits, in/out, waitlist and checkout-owned renewal",
+  "verifiedAt": "2026-11-13T17:49:03.345Z",
+  "database": "cerms",
+  "rulesUnchanged": true,
+  "rulesBaseline": "firebase/releases/checkout-2026-10-11.rules",
+  "rulesSha256": "417cb1f40e364e4cf76949a47dcf3b25c1b1b09cdfd62d8257278c28c9f852a1",
+  "serverSha256": "f565346c88b326fdc556559433ba89b0ba3df1aac2748e46c4a354b4697159a4",
+  "bothDatabaseConfigurationsUnchanged": true,
+  "bothDatabaseIndexesUnchanged": true,
+  "allRulesReleasesUnchanged": true,
+  "bothBucketsUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "clientChecks": 173,
+  "serverCheckoutChecks": 16,
+  "rulesChecks": 311,
+  "buildPassed": true,
+  "interceptedSingleAndGroupRentalFlowsPassed": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-13T17:48:31.705600306Z",
+      "entryPoint": "completeSale"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/updateRental",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-13T17:48:27.041499140Z",
+      "entryPoint": "updateRental"
+    }
+  ]
+}

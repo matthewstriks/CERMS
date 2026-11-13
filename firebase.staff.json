@@ -12,7 +12,7 @@
   "firestore": [
     {
       "database": "cerms",
-      "rules": "firebase/releases/register-managers-2026-09-30.rules",
+      "rules": "firebase/releases/theme-2026-11-13.rules",
       "indexes": "firebase/cerms.indexes.json"
     }
   ]

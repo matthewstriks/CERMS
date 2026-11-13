@@ -1,0 +1,35 @@
+{
+  "feature": "Atomic member creation and rental check-in through linked checkout",
+  "database": "cerms",
+  "verifiedAt": "2026-10-12T01:43:05.203Z",
+  "ruleset": "projects/cerms-7af24/rulesets/e0edcdd3-1454-47f9-a9b2-e862545fd5d9",
+  "previousRuleset": "projects/cerms-7af24/rulesets/f8aad50a-1377-4907-9f22-616b5358d9e1",
+  "sha256": "417cb1f40e364e4cf76949a47dcf3b25c1b1b09cdfd62d8257278c28c9f852a1",
+  "rulesChecks": 311,
+  "serverCheckoutChecks": 8,
+  "interceptedMemberCheckoutPassed": true,
+  "defaultRulesAndStorageRulesUnchanged": true,
+  "bothDatabaseConfigurationsUnchanged": true,
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "legacyBucketUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-10-12T01:41:58.630812816Z",
+      "entryPoint": "completeSale"
+    }
+  ],
+  "buildPassed": true,
+  "clientTests": 168,
+  "interceptedPosRegressionPassed": true,
+  "interceptedMembershipRegressionPassed": true,
+  "databaseComparisonExcludedRollingFields": [
+    "earliestVersionTime",
+    "etag"
+  ]
+}

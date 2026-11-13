@@ -36,6 +36,7 @@ export interface MembershipHistory {
 export interface MembershipReader {
   readonly uid: string
   readonly club: string
+  readonly themePreference?: 'light' | 'dark'
   readonly staffName: string
   readonly permissions?: StaffPermissions
   list(query: MembershipQuery): Promise<MembershipPage>

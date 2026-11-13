@@ -1,0 +1,30 @@
+.app-update-notice {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 200;
+  width: min(420px, calc(100vw - 36px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface, white);
+  color: var(--ink);
+  box-shadow: 0 8px 32px #14291e26;
+}
+.app-update-notice p {
+  margin: 7px 0 12px;
+  font-size: 12px;
+}
+.app-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.app-update-actions button {
+  font-size: 12px;
+}
+.app-update-settings {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}

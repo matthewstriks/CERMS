@@ -16,29 +16,45 @@ import {
 import {
   cartTotals,
   paymentMethods,
+  settlePayments,
+  paymentAmountDue,
+  type PaymentEntry,
   type CartLine,
   type PaymentMethod,
   type SaleRequest,
   type SaleReceipt,
   type PosSettings as Settings,
   type RegisterTotals,
+  type OrderMember,
 } from '../../../domain/pos'
 import type { RegisterRecord } from '../../../domain/registers'
 import { money } from '../lib/data'
 import ReceiptDialog from './pos/ReceiptDialog'
 import PosSettings from './pos/PosSettings'
 import SalesHistory from './pos/SalesHistory'
+import CreateMemberDialog from './members/CreateMemberDialog'
+import OrderMemberPicker from './pos/OrderMemberPicker'
+import PosCatalog from './pos/PosCatalog'
+import { canCreateDevMember } from '../../../shared/dev-member-policy'
 import './pos/Pos.css'
-type Tender = { method: PaymentMethod; amount: string; received: string; reference: string }
+type Tender = PaymentEntry
 function readDraft(key: string): {
   cart: CartLine[]
   customerName: string
   note: string
   pending: SaleRequest | null
+  member?: OrderMember
+  pendingMembers?: OrderMember[]
+  existingMembers?: OrderMember[]
+  rentalsOnly?: boolean
+  choosingRentals?: boolean
 } {
   const empty = { cart: [], customerName: '', note: '', pending: null }
+  let preservedPending: SaleRequest | null = null
   try {
     const d = JSON.parse(localStorage.getItem(key) || 'null')
+    if (d?.pending && isPosRequest(posEndpoints.completeSale, JSON.stringify({ data: d.pending })))
+      preservedPending = d.pending
     if (
       !d ||
       d.schemaVersion !== 1 ||
@@ -56,12 +72,64 @@ function readDraft(key: string): {
       ) ||
       typeof d.customerName !== 'string' ||
       typeof d.note !== 'string' ||
+      (d.member && (!d.member.id || typeof d.member.name !== 'string')) ||
+      d.cart.some(
+        (l: CartLine) =>
+          l.assignedRoom !== undefined &&
+          (typeof l.assignedRoom !== 'string' || l.assignedRoom.length > 120),
+      ) ||
+      (d.pendingMembers !== undefined &&
+        (!Array.isArray(d.pendingMembers) ||
+          d.pendingMembers.length > 20 ||
+          !d.pendingMembers.every(
+            (m: OrderMember) =>
+              m &&
+              typeof m.id === 'string' &&
+              typeof m.name === 'string' &&
+              m.draft &&
+              typeof m.draft.membershipProductId === 'string',
+          ))) ||
+      (d.existingMembers !== undefined &&
+        (!Array.isArray(d.existingMembers) ||
+          d.existingMembers.length > 50 ||
+          !d.existingMembers.every(
+            (m: OrderMember) =>
+              m && typeof m.id === 'string' && typeof m.name === 'string' && !m.draft,
+          ))) ||
+      d.cart.some(
+        (l: CartLine) =>
+          l.rentals !== undefined &&
+          (!Array.isArray(l.rentals) ||
+            l.rentals.length !== l.quantity ||
+            l.rentals.some(
+              (r) =>
+                !r ||
+                typeof r.id !== 'string' ||
+                typeof r.assignedRoom !== 'string' ||
+                r.assignedRoom.length > 120 ||
+                (r.memberId !== undefined && typeof r.memberId !== 'string'),
+            )),
+      ) ||
       (d.pending && !isPosRequest(posEndpoints.completeSale, JSON.stringify({ data: d.pending })))
     )
-      return empty
-    return d
+      return { ...empty, pending: preservedPending }
+    const pendingMembers = d.pendingMembers ?? (d.member?.draft ? [d.member] : [])
+    const member = d.member ? { id: d.member.id, name: d.member.name } : undefined
+    return {
+      ...d,
+      member,
+      pendingMembers,
+      existingMembers:
+        d.existingMembers ??
+        (member && !pendingMembers.some((m: OrderMember) => m.id === member.id) ? [member] : []),
+      cart: d.cart.map((l: CartLine) =>
+        l.product.data.rental && !l.rentals
+          ? { ...l, rentals: [{ id: crypto.randomUUID(), assignedRoom: l.assignedRoom ?? '' }] }
+          : l,
+      ),
+    }
   } catch {
-    return empty
+    return { ...empty, pending: preservedPending }
   }
 }
 export default function PointOfSale({ historyOnly = false }: { historyOnly?: boolean }) {
@@ -93,11 +161,25 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     [notice, setNotice] = useState(''),
     [payments, setPayments] = useState<Tender[]>([]),
     [paying, setPaying] = useState(false),
-    [confirmed, setConfirmed] = useState(false),
     [customerName, setCustomerName] = useState(initialDraft.customerName),
     [note, setNote] = useState(initialDraft.note),
     [pending, setPending] = useState<SaleRequest | null>(initialDraft.pending),
     [receipt, setReceipt] = useState<SaleReceipt | null>(null)
+  const [member, setMember] = useState<OrderMember | undefined>(initialDraft.member)
+  const [pendingMembers, setPendingMembers] = useState<OrderMember[]>(
+    initialDraft.pendingMembers ?? [],
+  )
+  const [existingMembers, setExistingMembers] = useState<OrderMember[]>(
+    initialDraft.existingMembers ?? [],
+  )
+  const [addingMembership, setAddingMembership] = useState<{ productId?: string } | null>(null)
+  const [pickingMember, setPickingMember] = useState<{ rentalId?: string } | null>(null)
+  const orderMembers = [...existingMembers, ...pendingMembers]
+  const canAddMembership = !!reader && canCreateDevMember(reader.uid, reader.club)
+  const [rentalsOnly, setRentalsOnly] = useState(initialDraft.rentalsOnly ?? false)
+  const [choosingRentals, setChoosingRentals] = useState(
+    initialDraft.choosingRentals ?? initialDraft.rentalsOnly ?? false,
+  )
   const saving = useRef(false),
     searchInput = useRef<HTMLInputElement>(null),
     paymentDialog = useRef<HTMLDialogElement>(null)
@@ -106,12 +188,34 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     try {
       localStorage.setItem(
         key,
-        JSON.stringify({ schemaVersion: 1, cart, customerName, note, pending }),
+        JSON.stringify({
+          schemaVersion: 1,
+          cart,
+          customerName,
+          note,
+          pending,
+          member,
+          pendingMembers,
+          existingMembers,
+          rentalsOnly,
+          choosingRentals,
+        }),
       )
     } catch {
       setError('Unable to save the local draft. Keep this window open until checkout is confirmed.')
     }
-  }, [cart, customerName, note, pending, key])
+  }, [
+    cart,
+    customerName,
+    note,
+    pending,
+    member,
+    pendingMembers,
+    existingMembers,
+    rentalsOnly,
+    choosingRentals,
+    key,
+  ])
   async function refresh() {
     if (!clients) return
     setBusy(true)
@@ -163,29 +267,158 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
   }, [paying])
   const totals = cartTotals(cart, settings?.taxRateBps ?? null),
     locked = busy || !!pending
-  const visible = products.filter(
-    (p) =>
-      p.data.active &&
-      (!p.data.restricted || p.data.restrictedUsers.includes(reader?.uid ?? '')) &&
-      (!category || p.data.cat === category) &&
-      (!search || `${p.data.name} ${p.data.barcode}`.toLowerCase().includes(search.toLowerCase())),
+  const permittedProducts = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          p.data.active &&
+          (!choosingRentals || p.data.rental) &&
+          (!p.data.membership || canAddMembership) &&
+          (!p.data.restricted || p.data.restrictedUsers.includes(reader?.uid ?? '')),
+      ),
+    [products, choosingRentals, canAddMembership, reader?.uid],
+  )
+  const visible = useMemo(
+    () =>
+      permittedProducts.filter(
+        (p) =>
+          (!category || p.data.cat === category) &&
+          (!search ||
+            `${p.data.name} ${p.data.barcode}`.toLowerCase().includes(search.toLowerCase())),
+      ),
+    [permittedProducts, category, search],
+  )
+  const favorites = useMemo(
+    () => permittedProducts.filter((p) => p.data.favorite),
+    [permittedProducts],
   )
   function add(p: CatalogRecord<CatalogProduct>) {
     if (locked) return
+    if (p.data.membership) {
+      if (canAddMembership) setAddingMembership({ productId: p.id })
+      else setError('New memberships are available to the owner in Dev System.')
+      return
+    }
+    if (choosingRentals && !p.data.rental) {
+      setError('Choose a rental, then continue to the order to add other items.')
+      return
+    }
+    if (p.data.rental && !member) {
+      setError('Choose an order member before adding rentals.')
+      return
+    }
+    if (p.data.rental && cart.reduce((count, l) => count + (l.rentals?.length ?? 0), 0) >= 100) {
+      setError('Use at most 100 rentals per order.')
+      return
+    }
     setCart((rows) => {
       const exists = rows.find((l) => l.product.id === p.id)
       if (exists)
         return rows.map((l) =>
-          l === exists ? { ...l, quantity: Math.min(1000, l.quantity + 1) } : l,
+          l === exists
+            ? {
+                ...l,
+                quantity: Math.min(1000, l.quantity + 1),
+                ...(p.data.rental
+                  ? {
+                      rentals: [
+                        ...(l.rentals ?? []),
+                        { id: crypto.randomUUID(), assignedRoom: '' },
+                      ],
+                    }
+                  : {}),
+              }
+            : l,
         )
       if (rows.length >= 100) {
         setError('Use at most 100 products per sale.')
         return rows
       }
-      return [...rows, { product: p, quantity: 1, unitPriceCents: p.data.priceCents }]
+      return [
+        ...rows,
+        {
+          product: p,
+          quantity: 1,
+          unitPriceCents: p.data.priceCents,
+          ...(p.data.rental ? { rentals: [{ id: crypto.randomUUID(), assignedRoom: '' }] } : {}),
+        },
+      ]
     })
     setNotice('')
     searchInput.current?.focus()
+  }
+  function updateRental(
+    rentalId: string,
+    patch: Partial<NonNullable<CartLine['rentals']>[number]>,
+  ) {
+    setCart((rows) =>
+      rows.map((l) => ({
+        ...l,
+        rentals: l.rentals?.map((r) => (r.id === rentalId ? { ...r, ...patch } : r)),
+      })),
+    )
+  }
+  function removeRental(rentalId: string) {
+    setCart((rows) =>
+      rows.flatMap((l) => {
+        if (!l.rentals?.some((r) => r.id === rentalId)) return [l]
+        const rentals = l.rentals.filter((r) => r.id !== rentalId)
+        return rentals.length ? [{ ...l, rentals, quantity: rentals.length }] : []
+      }),
+    )
+  }
+  function removeMemberships(ids: string[]) {
+    const remaining = pendingMembers.filter((m) => !ids.includes(m.id))
+    setPendingMembers(remaining)
+    setCart((rows) =>
+      rows.flatMap((l) => {
+        if (l.product.data.membership) {
+          const quantity = remaining.filter(
+            (m) => m.draft?.membershipProductId === l.product.id,
+          ).length
+          return quantity ? [{ ...l, quantity }] : []
+        }
+        return [
+          {
+            ...l,
+            rentals: l.rentals?.map((r) =>
+              r.memberId && ids.includes(r.memberId) ? { ...r, memberId: '' } : r,
+            ),
+          },
+        ]
+      }),
+    )
+    if (member && ids.includes(member.id)) {
+      setMember(undefined)
+      setCustomerName('')
+    }
+  }
+  function addMembership(m: OrderMember, product: CatalogRecord<CatalogProduct>) {
+    if (locked || pendingMembers.length >= 20 || orderMembers.length >= 50)
+      throw new Error('Use at most 20 new memberships per order.')
+    if (
+      pendingMembers.some(
+        (p) =>
+          p.draft?.governmentIdType === m.draft?.governmentIdType &&
+          p.draft?.governmentId.trim().toUpperCase() ===
+            m.draft?.governmentId.trim().toUpperCase() &&
+          p.draft?.birthDate === m.draft?.birthDate,
+      )
+    )
+      throw new Error('This member already has a pending membership in the order.')
+    if (cart.length >= 100 && !cart.some((l) => l.product.id === product.id))
+      throw new Error('Use at most 100 products per order.')
+    setPendingMembers((rows) => [...rows, m])
+    setCart((rows) => {
+      const exists = rows.find((l) => l.product.id === product.id)
+      return exists
+        ? rows.map((l) => (l === exists ? { ...l, quantity: l.quantity + 1 } : l))
+        : [...rows, { product, quantity: 1, unitPriceCents: product.data.priceCents }]
+    })
+    if (!member) {
+      setMember({ id: m.id, name: m.name })
+      setCustomerName(m.name)
+    }
   }
   function scan() {
     const matches = products.filter(
@@ -202,24 +435,14 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     else if (visible.length === 1) add(visible[0]!)
     else setError('No unique matching barcode. Search or choose a product.')
   }
-  let allocated = 0,
-    cashChange = 0,
-    paymentError = ''
+  let settlement = {
+    remainingCents: Math.abs(totals.totalCents),
+    changeCents: 0,
+    payments: [] as SaleRequest['payments'],
+  }
+  let paymentError = ''
   try {
-    if (payments.filter((p) => p.method === 'cash').length > 1)
-      throw new Error('Use one cash portion and split the rest across other methods.')
-    for (const p of payments) {
-      const amount = parsePrice(p.amount)
-      if (amount <= 0) throw new Error('Each payment portion must be greater than zero.')
-      allocated += amount
-      if (p.method === 'cash') {
-        const received = parsePrice(p.received)
-        if (received < amount) throw new Error('Cash received is less than the cash portion.')
-        if (totals.totalCents < 0 && received !== amount)
-          throw new Error('Cash paid out must equal the cash payment portion.')
-        cashChange += totals.totalCents < 0 ? 0 : received - amount
-      }
-    }
+    settlement = settlePayments(totals.totalCents, payments)
   } catch (e) {
     paymentError = e instanceof Error ? e.message : 'Check payment amounts.'
   }
@@ -231,13 +454,29 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     try {
       localStorage.setItem(
         key,
-        JSON.stringify({ schemaVersion: 1, cart, customerName, note, pending: request }),
+        JSON.stringify({
+          schemaVersion: 1,
+          cart,
+          customerName,
+          note,
+          pending: request,
+          member,
+          pendingMembers,
+          existingMembers,
+          rentalsOnly,
+          choosingRentals,
+        }),
       )
       setPending(request)
       const saved = await clients.pos.complete(request)
       if (!saved)
         throw new Error('Sale saved but receipt could not be loaded. Retry to retrieve it.')
       setReceipt(saved)
+      setMember(undefined)
+      setPendingMembers([])
+      setExistingMembers([])
+      setRentalsOnly(false)
+      setChoosingRentals(false)
       setCart([])
       setCustomerName('')
       setNote('')
@@ -245,12 +484,15 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
       setPending(null)
       setPaying(false)
       localStorage.removeItem(key)
-      setNotice('Sale saved. Register totals and inventory have been updated.')
+      setNotice(
+        request.member
+          ? 'Order completed. Linked member and rental details have been saved.'
+          : 'Sale saved. Register totals and inventory have been updated.',
+      )
       await refresh()
     } catch (e) {
       if (e && typeof e === 'object' && 'definitive' in e && e.definitive) {
         setPending(null)
-        setConfirmed(false)
       }
       setError(e instanceof Error ? e.message : 'Save not confirmed. Retry the same request.')
     } finally {
@@ -344,6 +586,31 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
             <div className="pos-layout">
               <section className="panel pos-catalog">
                 <div className="pos-catalog-tools">
+                  {choosingRentals && (
+                    <div>
+                      <h2>Select rentals for check-in</h2>
+                      <p>
+                        Select rentals and enter each Assigned Room/Number, then continue to
+                        checkout.
+                      </p>
+                      <button
+                        disabled={
+                          locked ||
+                          !cart.some((l) => l.product.data.rental) ||
+                          cart.some(
+                            (l) =>
+                              l.product.data.rental &&
+                              l.rentals?.some(
+                                (r) => !r.assignedRoom.trim() || !(r.memberId ?? member?.id),
+                              ),
+                          )
+                        }
+                        onClick={() => setChoosingRentals(false)}
+                      >
+                        Continue to order
+                      </button>
+                    </div>
+                  )}
                   <label className="pos-search">
                     <Search size={17} />
                     <input
@@ -373,33 +640,16 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     ))}
                   </select>
                 </div>
-                <div className="pos-product-grid">
-                  {visible.map((p) => (
-                    <button
-                      className="pos-product"
-                      key={p.id}
-                      disabled={locked || (p.data.inventory === 0 && !p.data.payout)}
-                      onClick={() => add(p)}
-                    >
-                      <span>{p.data.name}</span>
-                      <strong>
-                        {p.data.askforprice
-                          ? 'Enter price'
-                          : `${p.data.payout ? '−' : ''}${money(p.data.priceCents / 100)}`}
-                      </strong>
-                      <small>
-                        {categories.find((c) => c.id === p.data.cat)?.data.name}
-                        {p.data.inventory !== null ? ` · ${p.data.inventory} in stock` : ''}
-                      </small>
-                      <small>
-                        {p.data.membership ? 'Membership ' : ''}
-                        {p.data.rental ? 'Rental ' : ''}
-                        {p.data.payout ? 'Payout ' : ''}
-                        {p.data.taxable ? 'Taxable' : ''}
-                      </small>
-                    </button>
-                  ))}
-                </div>
+                <PosCatalog
+                  client={clients.catalog}
+                  rows={visible}
+                  favorites={favorites}
+                  categories={categories}
+                  search={search}
+                  category={category}
+                  disabled={locked}
+                  onAdd={add}
+                />
                 {busy && !products.length ? (
                   <p role="status">Loading products…</p>
                 ) : (
@@ -412,10 +662,17 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     <ShoppingCart size={19} /> Current sale
                   </h2>
                   <button
-                    disabled={locked || !cart.length}
+                    disabled={locked || (!cart.length && !member)}
                     onClick={() => {
                       if (window.confirm('Clear this unsaved cart?')) {
                         setCart([])
+                        setCustomerName('')
+                        setNote('')
+                        setMember(undefined)
+                        setPendingMembers([])
+                        setExistingMembers([])
+                        setRentalsOnly(false)
+                        setChoosingRentals(false)
                         setPayments([])
                       }
                     }}
@@ -423,6 +680,47 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     Clear
                   </button>
                 </div>
+                <section className="order-member-controls" aria-label="Order members">
+                  <label>
+                    Order linked to
+                    <select
+                      aria-label="Order linked to"
+                      disabled={locked}
+                      value={member?.id ?? ''}
+                      onChange={(e) => {
+                        const selected = orderMembers.find((m) => m.id === e.target.value)
+                        setMember(selected ? { id: selected.id, name: selected.name } : undefined)
+                        setCustomerName(selected?.name ?? '')
+                      }}
+                    >
+                      <option value="">No linked member</option>
+                      {orderMembers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                          {m.draft ? ' · Pending membership' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="member-row-actions">
+                    <button
+                      disabled={locked || orderMembers.length >= 50}
+                      onClick={() => setPickingMember({})}
+                    >
+                      Find existing member
+                    </button>
+                    {canAddMembership && (
+                      <button
+                        disabled={
+                          locked || pendingMembers.length >= 20 || orderMembers.length >= 50
+                        }
+                        onClick={() => setAddingMembership({})}
+                      >
+                        Add membership
+                      </button>
+                    )}
+                  </div>
+                </section>
                 <div className="pos-cart-lines">
                   {cart.map((l) => (
                     <div className="pos-cart-line" key={l.product.id}>
@@ -432,6 +730,89 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                           {money(l.unitPriceCents / 100)} each
                           {l.product.data.payout ? ' · Payout' : ''}
                         </small>
+                        {l.product.data.membership &&
+                          pendingMembers
+                            .filter((m) => m.draft?.membershipProductId === l.product.id)
+                            .map((m) => (
+                              <div className="pos-membership-assignment" key={m.id}>
+                                <span>
+                                  Membership for <strong>{m.name}</strong> · Pending
+                                </span>
+                                <button
+                                  disabled={locked}
+                                  aria-label={`Remove membership for ${m.name}`}
+                                  onClick={() => removeMemberships([m.id])}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                        {l.product.data.rental &&
+                          l.rentals?.map((r, index) => (
+                            <div className="pos-rental-assignment" key={r.id}>
+                              <label>
+                                {r.renewalVisitId ? 'Renewal for' : 'Assigned to · Rental'}{' '}
+                                {index + 1}
+                                <select
+                                  aria-label={`Assigned member for ${l.product.data.name} ${index + 1}`}
+                                  value={r.memberId === '' ? '__unassigned' : (r.memberId ?? '')}
+                                  disabled={locked || !!r.renewalVisitId}
+                                  onChange={(e) =>
+                                    e.target.value === '__find'
+                                      ? setPickingMember({ rentalId: r.id })
+                                      : updateRental(r.id, {
+                                          memberId:
+                                            e.target.value === '__unassigned'
+                                              ? ''
+                                              : e.target.value || undefined,
+                                        })
+                                  }
+                                >
+                                  <option value="">
+                                    {member
+                                      ? `Order member: ${member.name}`
+                                      : 'Choose an order member'}
+                                  </option>
+                                  <option value="__unassigned" disabled>
+                                    Select a member
+                                  </option>
+                                  {orderMembers.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                      {m.name}
+                                      {m.draft ? ' · Pending membership' : ''}
+                                    </option>
+                                  ))}
+                                  <option value="__find" disabled={orderMembers.length >= 50}>
+                                    Find another existing member…
+                                  </option>
+                                </select>
+                              </label>
+                              <label>
+                                Assigned Room/Number
+                                <input
+                                  required
+                                  maxLength={120}
+                                  disabled={locked || !!r.renewalVisitId}
+                                  value={r.assignedRoom}
+                                  aria-label={
+                                    l.rentals!.length === 1
+                                      ? `Assigned Room/Number for ${l.product.data.name}`
+                                      : `Assigned Room/Number for ${l.product.data.name} ${index + 1}`
+                                  }
+                                  onChange={(e) =>
+                                    updateRental(r.id, { assignedRoom: e.target.value })
+                                  }
+                                />
+                              </label>
+                              <button
+                                disabled={locked}
+                                aria-label={`Remove rental ${l.product.data.name} ${index + 1}`}
+                                onClick={() => removeRental(r.id)}
+                              >
+                                Remove rental
+                              </button>
+                            </div>
+                          ))}
                       </div>
                       <div className="pos-line-controls">
                         <label>
@@ -442,7 +823,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                             min={1}
                             max={1000}
                             value={l.quantity}
-                            disabled={locked}
+                            disabled={locked || l.product.data.rental || l.product.data.membership}
                             onChange={(e) =>
                               setCart((rows) =>
                                 rows.map((r) =>
@@ -495,7 +876,15 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                         <button
                           disabled={locked}
                           aria-label={`Remove ${l.product.data.name}`}
-                          onClick={() => setCart((rows) => rows.filter((r) => r !== l))}
+                          onClick={() =>
+                            l.product.data.membership
+                              ? removeMemberships(
+                                  pendingMembers
+                                    .filter((m) => m.draft?.membershipProductId === l.product.id)
+                                    .map((m) => m.id),
+                                )
+                              : setCart((rows) => rows.filter((r) => r !== l))
+                          }
                         >
                           <Trash2 size={16} />
                         </button>
@@ -509,7 +898,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                   <input
                     maxLength={200}
                     value={customerName}
-                    disabled={locked}
+                    disabled={locked || !!member}
                     onChange={(e) => setCustomerName(e.target.value)}
                   />
                 </label>
@@ -538,8 +927,8 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                 </dl>
                 {cart.some((l) => l.product.data.membership || l.product.data.rental) && (
                   <p className="muted">
-                    This sale records payment. Member creation, renewals and rental assignments are
-                    handled separately.
+                    Membership creation, rental check-in and renewal time are saved only after
+                    successful checkout.
                   </p>
                 )}
                 {settings?.taxRateBps == null && cart.some((l) => l.product.data.taxable) && (
@@ -554,6 +943,18 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     !register ||
                     !settings ||
                     !cart.length ||
+                    choosingRentals ||
+                    (rentalsOnly && !cart.some((l) => l.product.data.rental)) ||
+                    cart.some(
+                      (l) =>
+                        l.product.data.rental &&
+                        l.rentals?.some(
+                          (r) => !r.assignedRoom.trim() || !(r.memberId ?? member?.id),
+                        ),
+                    ) ||
+                    pendingMembers.some(
+                      (m) => !cart.some((l) => l.product.id === m.draft?.membershipProductId),
+                    ) ||
                     cart.some(
                       (l) =>
                         !Number.isInteger(l.quantity) ||
@@ -569,13 +970,10 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                         : [
                             {
                               method: 'cash',
-                              amount: (Math.abs(totals.totalCents) / 100).toFixed(2),
-                              received: (Math.abs(totals.totalCents) / 100).toFixed(2),
-                              reference: '',
+                              amount: '',
                             },
                           ],
                     )
-                    setConfirmed(false)
                     setError('')
                     setPaying(true)
                   }}
@@ -597,7 +995,9 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
       >
         <h2>{totals.totalCents < 0 ? 'Record payout' : 'Take payment'}</h2>
         <p className="pos-payment-total">{money(Math.abs(totals.totalCents) / 100)}</p>
-        <p>Record payments taken outside CERMS. Do not enter card numbers or security codes.</p>
+        <p>
+          Double-click an amount to fill the remaining due. Enter cash received to calculate change.
+        </p>
         <fieldset disabled={locked}>
           {payments.map((p, i) => (
             <div className="pos-tender" key={i}>
@@ -608,10 +1008,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                   value={p.method}
                   onChange={(e) => {
                     const method = e.target.value as PaymentMethod
-                    setPayments((rows) =>
-                      rows.map((r, j) => (j === i ? { ...r, method, reference: '' } : r)),
-                    )
-                    setConfirmed(false)
+                    setPayments((rows) => rows.map((r, j) => (j === i ? { ...r, method } : r)))
                   }}
                 >
                   {Object.entries(paymentMethods).map(([key, label]) => (
@@ -627,50 +1024,32 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                   aria-label={`Payment amount ${i + 1}`}
                   inputMode="decimal"
                   value={p.amount}
+                  title="Double-click to fill the amount due"
+                  onDoubleClick={() =>
+                    setPayments((rows) =>
+                      rows.map((r, j) =>
+                        j === i
+                          ? {
+                              ...r,
+                              amount: (paymentAmountDue(totals.totalCents, rows, i) / 100).toFixed(
+                                2,
+                              ),
+                            }
+                          : r,
+                      ),
+                    )
+                  }
                   onChange={(e) => {
                     setPayments((rows) =>
                       rows.map((r, j) => (j === i ? { ...r, amount: e.target.value } : r)),
                     )
-                    setConfirmed(false)
                   }}
                 />
               </label>
-              {p.method === 'cash' ? (
-                <label>
-                  {totals.totalCents < 0 ? 'Cash paid out' : 'Cash received'}
-                  <input
-                    aria-label="Cash received"
-                    inputMode="decimal"
-                    value={p.received}
-                    onChange={(e) => {
-                      setPayments((rows) =>
-                        rows.map((r, j) => (j === i ? { ...r, received: e.target.value } : r)),
-                      )
-                      setConfirmed(false)
-                    }}
-                  />
-                </label>
-              ) : (
-                <label>
-                  Reference (optional)
-                  <input
-                    aria-label={`Payment reference ${i + 1}`}
-                    maxLength={120}
-                    placeholder="Terminal transaction / check reference"
-                    value={p.reference}
-                    onChange={(e) =>
-                      setPayments((rows) =>
-                        rows.map((r, j) => (j === i ? { ...r, reference: e.target.value } : r)),
-                      )
-                    }
-                  />
-                </label>
-              )}
               <button
                 aria-label={`Remove payment ${i + 1}`}
                 onClick={() => {
                   setPayments((rows) => rows.filter((_, j) => j !== i))
-                  setConfirmed(false)
                 }}
               >
                 <Trash2 size={16} />
@@ -680,17 +1059,14 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           <button
             disabled={payments.length >= 12}
             onClick={() => {
-              const remaining = Math.max(0, Math.abs(totals.totalCents) - allocated)
+              const remaining = settlement.remainingCents
               setPayments((rows) => [
                 ...rows,
                 {
                   method: rows.some((r) => r.method === 'cash') ? 'card' : 'cash',
                   amount: (remaining / 100).toFixed(2),
-                  received: (remaining / 100).toFixed(2),
-                  reference: '',
                 },
               ])
-              setConfirmed(false)
             }}
           >
             <Plus size={16} /> Add payment method
@@ -698,11 +1074,11 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           <dl className="pos-totals">
             <div>
               <dt>Remaining balance</dt>
-              <dd>{money((Math.abs(totals.totalCents) - allocated) / 100)}</dd>
+              <dd>{money(settlement.remainingCents / 100)}</dd>
             </div>
             <div className="pos-grand-total">
               <dt>Change to give</dt>
-              <dd>{money(cashChange / 100)}</dd>
+              <dd>{money(settlement.changeCents / 100)}</dd>
             </div>
           </dl>
           {paymentError && (
@@ -710,16 +1086,6 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
               {paymentError}
             </p>
           )}
-          <label className="pos-confirm">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-            />
-            I confirm all payment portions{' '}
-            {totals.totalCents < 0 ? 'have been paid out' : 'have been received'}
-            {cashChange > 0 ? ' and the displayed change has been given' : ''}.
-          </label>
         </fieldset>
         {error && (
           <p role="alert" className="inline-error">
@@ -737,9 +1103,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           ) : (
             <button
               className="primary"
-              disabled={
-                busy || !confirmed || !!paymentError || allocated !== Math.abs(totals.totalCents)
-              }
+              disabled={busy || !!paymentError || settlement.remainingCents !== 0}
               onClick={() => {
                 if (!register) return
                 try {
@@ -750,19 +1114,26 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     taxRateBps: settings?.taxRateBps ?? 0,
                     customerName: customerName.trim(),
                     note: note.trim(),
+                    ...(member ? { member } : {}),
+                    pendingMembers,
+                    rentals: cart
+                      .filter((l) => l.product.data.rental)
+                      .flatMap((l) =>
+                        (l.rentals ?? []).map((r) => ({
+                          id: r.id,
+                          ...(r.renewalVisitId ? { renewalVisitId: r.renewalVisitId } : {}),
+                          productId: l.product.id,
+                          assignedRoom: r.assignedRoom.trim(),
+                          memberId: r.memberId ?? member!.id,
+                        })),
+                      ),
                     lines: cart.map((l) => ({
                       productId: l.product.id,
                       version: l.product.version,
                       quantity: l.quantity,
                       unitPriceCents: l.unitPriceCents,
                     })),
-                    payments: payments.map((p) => ({
-                      method: p.method,
-                      amountCents: parsePrice(p.amount),
-                      receivedCents:
-                        p.method === 'cash' ? parsePrice(p.received) : parsePrice(p.amount),
-                      reference: p.reference.trim(),
-                    })),
+                    payments: settlement.payments,
                   }
                   void submit(request)
                 } catch (e) {
@@ -775,6 +1146,40 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           )}
         </div>
       </dialog>
+      {addingMembership && (
+        <CreateMemberDialog
+          uid={reader.uid}
+          club={reader.club}
+          reader={reader}
+          initialProductId={addingMembership.productId}
+          onClose={() => setAddingMembership(null)}
+          onCreated={() => {}}
+          onAddToOrder={addMembership}
+          onViewMember={(m) => {
+            setAddingMembership(null)
+            setExistingMembers((rows) =>
+              rows.some((p) => p.id === m.id) ? rows : [...rows, { id: m.id, name: m.name }],
+            )
+            setMember({ id: m.id, name: m.name })
+            setCustomerName(m.name)
+          }}
+        />
+      )}
+      {pickingMember && (
+        <OrderMemberPicker
+          reader={reader}
+          onClose={() => setPickingMember(null)}
+          onSelect={(m) => {
+            setExistingMembers((rows) => (rows.some((p) => p.id === m.id) ? rows : [...rows, m]))
+            if (pickingMember.rentalId) updateRental(pickingMember.rentalId, { memberId: m.id })
+            else {
+              setMember(m)
+              setCustomerName(m.name)
+            }
+            setPickingMember(null)
+          }}
+        />
+      )}
       {receipt && <ReceiptDialog receipt={receipt} onClose={() => setReceipt(null)} />}
     </>
   )

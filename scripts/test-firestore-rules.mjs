@@ -1,4 +1,4 @@
-import {posRuleChecks} from './pos-rule-checks.mjs'
+import { posRuleChecks } from './pos-rule-checks.mjs'
 import { productImageRuleChecks } from './product-image-rule-checks.mjs'
 import { staffRuleChecks } from './staff-rule-checks.mjs'
 import assert from 'node:assert/strict'
@@ -317,6 +317,38 @@ try {
   )
   await check('Old club revoked', base + '/members/a', { uid: owner }, false)
   await check('New club granted', base + '/members/b', { uid: owner }, true)
+  await seed('users/' + owner, { ...fields(owner), themePreference: str('dark') })
+  await check(
+    'Owner switches with saved dark theme',
+    ownerPath,
+    patch(owner, { ...fields(owner), themePreference: str('dark'), access: str('club-b') }),
+    true,
+  )
+  await check(
+    'Direct theme mutation remains blocked',
+    ownerPath,
+    patch(owner, { ...fields(owner), themePreference: str('light'), access: str('club-b') }),
+    false,
+  )
+  await seed('users/' + owner, { ...fields(owner), themePreference: str('invalid') })
+  await check(
+    'Invalid theme cannot pass profile validation',
+    ownerPath,
+    patch(owner, { ...fields(owner), themePreference: str('invalid'), access: str('club-b') }),
+    false,
+  )
+  await seed('users/' + owner, {
+    ...fields(owner),
+    themePreference: str('light'),
+    access: str('club-b'),
+  })
+  await check(
+    'Staff cannot directly add theme field',
+    userPath,
+    patch('staff', { ...fields('staff'), themePreference: str('dark') }),
+    false,
+  )
+
   for (const path of ['future/item', 'users/staff/private/item', 'members/a/private/item']) {
     await seed(path, { secret: str('fixture') })
     await check('Unknown/nested read', base + '/' + path, { uid: owner }, false)
@@ -543,17 +575,24 @@ try {
   withPhone.writes[1].update.fields.memberId = str(phoneId)
   withPhone.writes[2].update.fields.memberId = str(phoneId)
   await check(
-    'Optional canonical phone accepted',
+    'Direct creation with canonical phone denied',
     base + ':commit',
     { uid: owner, method: 'POST', body: withPhone },
-    true,
+    false,
   )
   await check(
-    'Dev owner create',
+    'Direct owner creation without checkout denied',
     base + ':commit',
     { uid: owner, method: 'POST', body: devBody() },
-    true,
+    false,
   )
+  // Seed a synthetic server-created member for management/log policy tests.
+  await seed('members/' + devId, {
+    ...devBody().writes[0].update.fields,
+    creation_time: { timestampValue: new Date().toISOString() },
+  })
+  await seed('system/dev/memberIdentities/' + 'a'.repeat(64), devBody().writes[1].update.fields)
+  await seed('system/dev/memberNumbers/123456789', devBody().writes[2].update.fields)
   await check('Dev owner read', base + '/members/' + devId, { uid: owner }, true)
   const logPath =
     base + '/system/dev/memberLogs/' + devId + '/events/44444444-4444-4444-8444-444444444444'

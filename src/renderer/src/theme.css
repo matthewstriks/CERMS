@@ -6,3 +6,39 @@
   --line: #e4e9e3;
   --green: #2f654b;
 }
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #141b18;
+  --ink: #e3ece6;
+  --muted: #a4b4aa;
+  --line: #35443c;
+  --green: #357b56;
+  --accent-ink: #a2d5b4;
+  --surface: #1c2620;
+  --surface-soft: #253229;
+  --topbar: rgba(20, 27, 24, 0.92);
+  --success-bg: #223a2e;
+  --success-ink: #a2d5b4;
+  --success-line: #3e6650;
+  --warning-bg: #3b3322;
+  --warning-ink: #efcd87;
+  --warning-line: #76623d;
+  --danger-bg: #412a2a;
+  --danger-ink: #f1afaa;
+  --danger-line: #7b4d49;
+}
+
+:root[data-theme='dark']
+  input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']),
+:root[data-theme='dark'] textarea,
+:root[data-theme='dark'] select {
+  background-color: var(--surface-soft);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-theme='dark'] input::placeholder,
+:root[data-theme='dark'] textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.85;
+}

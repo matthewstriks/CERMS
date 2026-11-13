@@ -1,0 +1,29 @@
+{
+  "feature": "Account-persisted light/dark appearance preference",
+  "verifiedAt": "2026-11-13T17:57:29.829Z",
+  "database": "cerms",
+  "rulesChange": "Optional themePreference validation only; desktop profile writes unchanged",
+  "rulesBaseline": "firebase/releases/theme-2026-11-13.rules",
+  "rulesSha256": "0e17f97d36179fb9a0bb2d0e5ffc69a2ac115f20862ccfe98eb5fdcb63cf219a",
+  "serverSha256": "ef3044e9117ed37145ddc0e317eb5c3354e69bf83db35c838f4b69dc5f168abf",
+  "bothDatabaseConfigurationsUnchanged": true,
+  "bothDatabaseIndexesUnchanged": true,
+  "legacyAndStorageRulesUnchanged": true,
+  "bothBucketsUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "clientChecks": 174,
+  "serverThemeChecks": 3,
+  "rulesChecks": 315,
+  "buildPassed": true,
+  "interceptedThemeFlowPassed": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/saveThemePreference",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-13T17:57:09.328538447Z",
+      "entryPoint": "saveThemePreference"
+    }
+  ]
+}

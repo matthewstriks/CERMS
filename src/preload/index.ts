@@ -2,6 +2,18 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopApi } from '../shared/desktop'
 
 const api: DesktopApi = {
+  getUpdateState: () => ipcRenderer.invoke('app:update-state'),
+  checkForUpdates: () => ipcRenderer.invoke('app:update-check'),
+  installUpdate: () => ipcRenderer.invoke('app:update-install'),
+  onUpdateState: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      state: import('../shared/updates').UpdateState,
+    ) => callback(state)
+    ipcRenderer.on('app:update-state', listener)
+    return () => ipcRenderer.removeListener('app:update-state', listener)
+  },
+  getServiceStatus: () => ipcRenderer.invoke('app:service-status'),
   onNewOrder: (callback) => {
     const listener = () => callback()
     ipcRenderer.on('order:new', listener)

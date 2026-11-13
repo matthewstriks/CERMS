@@ -1,4 +1,11 @@
-import type { CatalogProduct, CatalogRecord } from './catalog'
+import { parsePrice, type CatalogProduct, type CatalogRecord } from './catalog'
+import type { MemberDraft } from './member-creation'
+export interface OrderMember {
+  id: string
+  name: string
+  number?: string
+  draft?: MemberDraft
+}
 export const paymentMethods = {
   cash: 'Cash',
   card: 'Card',
@@ -7,6 +14,56 @@ export const paymentMethods = {
   other: 'Other',
 } as const
 export type PaymentMethod = keyof typeof paymentMethods
+export interface PaymentEntry {
+  method: PaymentMethod
+  amount: string
+}
+export function paymentAmountDue(
+  totalCents: number,
+  entries: PaymentEntry[],
+  index: number,
+): number {
+  return Math.max(
+    0,
+    Math.abs(totalCents) -
+      entries.reduce((sum, entry, i) => {
+        if (i === index) return sum
+        try {
+          return sum + parsePrice(entry.amount)
+        } catch {
+          return sum
+        }
+      }, 0),
+  )
+}
+/** Cash amount is money handed over; only the outstanding balance enters the ledger. */
+export function settlePayments(totalCents: number, entries: PaymentEntry[]) {
+  if (entries.filter((p) => p.method === 'cash').length > 1)
+    throw new Error('Use one cash portion and split the rest across other methods.')
+  const amounts = entries.map((p) => parsePrice(p.amount))
+  if (amounts.some((amount) => amount <= 0))
+    throw new Error('Enter a positive amount for each payment method.')
+  const total = Math.abs(totalCents)
+  const nonCash = entries.reduce((sum, p, i) => sum + (p.method === 'cash' ? 0 : amounts[i]!), 0)
+  if (nonCash > total) throw new Error('Non-cash payments exceed the total due.')
+  const cashIndex = entries.findIndex((p) => p.method === 'cash')
+  const cashReceived = cashIndex < 0 ? 0 : amounts[cashIndex]!
+  const cashApplied = Math.min(cashReceived, total - nonCash)
+  if (cashIndex >= 0 && cashApplied === 0)
+    throw new Error('Remove the cash payment; other methods cover the total.')
+  if (totalCents < 0 && cashReceived > cashApplied)
+    throw new Error('Payout amounts cannot exceed the total due.')
+  return {
+    remainingCents: total - nonCash - cashApplied,
+    changeCents: totalCents < 0 ? 0 : cashReceived - cashApplied,
+    payments: entries.map((p, i): Payment => ({
+      method: p.method,
+      amountCents: p.method === 'cash' ? cashApplied : amounts[i]!,
+      receivedCents: amounts[i]!,
+      reference: '',
+    })),
+  }
+}
 export interface Payment {
   method: PaymentMethod
   amountCents: number
@@ -14,12 +71,30 @@ export interface Payment {
   reference: string
 }
 export interface CartLine {
+  assignedRoom?: string
+  rentals?: CartRental[]
   priceInput?: string
   product: CatalogRecord<CatalogProduct>
   quantity: number
   unitPriceCents: number
 }
+export interface CartRental {
+  renewalVisitId?: string
+  id: string
+  assignedRoom: string
+  memberId?: string
+}
+export interface RentalAssignment {
+  renewalVisitId?: string
+  id?: string
+  productId: string
+  assignedRoom: string
+  memberId?: string
+}
 export interface SaleRequest {
+  member?: OrderMember
+  pendingMembers?: OrderMember[]
+  rentals?: RentalAssignment[]
   business: string
   requestId: string
   registerId: string
@@ -46,6 +121,8 @@ export interface RegisterTotals {
   cashPaidOutCents: number
 }
 export interface SaleReceipt extends Omit<SaleRequest, 'lines' | 'payments' | 'requestId'> {
+  members?: OrderMember[]
+  memberships?: { productId: string; memberId: string }[]
   id: string
   receiptNumber: string
   createdAt: number
@@ -107,10 +184,24 @@ export function receiptText(r: SaleReceipt): string {
     `Cashier: ${r.cashierName}`,
     `Register: ${r.registerId}`,
     r.customerName ? `Customer: ${r.customerName}` : '',
+    r.member ? `Member: ${r.member.number ?? r.member.id}` : '',
     '--------------------------------',
     ...r.lines.flatMap((l) => [
       l.name,
       `${l.quantity} × ${money(l.unitPriceCents)}   ${money(l.subtotalCents)}`,
+      ...(r.memberships
+        ?.filter((a) => a.productId === l.productId)
+        .map(
+          (a) =>
+            `Membership for: ${r.members?.find((m) => m.id === a.memberId)?.name ?? a.memberId}`,
+        ) ?? []),
+      ...(r.rentals
+        ?.filter((a) => a.productId === l.productId)
+        .flatMap((a) => [
+          `Assigned to: ${r.members?.find((m) => m.id === (a.memberId ?? r.member?.id))?.name ?? r.member?.name ?? a.memberId ?? ''}`,
+          ...(a.renewalVisitId ? ['Rental renewal'] : []),
+          `Assigned Room/Number: ${a.assignedRoom}`,
+        ]) ?? []),
     ]),
     '--------------------------------',
     `Subtotal: ${money(r.subtotalCents)}`,

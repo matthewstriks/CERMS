@@ -1,3 +1,4 @@
+import { expect } from 'playwright/test'
 import { _electron as electron } from 'playwright'
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
@@ -12,6 +13,90 @@ try {
   console.log('Desktop window created:', page.url())
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
+  await page.getByRole('heading', { name: 'Sign in to CERMS' }).waitFor()
+  // Drive login UI through synthetic IPC status snapshots; never call Firebase data/Auth.
+  await app.evaluate(({ ipcMain }) => {
+    globalThis.cermsStatusFixture = {
+      checkedAt: Date.now(),
+      rows: [
+        { id: 'internet', name: 'Internet', tone: 'green', detail: 'Connected' },
+        { id: 'auth', name: 'Auth', tone: 'green', detail: 'No reported incidents' },
+        {
+          id: 'database',
+          name: 'Database',
+          tone: 'green',
+          detail: 'No reported incidents',
+        },
+        {
+          id: 'backend',
+          name: 'API',
+          tone: 'green',
+          detail: 'No reported incidents',
+        },
+        {
+          id: 'storage',
+          name: 'Storage',
+          tone: 'green',
+          detail: 'No reported incidents',
+        },
+      ],
+    }
+    ipcMain.removeHandler('app:service-status')
+    ipcMain.handle('app:service-status', () => globalThis.cermsStatusFixture)
+  })
+  await page.reload()
+  const statusButton = page.getByRole('button', { name: /^Service status:/ })
+  await expect(statusButton).toHaveClass(/service-green/)
+  await statusButton.click()
+  const statusPanel = page.getByRole('dialog', { name: 'Service status', exact: true })
+  await expect(statusPanel).toBeVisible()
+  await expect(statusPanel.getByRole('listitem')).toHaveCount(5)
+  await expect(statusPanel).toContainText('public, global provider reports')
+  await mkdir('artifacts', { recursive: true })
+  await page.screenshot({ path: 'artifacts/login-service-status.png' })
+  await app.evaluate(() => {
+    globalThis.cermsStatusFixture.rows[2] = {
+      id: 'database',
+      name: 'Database',
+      tone: 'red',
+      detail: 'Provider reports an outage',
+    }
+  })
+  await statusPanel.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect(statusButton).toHaveClass(/service-red/)
+  await expect(statusPanel.getByRole('listitem').filter({ hasText: 'Database' })).toContainText(
+    'outage',
+  )
+  await app.evaluate(() => {
+    globalThis.cermsStatusFixture.checkedAt = Date.now() - 130000
+  })
+  await statusPanel.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect(statusButton).toHaveClass(/service-yellow/)
+  await expect(statusPanel).toContainText('Last check is out of date')
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    window.dispatchEvent(new Event('offline'))
+  })
+  await expect(statusButton).toHaveClass(/service-red/)
+  await expect(statusPanel).toContainText('This device is offline')
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled()
+  await app.evaluate(() => {
+    globalThis.cermsStatusFixture.checkedAt = Date.now()
+    globalThis.cermsStatusFixture.rows[2] = {
+      id: 'database',
+      name: 'Database',
+      tone: 'green',
+      detail: 'No reported incidents',
+    }
+  })
+  await page.evaluate(() => {
+    delete navigator.onLine
+    window.dispatchEvent(new Event('online'))
+  })
+  await expect(statusButton).toHaveClass(/service-green/)
+  await page.keyboard.press('Escape')
+  await expect(statusPanel).not.toBeVisible()
+
   await page.getByRole('heading', { name: 'Sign in to CERMS' }).waitFor()
   assert.equal(
     await page
@@ -54,7 +139,7 @@ try {
   assert.equal(await page.getByRole('navigation').count(), 0)
   assert.deepEqual(errors, [])
   console.log(
-    'Desktop smoke passed: compact login, version, support, forgot password, protected routes, sandbox and reload.',
+    'Desktop smoke passed: service status green/yellow/red, stale/offline/recovery, details/keyboard dismissal, compact login, support, forgot password, protected routes, sandbox and reload.',
   )
 } finally {
   await app.close()

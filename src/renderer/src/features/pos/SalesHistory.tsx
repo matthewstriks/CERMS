@@ -35,7 +35,7 @@ export default function SalesHistory({ client }: { client: PosClient }) {
       (!method || r.payments.some((p) => p.method === method)) &&
       (!day || new Date(r.createdAt).toLocaleDateString('en-CA') === day) &&
       (!search ||
-        `${r.receiptNumber} ${r.cashierName} ${r.customerName} ${r.registerId} ${r.payments.map((p) => p.reference).join(' ')}`
+        `${r.receiptNumber} ${r.cashierName} ${r.customerName} ${r.registerId} ${(r.members ?? []).map((m) => `${m.name} ${m.number ?? ''} ${m.id}`).join(' ')} ${r.payments.map((p) => p.reference).join(' ')}`
           .toLowerCase()
           .includes(search.toLowerCase())),
   )

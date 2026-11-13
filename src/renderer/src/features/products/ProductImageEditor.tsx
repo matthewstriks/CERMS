@@ -88,7 +88,11 @@ export default function ProductImageEditor({
             }}
           />
         </label>
-        <p>JPEG, PNG or WebP · Up to 5 MB and 16 megapixels. Uploaded when you save the product.</p>
+        <p>
+          Shown in Point of sale. Recommended: a square image around 512 × 512 pixels. JPEG, PNG or
+          WebP images are optimized automatically, with no source size or dimension cutoff. Uploaded
+          when you save the product.
+        </p>
         {hasImage && (
           <button
             type="button"

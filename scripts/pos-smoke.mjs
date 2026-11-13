@@ -1,14 +1,75 @@
+import { saveThemePreference } from '../functions/theme.mjs'
 import { _electron as electron, expect } from 'playwright/test'
 import assert from 'node:assert/strict'
 import { readFile, mkdir } from 'node:fs/promises'
-import { completeSale, savePosSettings } from '../functions/pos.mjs'
-import { posFixture, owner as uid, business as club, registerId } from './fixtures/pos-server.mjs'
+import { createRequire } from 'node:module'
+import { getImage } from '../functions/product-images.mjs'
+import { completeSale, savePosSettings, updateRental } from '../functions/pos.mjs'
+import { posFixture, owner as uid, registerId } from './fixtures/pos-server.mjs'
 import { membershipProduct } from './fixtures/catalog.mjs'
 import { emptyCounts } from './fixtures/registers.mjs'
+const themeSmoke = process.argv.includes('--theme')
+let failThemeNext = false
+const catalogSmoke = process.argv.includes('--catalog')
+const groupSmoke = process.argv.includes('--group')
+const membershipSmoke = process.argv.includes('--members') || groupSmoke
+const club = membershipSmoke ? 'dev' : 'club-a'
 const fixture = posFixture(),
   docs = fixture.docs,
   base = 'projects/cerms-7af24/databases/cerms/documents',
   time = '2026-10-01T12:00:00Z'
+if (membershipSmoke) {
+  for (const [key, value] of [...docs])
+    if (key.startsWith('system/club-a')) {
+      docs.set(key.replace('system/club-a', 'system/dev'), value)
+      docs.delete(key)
+    }
+  docs.get('users/' + uid).access = 'dev'
+  const retail = docs.get('system/dev/products/retail')
+  docs.set('system/dev/products/plan', {
+    ...membershipProduct(),
+    ...retail,
+    membership: true,
+    name: 'Monthly plan',
+    membershipLengthRaw: 30,
+    membershipLengthType: 'day',
+    inventory: null,
+  })
+  docs.set('system/dev/products/room', {
+    ...membershipProduct(),
+    ...retail,
+    membership: false,
+    rental: true,
+    name: 'Room rental',
+    rentalLengthRaw: 2,
+    rentalLengthType: 'hour',
+    inventory: null,
+  })
+}
+if (groupSmoke) {
+  for (const [id, name, number] of [
+    ['buyer', 'Alex Buyer', 101],
+    ['friend', 'Casey Friend', 102],
+  ])
+    docs.set('members/' + id, {
+      access: 'dev',
+      name,
+      fname: name.split(' ')[0],
+      lname: name.split(' ')[1],
+      id_number: number,
+      membership_type: 'Existing annual',
+      id_expiration: Math.floor(Date.now() / 1000) + 86400,
+      creation_time: { timestampValue: time },
+      checkedIn: false,
+      dna: false,
+      notes: [],
+      dob: '1990-01-02',
+      email: '',
+      idnum: 'FAKE-' + id,
+      idstate: 'TX',
+    })
+}
+if (themeSmoke) docs.get('users/' + uid).themePreference = 'dark'
 docs.get('users/' + uid).email = 'matthew@striks.com'
 docs.set(`system/${club}/products/retail`, {
   ...membershipProduct(),
@@ -35,6 +96,41 @@ Object.assign(docs.get(`system/${club}/registers/${registerId}`), {
   closedAt: null,
   closeNote: '',
 })
+const imageReads = new Map()
+let catalogImage
+if (catalogSmoke) {
+  const sharp = createRequire(new URL('../functions/package.json', import.meta.url))('sharp')
+  catalogImage = await sharp({
+    create: { width: 160, height: 160, channels: 3, background: '#32876b' },
+  })
+    .webp()
+    .toBuffer()
+  Object.assign(docs.get(`system/${club}/products/retail`), {
+    favorite: true,
+    imagePath: `cerms5/catalog/${club}/products/retail/${'a'.repeat(64)}.webp`,
+  })
+  for (const [id, name] of [
+    ['fallback', 'Text fallback'],
+    ['broken', 'Unavailable image'],
+  ])
+    docs.set(`system/${club}/products/${id}`, {
+      ...docs.get(`system/${club}/products/retail`),
+      name,
+      cat: 'rooms',
+      barcode: id,
+      favorite: false,
+      imagePath:
+        id === 'broken' ? `cerms5/catalog/${club}/products/broken/${'b'.repeat(64)}.webp` : null,
+    })
+  docs.set(`system/${club}/categories/rooms`, {
+    name: 'Rooms',
+    desc: '',
+    color: '#f0dbaa',
+    version: 1,
+    updatedBy: uid,
+    updatedAt: { timestampValue: time },
+  })
+}
 const encode = (v) =>
   v === null
     ? { nullValue: null }
@@ -59,10 +155,16 @@ const document = (p) => ({
   createTime: time,
   updateTime: time,
 })
+async function expandCategories(page) {
+  await page.locator('.pos-category summary').first().waitFor()
+  for (const summary of await page.locator('.pos-category:not([open]) > summary').all())
+    await summary.click()
+}
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
 delete env.ELECTRON_RUN_AS_NODE
 const app = await electron.launch({ args: ['.'], env, timeout: 20000 }),
   errors = []
+let originalDraft
 let saleCalls = 0,
   dropFirstResponse = true
 try {
@@ -133,6 +235,37 @@ try {
             dropFirstResponse = false
             return route.abort('failed')
           }
+        } else if (url.pathname === '/saveThemePreference') {
+          if (failThemeNext) {
+            failThemeNext = false
+            throw new Error('Synthetic appearance failure')
+          }
+          result = await saveThemePreference({ auth: { uid }, data }, fixture.deps)
+        } else if (url.pathname === '/updateRental') {
+          result = await updateRental({ auth: { uid }, data }, fixture.deps)
+        } else if (catalogSmoke && url.pathname === '/getProductImage') {
+          imageReads.set(data.productId, (imageReads.get(data.productId) ?? 0) + 1)
+          result = await getImage(
+            { auth: { uid }, data },
+            {
+              fail: fixture.deps.fail,
+              db: {
+                doc: (path) => ({
+                  get: async () => ({ exists: docs.has(path), data: () => docs.get(path) }),
+                }),
+              },
+              bucket: {
+                file: (path) => ({
+                  getMetadata: async () => {
+                    if (path.includes('/broken/'))
+                      fixture.deps.fail('not-found', 'Synthetic missing image')
+                    return [{ contentType: 'image/webp', size: catalogImage.length }]
+                  },
+                  download: async () => [catalogImage],
+                }),
+              },
+            },
+          )
         } else if (url.pathname === '/savePosSettings')
           result = await savePosSettings({ auth: { uid }, data }, fixture.deps)
         else throw Error('Unexpected function')
@@ -166,7 +299,11 @@ try {
         const collection = body.structuredQuery.from[0].collectionId
         return respond(
           [...docs.keys()]
-            .filter((p) => p.startsWith(`system/${club}/${collection}/`))
+            .filter((p) =>
+              collection === 'members'
+                ? p.startsWith('members/')
+                : p.startsWith(`system/${club}/${collection}/`),
+            )
             .map((p) => ({ document: document(p) })),
         )
       }
@@ -218,6 +355,15 @@ try {
     BrowserWindow.getAllWindows().forEach((w) => stub(w.webContents))
     app.on('web-contents-created', (_e, wc) => stub(wc))
   })
+  originalDraft = await page.evaluate(
+    ({ uid, club }) => {
+      const key = `cerms.pos.${uid}.${club}`,
+        prior = localStorage.getItem(key)
+      localStorage.removeItem(key)
+      return prior
+    },
+    { uid, club },
+  )
   await page.getByLabel('Email', { exact: true }).fill('matthew@striks.com')
   await page.getByLabel('Password', { exact: true }).fill('synthetic-password')
   await page.evaluate(() => (location.hash = 'registers'))
@@ -241,70 +387,465 @@ try {
     item.click()
   })
   await expect(page.getByText('Your register is open')).toBeVisible()
-  await page.getByLabel('Product category').selectOption('retail')
-  await page.getByLabel('Search or scan products').fill('12345')
-  await page.getByLabel('Search or scan products').press('Enter')
-  await page.getByLabel('Quantity for Test retail').fill('2')
-  await page.getByRole('button', { name: 'Take payment', exact: true }).click()
-  const payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
-  await payment.getByLabel('Payment amount 1').fill('10.00')
-  await payment.getByLabel('Cash received', { exact: true }).fill('20.00')
-  await payment.getByRole('button', { name: 'Add payment method' }).click()
-  await payment.getByLabel('Payment reference 2').fill('terminal-123')
-  await expect(payment.getByText('$10.00', { exact: true })).toBeVisible()
-  await payment.getByRole('checkbox').check()
-  await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
-  await expect(payment.getByRole('button', { name: 'Retry same sale' })).toBeVisible()
-  await page.evaluate(() => {
-    location.hash = 'registers'
-  })
-  await expect(page.getByRole('button', { name: 'Close my register' })).toBeVisible()
-  await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
-  await page.getByRole('button', { name: 'Retry / retrieve saved receipt' }).click()
-  const receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
-  await expect(receipt).toBeVisible()
-  await expect(receipt.locator('pre')).toContainText('Change: $10.00')
-  await expect(receipt.locator('pre')).toContainText('Card paid: $11.60')
-  await receipt.getByLabel('Receipt printer', { exact: true }).selectOption('Synthetic RP326')
-  await receipt.getByRole('button', { name: 'Print receipt', exact: true }).click()
-  await expect(receipt.getByText('Receipt sent to the printer.')).toBeVisible()
-  assert.equal(await app.evaluate(() => globalThis.receiptPrints.length), 1)
-  assert.equal(saleCalls, 2)
-  assert.equal(fixture.commits(), 1)
-  assert.equal(docs.get(`system/${club}/registerTotals/${registerId}`).expectedCashCents, 11000)
-  await mkdir('artifacts', { recursive: true })
-  await page.screenshot({ path: 'artifacts/pos-receipt.png' })
-  await receipt.getByRole('button', { name: 'Done', exact: true }).click()
-  await expect(page.getByText(/Expected cash \$110.00/)).toBeVisible()
-  await page.getByRole('button', { name: 'Sales & payments', exact: true }).click()
-  await expect(page.getByText('terminal-123', { exact: false })).toBeVisible()
-  await page.getByRole('button', { name: 'View / print' }).click()
-  await expect(page.getByRole('dialog', { name: 'Sale receipt' })).toBeVisible()
-  await page.getByRole('button', { name: 'Done', exact: true }).click()
-  await page.getByRole('button', { name: 'Tax & receipts', exact: true }).click()
-  await page.getByLabel('Sales tax (%)', { exact: true }).fill('7.25')
-  await page.getByRole('button', { name: 'Save POS settings' }).click()
-  await expect(page.getByText('Tax and receipt settings saved.')).toBeVisible()
-  assert.equal(docs.get(`system/${club}/posSettings/default`).taxRateBps, 725)
-  await page.getByRole('link', { name: 'Registers', exact: true }).click()
-  await page.getByRole('button', { name: 'Close my register' }).click()
-  const closing = page.getByRole('dialog', { name: 'Close register', exact: true })
-  await closing.getByLabel('$20 bills', { exact: true }).fill('5')
-  await closing.getByLabel('$10 bills', { exact: true }).fill('1')
-  await expect(closing.getByText('Expected cash', { exact: true })).toBeVisible()
-  await closing.getByRole('button', { name: 'Save ending count and close' }).click()
-  await expect(
-    page.getByText('Register closed. Your ending count is saved in Closed registers.'),
-  ).toBeVisible()
-  await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
-  await expect(
-    page.getByText('Open your register before checkout.', { exact: false }),
-  ).toBeVisible()
-  await page.screenshot({ path: 'artifacts/pos-workspace.png' })
-  assert.deepEqual(errors, [])
-  console.log(
-    'POS smoke passed: barcode, split payment/change, uncertain-save retry, receipt printing/reopen, tax settings and register close. All HTTPS intercepted; no real payments, writes or print jobs.',
-  )
+  if (themeSmoke) {
+    const profileBefore = structuredClone(docs.get('users/' + uid))
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark')
+    const light = page.getByRole('button', { name: 'Switch to light mode' })
+    await expect(light).toHaveAttribute('aria-pressed', 'true')
+    await light.click()
+    await expect(page.getByRole('button', { name: 'Switch to dark mode' })).toBeEnabled()
+    assert.deepEqual(docs.get('users/' + uid), { ...profileBefore, themePreference: 'light' })
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+    await expect(light).toBeEnabled()
+    assert.deepEqual(docs.get('users/' + uid), profileBefore)
+    // A failed write must show an error and restore the prior appearance.
+    failThemeNext = true
+    await light.click()
+    await expect(page.getByRole('alert')).toContainText('Synthetic appearance failure')
+    await expect(light).toBeEnabled()
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark')
+    assert.equal(fixture.commits(), 2)
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+    await page.getByLabel('Email', { exact: true }).fill('matthew@striks.com')
+    await page.getByLabel('Password', { exact: true }).fill('synthetic-password')
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
+    await expect(light).toBeEnabled()
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark')
+    assert.equal(fixture.commits(), 2, 'Sign-in must never write the preference')
+    await mkdir('artifacts', { recursive: true })
+    await expandCategories(page)
+    await expect(page.getByRole('button', { name: 'Test retail', exact: true })).toBeVisible()
+    await page.screenshot({ path: 'artifacts/dark-mode-pos.png' })
+    await page.getByRole('link', { name: 'Registers', exact: true }).click()
+    await page.getByRole('button', { name: 'Close my register', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    const appearance = await dialog.evaluate((el) => ({
+      bg: getComputedStyle(el).backgroundColor,
+      color: getComputedStyle(el).color,
+      scheme: getComputedStyle(el).colorScheme,
+    }))
+    assert.equal(appearance.scheme, 'dark')
+    assert.notEqual(appearance.bg, 'rgb(255, 255, 255)')
+    await page.screenshot({ path: 'artifacts/dark-mode-dialog.png' })
+    assert.deepEqual(errors, [])
+    console.log(
+      'Dark mode passed: saved-profile loading, both toggles, profile-only writes, failure rollback, sign-out/in persistence without sign-in writes, and dark POS/register dialog. All HTTPS intercepted.',
+    )
+  } else if (catalogSmoke) {
+    const favorites = page.getByRole('region', { name: 'Favorites', exact: true })
+    const tile = favorites.getByRole('button', { name: 'Test retail', exact: true })
+    await expect(tile.locator('img')).toBeVisible()
+    await expect(tile.locator('span')).toHaveCount(0)
+    const retailCategory = page
+      .locator('.pos-category')
+      .filter({ has: page.locator('summary').filter({ hasText: 'Retail' }) })
+    await expect(retailCategory).not.toHaveAttribute('open', '')
+    await retailCategory.locator('summary').click()
+    await expect(retailCategory).toHaveAttribute('open', '')
+    await retailCategory.locator('summary').click()
+    await expect(retailCategory).not.toHaveAttribute('open', '')
+    await expect(tile).toBeVisible()
+    await expect(retailCategory.getByRole('button')).toHaveCount(0)
+    await page.getByLabel('Product category').selectOption('rooms')
+    await expect(tile).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Text fallback', exact: true })).toBeVisible()
+    await expect.poll(() => imageReads.get('broken') ?? 0).toBeGreaterThan(0)
+    await expect(
+      page.getByRole('button', { name: 'Unavailable image', exact: true }).locator('img'),
+    ).toHaveCount(0)
+    await page.getByLabel('Search or scan products').fill('no matching products')
+    await expect(tile).toBeVisible()
+    await expect(page.locator('.pos-category')).toHaveCount(0)
+    await page.getByLabel('Search or scan products').fill('')
+    await page.getByLabel('Product category').selectOption('')
+    const rooms = page
+      .locator('.pos-category')
+      .filter({ has: page.locator('summary').filter({ hasText: 'Rooms' }) })
+    await expect(rooms).not.toHaveAttribute('open', '')
+    await rooms.locator('summary').focus()
+    await page.keyboard.press('Enter')
+    await expect(rooms.getByRole('button')).toHaveCount(2)
+    await page.keyboard.press('Enter')
+    await expect(rooms.getByRole('button')).toHaveCount(0)
+    await expect(tile).toBeVisible()
+    await rooms.locator('summary').click()
+    await page.getByRole('button', { name: 'Text fallback', exact: true }).click()
+    await tile.click()
+    await expect(page.locator('.pos-cart')).toContainText('Test retail')
+    await expect(page.getByLabel('Quantity for Text fallback')).toHaveValue('1')
+    assert.equal(
+      imageReads.get('retail'),
+      1,
+      'Favorites and category reuse the same authenticated image read',
+    )
+    assert.equal(fixture.commits(), 0)
+    await mkdir('artifacts', { recursive: true })
+    await page.screenshot({ path: 'artifacts/pos-catalog-images.png' })
+    assert.deepEqual(errors, [])
+    console.log(
+      'POS catalog passed: image tiles, accessible names, text/error fallback, collapsible categories, persistent top favorites, filtering, keyboard toggles, deduplicated image reads and cart additions. All HTTPS intercepted.',
+    )
+  } else if (membershipSmoke) {
+    await page.getByRole('link', { name: 'Members', exact: true }).click()
+    await page.getByRole('button', { name: 'Create membership', exact: true }).click()
+    const form = page.getByRole('dialog')
+    await form.getByLabel('First name', { exact: true }).fill('Synthetic')
+    await form.getByLabel('Last name', { exact: true }).fill('Guest')
+    await form.getByLabel('Date of birth', { exact: true }).fill('1990-01-02')
+    await form.getByLabel('ID state or type', { exact: true }).selectOption('TX')
+    await form.getByLabel('ID number', { exact: true }).fill('FAKE-CHECKOUT-1')
+    await form.getByLabel('Type of membership', { exact: true }).selectOption('plan')
+    await form.getByRole('button', { name: 'Continue to checkout' }).click()
+    await expect(page.locator('.pos-cart')).toContainText('Monthly plan')
+    assert.equal(
+      [...docs.keys()].filter((k) => k.startsWith('members/')).length,
+      groupSmoke ? 2 : 0,
+    )
+    let firstPendingId, secondPendingId
+    if (groupSmoke) {
+      firstPendingId = await page.getByLabel('Order linked to', { exact: true }).inputValue()
+      await page.getByRole('button', { name: 'Add membership', exact: true }).click()
+      const another = page.getByRole('dialog', { name: 'Create member · Dev System' })
+      await another.getByLabel('First name', { exact: true }).fill('Second')
+      await another.getByLabel('Last name', { exact: true }).fill('Guest')
+      await another.getByLabel('Date of birth', { exact: true }).fill('1990-01-02')
+      await another.getByLabel('ID state or type', { exact: true }).selectOption('TX')
+      await another.getByLabel('ID number', { exact: true }).fill('FAKE-CHECKOUT-2')
+      await another.getByLabel('Type of membership', { exact: true }).selectOption('plan')
+      await another.getByRole('button', { name: 'Add membership to order', exact: true }).click()
+      secondPendingId = await page
+        .getByLabel('Order linked to', { exact: true })
+        .locator('option')
+        .filter({ hasText: 'Second Guest' })
+        .getAttribute('value')
+      await expect(page.getByLabel('Quantity for Monthly plan')).toHaveValue('2')
+    }
+    await expandCategories(page)
+    await page.locator('.pos-product').filter({ hasText: 'Room rental' }).click()
+    await expect(page.getByRole('button', { name: 'Take payment', exact: true })).toBeDisabled()
+    await page.getByLabel('Assigned Room/Number for Room rental', { exact: true }).fill('A-12')
+    if (groupSmoke) {
+      await expandCategories(page)
+      await page.locator('.pos-product').filter({ hasText: 'Room rental' }).click()
+      await expandCategories(page)
+      await page.locator('.pos-product').filter({ hasText: 'Room rental' }).click()
+      await page
+        .getByLabel('Assigned member for Room rental 1', { exact: true })
+        .selectOption(firstPendingId)
+      await page
+        .getByLabel('Assigned member for Room rental 2', { exact: true })
+        .selectOption(secondPendingId)
+      await page.getByLabel('Assigned Room/Number for Room rental 2', { exact: true }).fill('B-9')
+      await page.getByLabel('Assigned Room/Number for Room rental 3', { exact: true }).fill('C-4')
+      await page.getByRole('button', { name: 'Find existing member', exact: true }).click()
+      let picker = page.getByRole('dialog', { name: 'Choose existing member' })
+      await picker.getByRole('button', { name: /Alex Buyer/ }).click()
+      await expect(page.getByLabel('Order linked to', { exact: true })).toHaveValue('buyer')
+      await expect(
+        page.getByLabel('Assigned member for Room rental 1', { exact: true }),
+      ).toHaveValue(firstPendingId)
+      await expect(
+        page
+          .getByLabel('Assigned member for Room rental 3', { exact: true })
+          .locator('option')
+          .first(),
+      ).toHaveText('Order member: Alex Buyer')
+      await page
+        .getByLabel('Assigned member for Room rental 3', { exact: true })
+        .selectOption('__find')
+      picker = page.getByRole('dialog', { name: 'Choose existing member' })
+      await picker.getByRole('button', { name: /Casey Friend/ }).click()
+      await expect(page.getByLabel('Order linked to', { exact: true })).toHaveValue('buyer')
+      await page.getByLabel('Order linked to', { exact: true }).selectOption(secondPendingId)
+      await expect(
+        page.getByLabel('Assigned member for Room rental 3', { exact: true }),
+      ).toHaveValue('friend')
+      await page.getByLabel('Order linked to', { exact: true }).selectOption('buyer')
+      // Leaving and reopening the cart must preserve pending members and per-unit assignments.
+      await page.getByRole('link', { name: 'Registers', exact: true }).click()
+      await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
+      await expect(page.getByLabel('Order linked to', { exact: true })).toHaveValue('buyer')
+      await expect(
+        page.getByLabel('Assigned member for Room rental 2', { exact: true }),
+      ).toHaveValue(secondPendingId)
+      await expect(
+        page.getByLabel('Assigned Room/Number for Room rental 3', { exact: true }),
+      ).toHaveValue('C-4')
+      assert.equal(fixture.commits(), 0)
+      await mkdir('artifacts', { recursive: true })
+      await expandCategories(page)
+      await expect(page.locator('.pos-product').filter({ hasText: 'Test retail' })).toBeEnabled()
+      await page.screenshot({ path: 'artifacts/group-order-cart.png' })
+    }
+    await expandCategories(page)
+    await page.locator('.pos-product').filter({ hasText: 'Test retail' }).click()
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    let payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByRole('button', { name: 'Back to cart' }).click()
+    assert.equal(
+      [...docs.keys()].filter((k) => k.startsWith('members/')).length,
+      groupSmoke ? 2 : 0,
+    )
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    await payment.getByLabel('Payment amount 1').dblclick()
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    await expect(payment.getByRole('button', { name: 'Retry same sale' })).toBeVisible()
+    await payment.getByRole('button', { name: 'Retry same sale' }).click()
+    const receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+    await expect(receipt.locator('pre')).toContainText('Assigned Room/Number: A-12')
+    assert.equal(fixture.commits(), 1)
+    const memberEntry = [...docs].find(
+      ([k, m]) => k.startsWith('members/') && m.name === 'Synthetic Guest',
+    )
+    const savedMember = memberEntry[1]
+    const sale = [...docs].find(([k]) => k.startsWith('system/dev/sales/'))[1]
+    assert.equal(sale.member.id, groupSmoke ? 'buyer' : memberEntry[0].slice(8))
+    assert.equal(sale.lines.length, 3)
+    const visit = [...docs].find(([k]) => k.startsWith('activity/'))[1]
+    assert.equal(visit.memberID, memberEntry[0].slice(8))
+    if (groupSmoke) {
+      assert.equal(sale.memberships.length, 2)
+      assert.equal(sale.rentals.length, 3)
+      assert.deepEqual(
+        sale.rentals.map((r) => r.memberId),
+        [firstPendingId, secondPendingId, 'friend'],
+      )
+      assert.equal(docs.get('members/buyer').checkedIn, false)
+      assert.equal(docs.get('members/friend').checkedIn, true)
+      assert.equal([...docs.keys()].filter((k) => k.startsWith('activity/')).length, 3)
+    }
+    assert.equal(visit.lockerRoomStatus[1], 'A-12')
+    await receipt.getByRole('button', { name: 'Done', exact: true }).click()
+    await page.getByRole('link', { name: 'Members', exact: true }).click()
+    const row = page.getByRole('row').filter({ hasText: 'Synthetic Guest' })
+    await expect(row.getByRole('button', { name: 'Create order', exact: true })).toBeVisible()
+    await row.getByRole('button', { name: 'Check in', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Select rentals for check-in' })).toBeVisible()
+    await expandCategories(page)
+    await page.locator('.pos-product').filter({ hasText: 'Room rental' }).click()
+    await page.getByLabel('Assigned Room/Number for Room rental', { exact: true }).fill('B-9')
+    await page.getByRole('button', { name: 'Continue to order', exact: true }).click()
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByLabel('Payment amount 1').dblclick()
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    await expect(payment.getByRole('alert')).toContainText('active visit')
+    assert.equal(fixture.commits(), 1)
+    await payment.getByRole('button', { name: 'Back to cart' }).click()
+    await page.getByRole('link', { name: 'Overview', exact: true }).click()
+    const admission = {
+      id: [...docs.keys()].find((k) => k.startsWith('activity/')).slice(9),
+      editRevision: 0,
+      memberId: memberEntry[0].slice(8),
+      memberName: savedMember.name,
+      memberNumber: String(savedMember.id_number),
+      membershipType: savedMember.membership_type,
+      memberStatus: 'ready',
+      active: visit.active,
+      inside: visit.currIn,
+      waiting: false,
+      rentalEnabled: true,
+      rental: visit.lockerRoomStatus[2],
+      location: visit.lockerRoomStatus[1],
+      rentalStartedAt: visit.lockerRoomStatus[4] * 1000,
+      expiresAt: visit.lockerRoomStatus[5] * 1000,
+      enteredAt: Date.now(),
+      dna: false,
+      tagged: false,
+      notes: '',
+      removedMember: false,
+    }
+    for (const hash of ['overview', 'activity']) {
+      await page.evaluate((h) => {
+        location.hash = h
+      }, hash)
+      await expect(page.getByText('Live updates', { exact: true })).toBeVisible()
+      await page.evaluate(
+        (row) =>
+          window.dispatchEvent(
+            new CustomEvent('admissions-fixture', {
+              detail: { rows: [row], status: 'live' },
+            }),
+          ),
+        admission,
+      )
+      await expect(page.getByRole('row').filter({ hasText: savedMember.name })).toContainText(
+        'Room rental · A-12',
+      )
+    }
+    // Exercise the shared visit editor on both entry points, then paid renewal.
+    const beforeExpiry = visit.lockerRoomStatus[5]
+    for (const hash of ['overview', 'activity']) {
+      await page.evaluate((h) => {
+        location.hash = h
+      }, hash)
+      await expect(page.getByText('Live updates', { exact: true })).toBeVisible()
+      await page.evaluate(
+        (row) =>
+          window.dispatchEvent(
+            new CustomEvent('admissions-fixture', { detail: { rows: [row], status: 'live' } }),
+          ),
+        admission,
+      )
+      await page.getByRole('button', { name: `View visit for ${savedMember.name}` }).click()
+      const details = page.getByRole('dialog', { name: savedMember.name, exact: true })
+      await details.getByLabel('Assigned Room/Number', { exact: true }).fill('C-22')
+      await details.getByLabel('Visit notes', { exact: true }).fill('Renewal fixture note')
+      await details.getByLabel('Inside (off = outside)').uncheck()
+      await details.getByLabel('On waitlist').check()
+      await details.getByRole('button', { name: 'Save rental changes' }).click()
+      await expect(details.getByRole('status')).toContainText('saved')
+      const updated = docs.get('activity/' + admission.id)
+      assert.equal(updated.currIn, false)
+      assert.equal(updated.waitlist, true)
+      assert.equal(updated.lockerRoomStatus[1], 'C-22')
+      assert.equal(updated.lockerRoomStatus[5], beforeExpiry)
+      Object.assign(admission, {
+        editRevision: updated.editRevision,
+        inside: false,
+        waiting: true,
+        location: 'C-22',
+        notes: updated.notes,
+      })
+      await page.evaluate(
+        (row) =>
+          window.dispatchEvent(
+            new CustomEvent('admissions-fixture', { detail: { rows: [row], status: 'live' } }),
+          ),
+        admission,
+      )
+      if (hash === 'overview')
+        await details.getByRole('button', { name: 'Close', exact: true }).click()
+      else {
+        // Discard the deliberately failed duplicate-check-in cart from above.
+        await page.evaluate(
+          ({ uid, club }) => localStorage.removeItem(`cerms.pos.${uid}.${club}`),
+          { uid, club },
+        )
+        await details.getByRole('button', { name: 'Renew in order' }).click()
+      }
+    }
+    await expect(
+      page.getByLabel('Assigned Room/Number for Room rental', { exact: true }),
+    ).toHaveValue('C-22')
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByRole('button', { name: 'Back to cart' }).click()
+    assert.equal(docs.get('activity/' + admission.id).lockerRoomStatus[5], beforeExpiry)
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByLabel('Payment amount 1').dblclick()
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: 'Sale receipt', exact: true })).toBeVisible()
+    assert.equal(docs.get('activity/' + admission.id).lockerRoomStatus[5], beforeExpiry + 7200)
+    assert.equal(
+      [...docs.keys()].filter((k) => k.startsWith('activity/')).length,
+      groupSmoke ? 3 : 1,
+    )
+    await expect(page.getByRole('dialog', { name: 'Sale receipt', exact: true })).toContainText(
+      'Rental renewal',
+    )
+    console.log(
+      'Rental edit/in-out/waitlist on both pages and canceled/completed renewal checkout passed.',
+    )
+    await mkdir('artifacts', { recursive: true })
+    await page.screenshot({ path: 'artifacts/member-checkout.png' })
+    assert.deepEqual(errors, [])
+    if (groupSmoke)
+      console.log(
+        'Group order verified: repeated memberships/rentals, recipient overrides, primary member switching, cart recovery and single atomic commit.',
+      )
+    console.log(
+      'Member checkout smoke passed: deferred creation, added retail/rental, assignment, canceled payment, lost-response retry, linked receipt, duplicate check-in rejection, member actions and both admission views. All HTTPS intercepted.',
+    )
+  } else {
+    await page.getByLabel('Product category').selectOption('retail')
+    await page.getByLabel('Search or scan products').fill('12345')
+    await page.getByLabel('Search or scan products').press('Enter')
+    await page.getByLabel('Quantity for Test retail').fill('2')
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    const payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await expect(payment.getByLabel('Payment method 1')).toHaveValue('cash')
+    await expect(payment.getByLabel('Payment amount 1')).toHaveValue('')
+    await payment.getByLabel('Payment amount 1').fill('10.00')
+    await payment.getByRole('button', { name: 'Add payment method' }).click()
+    await payment.getByLabel('Payment amount 2').fill('1.00')
+    await payment.getByLabel('Payment amount 2').dblclick()
+    await expect(payment.getByLabel('Payment amount 2')).toHaveValue('11.60')
+    await payment.getByLabel('Payment amount 1').fill('20.00')
+    await expect(payment.getByLabel('Cash received', { exact: true })).toHaveCount(0)
+    await expect(payment.getByRole('checkbox')).toHaveCount(0)
+    await expect(payment.getByText('$10.00', { exact: true })).toBeVisible()
+    await mkdir('artifacts', { recursive: true })
+    await payment.screenshot({ path: 'artifacts/pos-payment.png' })
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    await expect(payment.getByRole('button', { name: 'Retry same sale' })).toBeVisible()
+    await page.evaluate(() => {
+      location.hash = 'registers'
+    })
+    await expect(page.getByRole('button', { name: 'Close my register' })).toBeVisible()
+    await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
+    await page.getByRole('button', { name: 'Retry / retrieve saved receipt' }).click()
+    const receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+    await expect(receipt).toBeVisible()
+    await expect(receipt.locator('pre')).toContainText('Change: $10.00')
+    await expect(receipt.locator('pre')).toContainText('Card paid: $11.60')
+    await receipt.getByLabel('Receipt printer', { exact: true }).selectOption('Synthetic RP326')
+    await receipt.getByRole('button', { name: 'Print receipt', exact: true }).click()
+    await expect(receipt.getByText('Receipt sent to the printer.')).toBeVisible()
+    assert.equal(await app.evaluate(() => globalThis.receiptPrints.length), 1)
+    assert.equal(saleCalls, 2)
+    assert.equal(fixture.commits(), 1)
+    assert.equal(docs.get(`system/${club}/registerTotals/${registerId}`).expectedCashCents, 11000)
+    await mkdir('artifacts', { recursive: true })
+    await page.screenshot({ path: 'artifacts/pos-receipt.png' })
+    await receipt.getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(page.getByText(/Expected cash \$110.00/)).toBeVisible()
+    await page.getByRole('button', { name: 'Sales & payments', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'View / print' })).toBeVisible()
+    await page.getByRole('button', { name: 'View / print' }).click()
+    await expect(page.getByRole('dialog', { name: 'Sale receipt' })).toBeVisible()
+    await page.getByRole('button', { name: 'Done', exact: true }).click()
+    await page.getByRole('button', { name: 'Tax & receipts', exact: true }).click()
+    await page.getByLabel('Sales tax (%)', { exact: true }).fill('7.25')
+    await page.getByRole('button', { name: 'Save POS settings' }).click()
+    await expect(page.getByText('Tax and receipt settings saved.')).toBeVisible()
+    assert.equal(docs.get(`system/${club}/posSettings/default`).taxRateBps, 725)
+    await page.getByRole('link', { name: 'Registers', exact: true }).click()
+    await page.getByRole('button', { name: 'Close my register' }).click()
+    const closing = page.getByRole('dialog', { name: 'Close register', exact: true })
+    await closing.getByLabel('$20 bills', { exact: true }).fill('5')
+    await closing.getByLabel('$10 bills', { exact: true }).fill('1')
+    await expect(closing.getByText('Expected cash', { exact: true })).toBeVisible()
+    await closing.getByRole('button', { name: 'Save ending count and close' }).click()
+    await expect(
+      page.getByText('Register closed. Your ending count is saved in Closed registers.'),
+    ).toBeVisible()
+    await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
+    await expect(
+      page.getByText('Open your register before checkout.', { exact: false }),
+    ).toBeVisible()
+    await page.screenshot({ path: 'artifacts/pos-workspace.png' })
+    assert.deepEqual(errors, [])
+    console.log(
+      'POS smoke passed: barcode, split payment/change, uncertain-save retry, receipt printing/reopen, tax settings and register close. All HTTPS intercepted; no real payments, writes or print jobs.',
+    )
+  }
 } finally {
+  if (originalDraft !== undefined)
+    await (
+      await app.firstWindow()
+    )
+      .evaluate(
+        ({ uid, club, prior }) => {
+          const key = `cerms.pos.${uid}.${club}`
+          if (prior === null) localStorage.removeItem(key)
+          else localStorage.setItem(key, prior)
+        },
+        { uid, club, prior: originalDraft },
+      )
+      .catch(() => {})
   await app.close()
 }

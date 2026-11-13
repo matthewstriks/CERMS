@@ -1,150 +1,15 @@
-import { doc, getDoc } from 'firebase/firestore/lite'
-import { getFirebaseServices } from './firebase-membership'
-import {
-  canCreateDevMember,
-  devMemberCommit,
-  isDevMemberCommit,
-  type DevMemberFields,
-} from '../shared/dev-member-policy'
-import {
-  devMemberRecord,
-  memberHash,
-  normalizeGovernmentId,
-  validateDevMember,
-} from '../domain/dev-member'
-import type { MemberCreator, MembershipOption } from '../domain/member-creation'
+import { canCreateDevMember } from '../shared/dev-member-policy'
+import type { MemberCreator } from '../domain/member-creation'
 import { createCatalog } from './firebase-catalog'
-import { catalogMembershipOptions, catalogMembershipOption } from './catalog-memberships'
-import { validProduct } from '../domain/catalog'
-
-/** Deliberate owner-only creation in dev. Every write is create-only and atomically reserves its identity and number. */
+import { catalogMembershipOptions } from './catalog-memberships'
+/** Desktop creation is fulfilled only by completeSale; this adapter lists choices. */
 export function createDevMemberCreator(uid: string, club: string): MemberCreator {
   if (!canCreateDevMember(uid, club))
-    throw new Error('Member creation is available only to the owner in Dev System.')
-  const { auth, db } = getFirebaseServices()
-  let displayedOptions: MembershipOption[] | undefined
-  async function checkSession() {
-    if (auth.currentUser?.uid !== uid) throw new Error('Sign in again before creating a member.')
-    const profile = await getDoc(doc(db, 'users', uid))
-    if (!profile.exists() || profile.data().access !== 'dev')
-      throw new Error('Your system changed. Reopen member creation in Dev System.')
-  }
+    throw new Error('Member creation is owner-only in Dev System.')
   return {
-    async options() {
-      await checkSession()
-      const products = await catalogMembershipOptions(createCatalog({ uid, club }), uid)
-      await checkSession()
-      displayedOptions = products
-      return products
-    },
-    async create(input, requestId) {
-      if (!/^[a-f0-9-]{36}$/.test(requestId)) throw new Error('Invalid creation request.')
-      await checkSession()
-      const draft = validateDevMember(input)
-      const fingerprint = await memberHash(draft)
-      const identity = await memberHash([
-        'dev',
-        draft.governmentIdType,
-        normalizeGovernmentId(draft.governmentId),
-        draft.birthDate,
-      ])
-      const ref = doc(db, 'members', requestId)
-      async function priorResult() {
-        const prior = await getDoc(ref)
-        if (!prior.exists()) return null
-        const data = prior.data()
-        if (data.access !== 'dev' || data.createdBy !== uid || data.fingerprint !== fingerprint)
-          throw new Error('This request already saved different details. Start a new member.')
-        return { id: prior.id, number: data.id_number as number, name: data.name as string }
-      }
-      const prior = await priorResult()
-      if (prior) return prior
-      async function selectedMembership() {
-        const snapshot = await getDoc(
-          doc(db, 'system', 'dev', 'products', draft.membershipProductId),
-        )
-        if (!snapshot.exists())
-          throw new Error(
-            'This membership product no longer exists. Reopen the form to choose another.',
-          )
-        const { version, updatedAt: _updatedAt, updatedBy: _updatedBy, ...data } = snapshot.data()
-        if (!Number.isSafeInteger(version) || version < 1 || !validProduct(data))
-          throw new Error('This membership product has an unsupported format.')
-        const option = catalogMembershipOption(snapshot.id, data, uid)
-        if (!option)
-          throw new Error(
-            'This product is no longer an active membership available to you. Reopen the form to choose another.',
-          )
-        const displayed = displayedOptions?.find((item) => item.id === option.id)
-        if (
-          displayedOptions &&
-          (!displayed ||
-            displayed.name !== option.name ||
-            displayed.durationSeconds !== option.durationSeconds)
-        )
-          throw new Error(
-            'This membership product changed. Reopen the form to review its current name and duration.',
-          )
-        return option
-      }
-      if ((await getDoc(doc(db, 'system', 'dev', 'memberIdentities', identity))).exists())
-        throw new Error('A member with this issuing state, ID and date of birth already exists.')
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const membership = await selectedMembership()
-        const number = 100000000 + (crypto.getRandomValues(new Uint32Array(1))[0]! % 900000000)
-        const record = devMemberRecord(draft, uid, number, identity, fingerprint, membership)
-        const fields: DevMemberFields = {}
-        for (const [key, value] of Object.entries(record)) {
-          if (key === 'creation_time') continue
-          fields[key] =
-            typeof value === 'string'
-              ? { stringValue: value }
-              : typeof value === 'number'
-                ? { integerValue: String(value) }
-                : typeof value === 'boolean'
-                  ? { booleanValue: value }
-                  : {
-                      arrayValue: {
-                        values: (value as string[]).map((stringValue) => ({ stringValue })),
-                      },
-                    }
-        }
-        const body = JSON.stringify(devMemberCommit(requestId, fields, identity, number))
-        if (!isDevMemberCommit(body))
-          throw new Error('Member details do not match the supported development format.')
-        await checkSession()
-        let response: Response
-        try {
-          const token = await auth.currentUser!.getIdToken()
-          response = await fetch(
-            'https://firestore.googleapis.com/v1/projects/cerms-7af24/databases/cerms/documents:commit',
-            {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body,
-            },
-          )
-        } catch {
-          const saved = await priorResult()
-          if (saved) return saved
-          throw new Error(
-            'Save could not be confirmed. Retry with the same details; do not clear the form.',
-          )
-        }
-        if (response.ok) return { id: requestId, number, name: record.name }
-        const saved = await priorResult()
-        if (saved) return saved
-        if ((await getDoc(doc(db, 'system', 'dev', 'memberIdentities', identity))).exists())
-          throw new Error('This member already exists. No existing record was changed.')
-        if ((await getDoc(doc(db, 'system', 'dev', 'memberNumbers', String(number)))).exists())
-          continue
-        throw new Error(
-          response.status === 403
-            ? 'Dev member creation is not permitted by the current Firebase rules.'
-            : 'Unable to confirm the save. Retry with the same details.',
-        )
-      }
-      throw new Error('Unable to reserve a membership number. Retry with the same details.')
+    options: () => catalogMembershipOptions(createCatalog({ uid, club }), uid),
+    async create() {
+      throw new Error('Complete the linked checkout to create this member.')
     },
   }
 }

@@ -6,6 +6,7 @@ export function applicationMenu(
   development: boolean,
   newMember: () => void,
   newOrder: () => void,
+  checkForUpdates: () => void = () => {},
 ): MenuItemConstructorOptions[] {
   const about: MenuItemConstructorOptions = {
     id: 'about-cerms',
@@ -19,6 +20,7 @@ export function applicationMenu(
             label: 'CERMS',
             submenu: [
               about,
+              { id: 'check-for-updates', label: 'Check for Updates…', click: checkForUpdates },
               { type: 'separator' },
               { role: 'services' },
               { type: 'separator' },
@@ -71,7 +73,15 @@ export function applicationMenu(
     },
     { role: 'windowMenu' },
     ...(platform !== 'darwin'
-      ? [{ label: 'Help', submenu: [about] } as MenuItemConstructorOptions]
+      ? [
+          {
+            label: 'Help',
+            submenu: [
+              about,
+              { id: 'check-for-updates', label: 'Check for Updates…', click: checkForUpdates },
+            ],
+          } as MenuItemConstructorOptions,
+        ]
       : []),
   ]
 }

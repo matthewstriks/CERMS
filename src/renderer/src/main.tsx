@@ -1,3 +1,4 @@
+import AppUpdates from './components/AppUpdates'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import AuthGate from './features/AuthGate'
@@ -10,6 +11,7 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <MembershipSessionProvider>
         <AuthGate />
+        <AppUpdates />
       </MembershipSessionProvider>
     </ErrorBoundary>
   </StrictMode>,

@@ -4,11 +4,11 @@ import { useMembershipSession } from '../lib/membership-session'
 import type { SystemOption } from '../../../data/firebase-system-access'
 
 export default function SystemSwitcher() {
-  const { reader, switchSystem } = useMembershipSession()
+  const { reader, switchSystem, savingTheme } = useMembershipSession()
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button className="system-switch-button" onClick={() => setOpen(true)}>
+      <button disabled={savingTheme} className="system-switch-button" onClick={() => setOpen(true)}>
         <ArrowLeftRight size={15} />
         Change system
       </button>

@@ -1,10 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import {
-  devMemberRecord,
-  memberHash,
-  normalizeMemberSearch,
-  validateDevMember,
-} from '../src/domain/dev-member'
+import { devMemberRecord, normalizeMemberSearch, validateDevMember } from '../src/domain/dev-member'
 import {
   devMemberCommit,
   isDevMemberCommit,
@@ -91,7 +86,7 @@ describe('dev member write boundary', () => {
     fields.phone = { integerValue: '12105550123' }
     expect(isDevMemberCommit(JSON.stringify(p))).toBe(false)
   })
-  it('permits only the exact three create-only dev writes', () => {
+  it('blocks desktop creation even for valid legacy create-only dev payloads', () => {
     const body = JSON.stringify(payload())
     expect(isDevMemberCommit(body)).toBe(true)
     expect(
@@ -100,7 +95,7 @@ describe('dev member write boundary', () => {
         'POST',
         body,
       ),
-    ).toBe(true)
+    ).toBe(false)
     for (const mutate of [
       (p: any) => {
         p.writes[1].update.name = p.writes[1].update.name.replace(
@@ -200,104 +195,14 @@ describe('dev creator with synthetic intercepted responses', () => {
     expect(await creator.options()).toEqual([{ ...membership, durationLabel: '30 days' }])
     expect(mock.fetch).not.toHaveBeenCalled()
   })
-  it('stores the selected catalog name and configured expiration', async () => {
-    const now = Math.floor(Date.now() / 1000)
-    await createDevMemberCreator(devCreatorUid, 'dev').create(draft(), crypto.randomUUID())
-    const fields = JSON.parse(mock.fetch.mock.calls[0]![1].body).writes[0].update.fields
-    expect(fields.productId.stringValue).toBe(membership.id)
-    expect(fields.membership_type.stringValue).toBe(membership.name)
-    expect(Number(fields.id_expiration.integerValue)).toBeGreaterThanOrEqual(
-      now + membership.durationSeconds,
-    )
-    expect(Number(fields.id_expiration.integerValue)).toBeLessThanOrEqual(
-      now + membership.durationSeconds + 2,
-    )
-  })
-  it.each([
-    { active: false },
-    { membership: false },
-    { restricted: true, restrictedUsers: ['someone-else'] },
-  ])('rejects an unavailable membership at save time: %j', async (change) => {
-    mock.getDoc.mockImplementation(async (path: string) => ({
-      id: path.split('/').at(-1),
-      exists: () => path.startsWith('users/') || path.includes('/products/'),
-      data: () =>
-        path.startsWith('users/')
-          ? { access: 'dev' }
-          : { ...catalogProduct(), ...change, version: 1 },
-    }))
+  it('requires checkout and never sends a direct member write', async () => {
     await expect(
       createDevMemberCreator(devCreatorUid, 'dev').create(draft(), crypto.randomUUID()),
-    ).rejects.toThrow('no longer an active membership')
+    ).rejects.toThrow('linked checkout')
     expect(mock.fetch).not.toHaveBeenCalled()
   })
-  it('rejects changed name or duration after choices were shown', async () => {
-    mock.products.mockResolvedValue({
-      rows: [{ id: membership.id, version: 1, data: { ...catalogProduct(), name: 'Old name' } }],
-      more: false,
-    })
-    const creator = createDevMemberCreator(devCreatorUid, 'dev')
-    await creator.options()
-    await expect(creator.create(draft(), crypto.randomUUID())).rejects.toThrow('product changed')
-    expect(mock.fetch).not.toHaveBeenCalled()
-  })
-  it('rejects missing catalog products instead of falling back to development membership', async () => {
-    await expect(
-      createDevMemberCreator(devCreatorUid, 'dev').create(
-        { ...draft(), membershipProductId: 'dev-annual' },
-        crypto.randomUUID(),
-      ),
-    ).rejects.toThrow('no longer exists')
-    expect(mock.fetch).not.toHaveBeenCalled()
-  })
-  it('sends only a validated create commit after checking saved dev access', async () => {
-    const creator = createDevMemberCreator(devCreatorUid, 'dev')
-    const result = await creator.create(draft(), crypto.randomUUID())
-    expect(result.name).toBe('José O’NEIL')
-    expect(mock.fetch).toHaveBeenCalledTimes(1)
-    expect(isDevMemberCommit(mock.fetch.mock.calls[0]![1].body)).toBe(true)
-  })
-  it('rejects other users/systems and access changes before sending a write', async () => {
+  it('keeps new membership checkout limited to the Dev owner', () => {
     expect(() => createDevMemberCreator('staff', 'dev')).toThrow('owner')
-    expect(() => createDevMemberCreator(devCreatorUid, 'TheZSATX')).toThrow('owner')
-    mock.getDoc.mockResolvedValue({ exists: () => true, data: () => ({ access: 'TheZSATX' }) })
-    await expect(
-      createDevMemberCreator(devCreatorUid, 'dev').create(draft(), crypto.randomUUID()),
-    ).rejects.toThrow('system changed')
-    expect(mock.fetch).not.toHaveBeenCalled()
-  })
-  it('returns a saved request without another write and rejects changed retry contents', async () => {
-    const fingerprint = await memberHash(validateDevMember(draft()))
-    const request = crypto.randomUUID()
-    mock.getDoc.mockImplementation(async (path: string) => ({
-      id: request,
-      exists: () => true,
-      data: () =>
-        path.startsWith('users/')
-          ? { access: 'dev' }
-          : {
-              access: 'dev',
-              createdBy: devCreatorUid,
-              fingerprint,
-              id_number: 123456789,
-              name: 'José O’NEIL',
-            },
-    }))
-    const creator = createDevMemberCreator(devCreatorUid, 'dev')
-    expect((await creator.create(draft(), request)).number).toBe(123456789)
-    await expect(creator.create({ ...draft(), firstName: 'Changed' }, request)).rejects.toThrow(
-      'different details',
-    )
-    expect(mock.fetch).not.toHaveBeenCalled()
-  })
-  it('rejects duplicate identities without sending a write', async () => {
-    mock.getDoc.mockImplementation(async (path: string) => ({
-      exists: () => !path.startsWith('members/'),
-      data: () => ({ access: 'dev' }),
-    }))
-    await expect(
-      createDevMemberCreator(devCreatorUid, 'dev').create(draft(), crypto.randomUUID()),
-    ).rejects.toThrow('already exists')
-    expect(mock.fetch).not.toHaveBeenCalled()
+    expect(() => createDevMemberCreator(devCreatorUid, 'club-a')).toThrow('owner')
   })
 })

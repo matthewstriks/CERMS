@@ -1,0 +1,42 @@
+{
+  "feature": "POS image tiles, collapsible categories, persistent favorites and scoped cashier image reads",
+  "database": "cerms",
+  "verifiedAt": "2026-10-12T02:34:34.066Z",
+  "ruleset": "projects/cerms-7af24/rulesets/e0edcdd3-1454-47f9-a9b2-e862545fd5d9",
+  "previousRuleset": "projects/cerms-7af24/rulesets/e0edcdd3-1454-47f9-a9b2-e862545fd5d9",
+  "sha256": "417cb1f40e364e4cf76949a47dcf3b25c1b1b09cdfd62d8257278c28c9f852a1",
+  "rulesChecks": 311,
+  "imageServiceChecks": 3,
+  "rulesUnchanged": true,
+  "privateImageBucketUnchanged": true,
+  "interceptedPosCatalogPassed": true,
+  "interceptedImageUploadPassed": true,
+  "interceptedMemberCheckoutPassed": true,
+  "defaultRulesAndStorageRulesUnchanged": true,
+  "bothDatabaseConfigurationsUnchanged": true,
+  "defaultIndexesUnchanged": true,
+  "cermsIndexesUnchanged": true,
+  "legacyBucketUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/getProductImage",
+      "state": "ACTIVE",
+      "updateTime": "2026-10-12T02:32:23.546586244Z",
+      "entryPoint": "getProductImage"
+    }
+  ],
+  "buildPassed": true,
+  "clientTests": 172,
+  "interceptedGroupCheckoutPassed": true,
+  "unrestrictedOriginalImageSize": true,
+  "largeOriginalAbovePreviousByteAndPixelLimitsPassed": true,
+  "sourceOptimizationClientOnly": true,
+  "imageServiceSourceSha256": "df7d38c3ff1ea2f33554757cdf79147adb1aa5ae872e658ae89a4a6e3e24952f",
+  "databaseComparisonExcludedRollingFields": [
+    "earliestVersionTime",
+    "etag"
+  ]
+}

@@ -79,6 +79,14 @@ export function createPos(reader: Pick<MembershipReader, 'uid' | 'club'>) {
         receiptFooter: d?.receiptFooter || 'Thank you for your visit.',
       }
     },
+    updateRental: (data: {
+      visitId: string
+      expectedRevision: number
+      assignedRoom: string
+      notes: string
+      inside: boolean
+      waiting: boolean
+    }) => call('updateRental', { business: reader.club, ...data }),
     saveSettings: (settings: PosSettings) =>
       call('savePosSettings', { business: reader.club, ...settings }),
     async complete(request: SaleRequest) {

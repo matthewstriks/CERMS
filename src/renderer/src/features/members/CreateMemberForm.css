@@ -7,7 +7,7 @@
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: white;
+  background: var(--surface, white);
   min-width: 0;
 }
 .create-member-form legend {
@@ -34,7 +34,7 @@
   border-radius: 6px;
   padding: 10px;
   color: var(--ink);
-  background: white;
+  background: var(--surface, white);
   font: inherit;
 }
 .create-member-form textarea {

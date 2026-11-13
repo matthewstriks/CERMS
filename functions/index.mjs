@@ -63,6 +63,7 @@ export const uploadProductImage = imageHandler(uploadImage)
 export const getProductImage = imageHandler(getImage)
 
 import {
+  updateRental as updateRentalHandler,
   completeSale as completeSaleHandler,
   savePosSettings as savePosSettingsHandler,
 } from './pos.mjs'
@@ -88,3 +89,26 @@ function posHandler(handler) {
 }
 export const completeSale = posHandler(completeSaleHandler)
 export const savePosSettings = posHandler(savePosSettingsHandler)
+
+export const updateRental = posHandler(updateRentalHandler)
+
+import { saveThemePreference as saveThemeHandler } from './theme.mjs'
+export const saveThemePreference = onCall(
+  { region: 'us-central1', maxInstances: 3, timeoutSeconds: 30 },
+  async (request) => {
+    try {
+      return await saveThemeHandler(request, {
+        db,
+        fail: (code, message) => {
+          throw new HttpsError(code, message)
+        },
+      })
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      throw new HttpsError(
+        'unavailable',
+        'Appearance could not be confirmed. Try again when connected.',
+      )
+    }
+  },
+)

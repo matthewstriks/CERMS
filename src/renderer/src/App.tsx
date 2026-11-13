@@ -1,7 +1,7 @@
 import { hasStaffPermission } from '../../domain/staff-permissions'
 import BrandLogo from './components/BrandLogo'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronRight, LogOut } from 'lucide-react'
+import { ChevronRight, LogOut, Moon, Sun } from 'lucide-react'
 import { modules } from './lib/modules'
 import type { ModuleId } from './lib/modules'
 import { Badge } from './components/ui'
@@ -85,8 +85,7 @@ export default function App() {
         membership.reader?.club ?? '',
         membership.reader?.permissions,
       )) ||
-    route === 'activity' ||
-    route === 'overview'
+    ((route === 'activity' || route === 'overview') && !canUsePos)
   return (
     <div className="app-layout">
       <a
@@ -159,9 +158,28 @@ export default function App() {
             <ChevronRight size={14} />
             <span>{current.label}</span>
           </div>
-          <div className="topbar-right">CERMS {info.data?.version ?? '…'}</div>
+          <div className="topbar-right">
+            <span>CERMS {info.data?.version ?? '…'}</span>
+            <button
+              className="theme-toggle"
+              aria-label={
+                membership.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+              }
+              title={membership.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-pressed={membership.theme === 'dark'}
+              disabled={membership.savingTheme || membership.switching}
+              onClick={() => void membership.toggleTheme()}
+            >
+              {membership.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
         </header>
         <main id="main-content">
+          {membership.themeError && (
+            <p className="inline-error" role="alert">
+              {membership.themeError}
+            </p>
+          )}
           {membership.sessionError && (
             <p className="inline-error" role="alert">
               {membership.sessionError}

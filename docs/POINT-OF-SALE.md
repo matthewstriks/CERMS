@@ -1,12 +1,18 @@
 # Point of sale
 
+Current checkout flow: [linked membership and rental checkout](MEMBER-CHECKOUT.md) supersedes the earlier separate member-creation/payment flow. Members and rental visits are now fulfilled atomically with their linked order; direct desktop member creation is blocked.
+
 CERMS records payments received on external terminals or by other methods; it does not charge cards, redeem gift-card balances, or collect card numbers. The user explicitly confirmed this model. Tax is configurable per business, and the supplied printer is a Rongta RP326 (80 mm).
+
+Group orders can include multiple pending memberships and individually assigned rentals; the order link can switch between existing and pending members. See [Multiple memberships and rental recipients](MULTI-MEMBER-ORDERS.md).
+
+POS tiles now use saved product images, collapsible category groups and a persistent top Favorites section; see [POS catalog](POS-CATALOG.md). Upload images and mark favorites in the existing Products editor.
 
 ## Checkout
 
 The POS catalog lists active products allowed for the cashier, with category dropdown, name/barcode search, Enter-terminated barcode scans, quantities, custom prices for ask-for-price products, and stock availability. Prices, taxability, restrictions, inventory and catalog versions are verified again on the server. Inventory is decremented atomically for tracked, non-payout products. Payout products produce negative line values; a net payout records outgoing tender and cannot overdraw recorded cash.
 
-Cash, card, externally redeemed gift card, check and other methods may be split across up to 12 payment portions (one cash portion). Portions must equal the exact total; cash received and change are separate from the cash portion applied to the sale. Staff confirm that payments/change actually occurred before recording. Optional references are external terminal/check references, not card data. All money is integer cents, with tax rounded per product line; configurable tax is 0–100% in hundredths of a percent. A missing tax setup blocks taxable sales instead of silently using zero. Owner settings can reuse an existing business `taxRate` fraction as the initial displayed rate; saving writes only the new POS settings subdocument.
+Cash, card, externally redeemed gift card, check and other methods may be split across up to 12 payment portions (one cash portion). The Take payment window contains method and amount rows, Add payment method, the remaining balance and cash change. Double-clicking an amount fills the remaining due after the other rows. A cash amount means cash received; the client subtracts non-cash payments, applies only the remaining amount from cash and records any excess as change. Non-cash overpayments and excess payouts are blocked. Complete sale records that the entered external payments were received; there is no separate confirmation checkbox or reference field. Saved receipts still retain any references from earlier orders. All money is integer cents, with tax rounded per product line; configurable tax is 0–100% in hundredths of a percent. A missing tax setup blocks taxable sales instead of silently using zero. Owner settings can reuse an existing business `taxRate` fraction as the initial displayed rate; saving writes only the new POS settings subdocument.
 
 Each cashier must have their own open register. The owner has POS access automatically; other staff need the new `processSales` permission in Users & permissions. Old five-flag permission maps remain valid, preserve register defaults, and do not gain POS rights. Creating new staff with this flag is supported by the updated CERMS 5 staff service; existing Auth logins are untouched. All business staff can read saved receipts and register totals, consistent with existing business order/register visibility.
 

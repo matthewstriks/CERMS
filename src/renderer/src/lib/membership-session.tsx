@@ -1,9 +1,13 @@
-import { createContext, useContext, useRef, useState } from 'react'
+import { createContext, useContext, useRef, useState, useLayoutEffect } from 'react'
 import type { ReactNode } from 'react'
 import { canSwitchSystems } from '../../../shared/firebase-policy'
 import type { MembershipReader } from '../../../data/membership-contracts'
 
 interface MembershipSession {
+  theme: 'light' | 'dark'
+  savingTheme: boolean
+  themeError: string
+  toggleTheme(): Promise<void>
   switching: boolean
   sessionError: string
   switchSystem(systemId: string): Promise<void>
@@ -16,10 +20,46 @@ export function MembershipSessionProvider({ children }: { children: ReactNode })
   const [reader, setReader] = useState<MembershipReader | null>(null)
   const [switching, setSwitching] = useState(false)
   const [sessionError, setSessionError] = useState('')
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [savingTheme, setSavingTheme] = useState(false)
+  const [themeError, setThemeError] = useState('')
+  const themeOperation = useRef(false)
+  const activeReader = useRef(reader)
+  activeReader.current = reader
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
   const operation = useRef(false)
   return (
     <Context.Provider
       value={{
+        theme,
+        savingTheme,
+        themeError,
+        async toggleTheme() {
+          if (!reader || operation.current || themeOperation.current) return
+          const uid = reader.uid,
+            previous = theme,
+            next = theme === 'dark' ? 'light' : 'dark'
+          themeOperation.current = true
+          setSavingTheme(true)
+          setThemeError('')
+          setTheme(next)
+          try {
+            const client = await import('../../../data/firebase-theme')
+            await client.saveThemePreference(uid, next)
+          } catch (error) {
+            if (activeReader.current === reader) {
+              setTheme(previous)
+              setThemeError(
+                error instanceof Error ? error.message : 'Appearance could not be saved.',
+              )
+            }
+          } finally {
+            themeOperation.current = false
+            setSavingTheme(false)
+          }
+        },
         reader,
         switching,
         sessionError,
@@ -27,6 +67,7 @@ export function MembershipSessionProvider({ children }: { children: ReactNode })
           if (
             operation.current ||
             !reader ||
+            themeOperation.current ||
             !canSwitchSystems(reader.uid) ||
             systemId === reader.club
           )
@@ -47,6 +88,8 @@ export function MembershipSessionProvider({ children }: { children: ReactNode })
             // Even a failed response can follow a successful commit. Re-read saved
             // access rather than guessing, retrying the write, or restoring old data.
             const next = await client.loadMembershipSession()
+            setTheme(next.themePreference ?? 'light')
+            setThemeError('')
             setReader(next)
             if (switchFailure)
               setSessionError(`${switchFailure} Your saved system access has been reloaded.`)
@@ -72,6 +115,8 @@ export function MembershipSessionProvider({ children }: { children: ReactNode })
           const next = await client.connectMembership(email, password)
           try {
             await window.desktop.setWindowMode('workspace')
+            setTheme(next.themePreference ?? 'light')
+            setThemeError('')
             setReader(next)
           } catch (error) {
             next.close()
@@ -84,6 +129,8 @@ export function MembershipSessionProvider({ children }: { children: ReactNode })
           setSessionError('')
           reader?.close()
           setReader(null)
+          setTheme('light')
+          setThemeError('')
           const client = await import('../../../data/firebase-membership')
           await client.disconnectMembership()
         },

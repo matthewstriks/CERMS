@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { cartTotals, receiptText, type SaleReceipt } from '../src/domain/pos'
+import {
+  cartTotals,
+  receiptText,
+  settlePayments,
+  paymentAmountDue,
+  type SaleReceipt,
+} from '../src/domain/pos'
 import { productDefaults } from '../src/domain/catalog'
 import { allowFirebaseRequest } from '../src/shared/firebase-policy'
 import { posEndpoints } from '../src/shared/pos-policy'
@@ -116,4 +122,146 @@ describe('POS money and access', () => {
     expect(receiptText(r)).toContain('Change: $5.00')
     expect(receiptText(r)).toContain('Card paid: $10.00')
   })
+})
+
+describe('simple payment amounts', () => {
+  it('applies cash after noncash and records the excess as change regardless of row order', () => {
+    const entries = [
+      { method: 'cash' as const, amount: '20.00' },
+      { method: 'card' as const, amount: '11.60' },
+    ]
+    const settled = settlePayments(2160, entries)
+    expect(settled.remainingCents).toBe(0)
+    expect(settled.changeCents).toBe(1000)
+    expect(settled.payments[0]).toEqual({
+      method: 'cash',
+      amountCents: 1000,
+      receivedCents: 2000,
+      reference: '',
+    })
+    expect(settlePayments(2160, [...entries].reverse()).changeCents).toBe(1000)
+    expect(
+      paymentAmountDue(
+        2160,
+        [
+          { method: 'cash', amount: '10.00' },
+          { method: 'card', amount: '1.00' },
+        ],
+        1,
+      ),
+    ).toBe(1160)
+    expect(paymentAmountDue(2160, [{ method: 'cash', amount: '1.00' }], 0)).toBe(2160)
+  })
+  it('shows the remaining amount for partial payments and rejects noncash overpayment or excess payouts', () => {
+    expect(settlePayments(2160, [{ method: 'card', amount: '10.00' }]).remainingCents).toBe(1160)
+    expect(() => settlePayments(2160, [{ method: 'card', amount: '30.00' }])).toThrow('exceed')
+    expect(() => settlePayments(-2160, [{ method: 'cash', amount: '30.00' }])).toThrow(
+      'cannot exceed',
+    )
+    expect(() =>
+      settlePayments(2160, [
+        { method: 'cash', amount: '10.00' },
+        { method: 'cash', amount: '11.60' },
+      ]),
+    ).toThrow('one cash')
+    expect(settlePayments(0, []).remainingCents).toBe(0)
+    expect(() => settlePayments(2160, [{ method: 'cash', amount: '' }])).toThrow()
+  })
+})
+
+describe('group order requests and receipts', () => {
+  it('permits bounded pending-membership and recipient assignments through the existing callable only', () => {
+    const data = {
+      business: 'dev',
+      requestId: '10000000-0000-4000-8000-000000000001',
+      registerId: '10000000-0000-4000-8000-000000000002',
+      taxRateBps: 0,
+      customerName: '',
+      note: '',
+      member: { id: 'buyer', name: 'Existing buyer' },
+      pendingMembers: [
+        {
+          id: '10000000-0000-4000-8000-000000000003',
+          name: 'Pending guest',
+          draft: { membershipProductId: 'plan' },
+        },
+      ],
+      lines: [{ productId: 'plan', version: 1, quantity: 1, unitPriceCents: 100 }],
+      payments: [],
+      rentals: [
+        {
+          id: '10000000-0000-4000-8000-000000000004',
+          productId: 'room',
+          memberId: 'friend',
+          assignedRoom: 'A-1',
+        },
+      ],
+    }
+    const allowed = (request: unknown) =>
+      allowFirebaseRequest(posEndpoints.completeSale, 'POST', JSON.stringify({ data: request }))
+    expect(allowed(data)).toBe(true)
+    expect(allowed({ ...data, pendingMembers: Array(21).fill(data.pendingMembers[0]) })).toBe(false)
+    expect(allowed({ ...data, rentals: [{ ...data.rentals[0], memberId: '../foreign' }] })).toBe(
+      false,
+    )
+    expect(
+      allowed({ ...data, pendingMembers: [{ ...data.pendingMembers[0], id: 'invalid' }] }),
+    ).toBe(false)
+  })
+  it('prints each membership and rental recipient for repeated product units', () => {
+    const receipt = {
+      receiptName: 'Club',
+      receiptAddress: '',
+      receiptFooter: '',
+      createdAt: 1,
+      receiptNumber: 'sale',
+      registerId: 'register',
+      cashierName: 'Cashier',
+      customerName: 'Buyer',
+      member: { id: 'buyer', name: 'Buyer', number: '1' },
+      members: [
+        { id: 'new-a', name: 'Guest A', number: '2' },
+        { id: 'friend', name: 'Friend B', number: '3' },
+      ],
+      memberships: [{ productId: 'plan', memberId: 'new-a' }],
+      rentals: [
+        { id: 'r1', productId: 'room', memberId: 'new-a', assignedRoom: 'A-1' },
+        { id: 'r2', productId: 'room', memberId: 'friend', assignedRoom: 'B-2' },
+      ],
+      lines: [
+        { productId: 'plan', name: 'Plan', quantity: 1, unitPriceCents: 100, subtotalCents: 100 },
+        { productId: 'room', name: 'Room', quantity: 2, unitPriceCents: 100, subtotalCents: 200 },
+      ],
+      payments: [],
+      subtotalCents: 300,
+      totalCents: 300,
+      taxCents: 0,
+      taxRateBps: 0,
+      note: '',
+    } as unknown as SaleReceipt
+    const printed = receiptText(receipt)
+    expect(printed).toContain('Membership for: Guest A')
+    expect(printed).toContain('Assigned to: Guest A')
+    expect(printed).toContain('Assigned to: Friend B')
+    expect(printed).toContain('Assigned Room/Number: B-2')
+  })
+})
+
+it('allows only the bounded rental edit endpoint and valid renewal visit identifiers through the request guard', () => {
+  const edit = {
+    business: 'dev',
+    visitId: 'sale_unit',
+    expectedRevision: 0,
+    assignedRoom: 'A-1',
+    notes: '',
+    inside: false,
+    waiting: true,
+  }
+  const allowed = (d: unknown) =>
+    allowFirebaseRequest(posEndpoints.updateRental, 'POST', JSON.stringify({ data: d }))
+  expect(allowed(edit)).toBe(true)
+  expect(allowed({ ...edit, expiresAt: 9999999999 })).toBe(false)
+  expect(allowed({ ...edit, expectedRevision: -1 })).toBe(false)
+  expect(allowed({ ...edit, visitId: '../foreign' })).toBe(false)
+  expect(allowed({ ...edit, inside: 'true' })).toBe(false)
 })

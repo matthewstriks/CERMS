@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 const sharp = createRequire(new URL('../functions/package.json', import.meta.url))('sharp')
 import { _electron as electron, expect } from 'playwright/test'
 import assert from 'node:assert/strict'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
 delete env.ELECTRON_RUN_AS_NODE
 const app = await electron.launch({ args: ['.'], env, timeout: 20000 })
@@ -33,11 +33,20 @@ documents.set(ownerPath, {
   },
 })
 const imageBytes = await sharp({
-  create: { width: 80, height: 50, channels: 3, background: '#32876b' },
+  create: { width: 4001, height: 4001, channels: 3, background: '#32876b' },
 })
-  .png()
+  .png({ compressionLevel: 0 })
   .toBuffer()
-const savedImage = await sharp(imageBytes).webp().toBuffer()
+assert.ok(
+  imageBytes.length > 5 * 1024 * 1024,
+  'Synthetic original exceeds the former file-size cap',
+)
+const originalInfo = await sharp(imageBytes).metadata()
+assert.ok(
+  originalInfo.width * originalInfo.height > 16000000,
+  'Synthetic original exceeds the former pixel cap',
+)
+const savedImage = await sharp(imageBytes).resize(512, 512).webp().toBuffer()
 const productPath = `${base}/system/${club}/products/image-product`
 const categoryPath = `${base}/system/${club}/categories/memberships`
 documents.set(productPath, {
@@ -54,6 +63,8 @@ documents.set(categoryPath, {
     updatedBy: uid,
   }),
 })
+const largeImagePath = `/private/tmp/cerms-product-image-${process.pid}.png`
+await writeFile(largeImagePath, imageBytes)
 let imageUploads = 0
 try {
   const admissions = await readFile(
@@ -147,7 +158,12 @@ try {
       const { data } = request.postDataJSON()
       assert.equal(data.business, club)
       assert.equal(data.productId, 'image-product')
-      assert.equal(data.mimeType, 'image/png')
+      assert.equal(data.mimeType, 'image/webp')
+      const prepared = await sharp(Buffer.from(data.base64, 'base64')).metadata()
+      assert.ok(
+        prepared.width <= 1024 && prepared.height <= 1024,
+        'Original is automatically optimized before upload',
+      )
       imageUploads++
       return respond({
         result: {
@@ -202,9 +218,7 @@ try {
 
   await page.getByRole('button', { name: 'Edit product Image product', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Edit product', exact: true })
-  await dialog
-    .getByLabel('Product image', { exact: true })
-    .setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: imageBytes })
+  await dialog.getByLabel('Product image', { exact: true }).setInputFiles(largeImagePath)
   await expect(dialog.getByAltText('Product image preview')).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled()
   await dialog.getByRole('button', { name: 'Save changes', exact: true }).click()
@@ -225,8 +239,9 @@ try {
   assert.equal(creates, 0)
   assert.deepEqual(errors, [])
   console.log(
-    'Product image feature passed: select, preview, upload/save, reopen and remove. All network traffic intercepted.',
+    'Product image feature passed: source above 5 MB and 16 megapixels accepted, optimized automatically, previewed, saved, reopened and removed. All network traffic intercepted.',
   )
 } finally {
   await app.close()
+  await rm(largeImagePath, { force: true })
 }

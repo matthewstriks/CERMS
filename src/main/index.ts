@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { autoUpdater } from 'electron-updater'
+import { createUpdateController } from './updates'
+import { createServiceStatusMonitor } from './service-status'
 import { printReceipt } from './receipt-printing'
 import {
   app,
@@ -9,6 +13,7 @@ import {
   shell,
   Menu,
   clipboard,
+  dialog,
 } from 'electron'
 import { allowSystemSwitchAuthorization } from './system-switch-authorization'
 import { setWindowMode } from './window-mode'
@@ -139,6 +144,25 @@ app
   .whenReady()
   .then(async () => {
     if (process.platform === 'darwin') app.dock?.setIcon(appIcon)
+    let releaseUpdatesEnabled = false
+    if (app.isPackaged) {
+      try {
+        const metadata = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8'))
+        releaseUpdatesEnabled =
+          metadata.cermsRelease?.updatesEnabled === true &&
+          existsSync(join(process.resourcesPath, 'app-update.yml'))
+      } catch {
+        /* Local previews do not opt into release updates. */
+      }
+    }
+    const updates = createUpdateController(autoUpdater, {
+      version: app.getVersion(),
+      enabled: releaseUpdatesEnabled && ['darwin', 'win32'].includes(process.platform),
+      changed: (state) => {
+        if (mainWindow && !mainWindow.isDestroyed())
+          mainWindow.webContents.send('app:update-state', state)
+      },
+    })
     // Read-only Firebase access is a user requirement, not just a disabled UI control.
     session.defaultSession.webRequest.onBeforeRequest(
       {
@@ -224,6 +248,9 @@ app
               mainWindow.webContents.send('order:new')
             }
           },
+          () => {
+            void updates.check(true)
+          },
         ),
       ),
     )
@@ -239,6 +266,33 @@ app
         isTrustedRenderer(event.senderFrame.url, devUrl)
       )
     }
+    ipcMain.handle('app:update-state', (event) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      return updates.state()
+    })
+    ipcMain.handle('app:update-check', (event) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      return updates.check(true)
+    })
+    ipcMain.handle('app:update-install', async (event) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      if (updates.state().phase !== 'ready') return false
+      const result = await dialog.showMessageBox(mainWindow!, {
+        type: 'question',
+        title: 'Install CERMS update',
+        message: 'Install the update and restart CERMS?',
+        detail: 'Finish checkout and save any open forms first. You will need to sign in again.',
+        buttons: ['Install and restart', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+      })
+      return result.response === 0 && updates.install()
+    })
+    const serviceStatus = createServiceStatusMonitor()
+    ipcMain.handle('app:service-status', (event) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      return serviceStatus()
+    })
     ipcMain.handle('receipt:printers', async (event) => {
       if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
       return (await mainWindow!.webContents.getPrintersAsync()).map(({ name, displayName }) => ({
@@ -321,6 +375,21 @@ app
       await shell.openExternal(url)
     })
     await createWindow()
+    const startupUpdate = setTimeout(() => {
+      void updates.check()
+    }, 15000)
+    const updateInterval = setInterval(
+      () => {
+        void updates.check()
+      },
+      4 * 60 * 60 * 1000,
+    )
+    startupUpdate.unref()
+    updateInterval.unref()
+    app.once('before-quit', () => {
+      clearTimeout(startupUpdate)
+      clearInterval(updateInterval)
+    })
     app.on('activate', () => {
       if (!mainWindow) void createWindow()
     })

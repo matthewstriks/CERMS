@@ -1,3 +1,4 @@
+import publicClientConfig from '../../config/firebase-client.json'
 import { readStaffPermissions } from './firebase-staff-permissions'
 import { noStaffPermissions } from '../domain/staff-permissions'
 import { normalizeMemberSearch, normalizeGovernmentId } from '../domain/dev-member'
@@ -35,12 +36,15 @@ import type { MembershipQuery, MembershipReader } from './membership-contracts'
 import { dobVariants, nameVariants } from './membership-search'
 
 const config = {
-  apiKey: import.meta.env.RENDERER_VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.RENDERER_VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.RENDERER_VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.RENDERER_VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.RENDERER_VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.RENDERER_VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.RENDERER_VITE_FIREBASE_API_KEY || publicClientConfig.apiKey,
+  authDomain: import.meta.env.RENDERER_VITE_FIREBASE_AUTH_DOMAIN || publicClientConfig.authDomain,
+  projectId: import.meta.env.RENDERER_VITE_FIREBASE_PROJECT_ID || publicClientConfig.projectId,
+  storageBucket:
+    import.meta.env.RENDERER_VITE_FIREBASE_STORAGE_BUCKET || publicClientConfig.storageBucket,
+  messagingSenderId:
+    import.meta.env.RENDERER_VITE_FIREBASE_MESSAGING_SENDER_ID ||
+    publicClientConfig.messagingSenderId,
+  appId: import.meta.env.RENDERER_VITE_FIREBASE_APP_ID || publicClientConfig.appId,
 }
 let services: ReturnType<typeof createServices> | undefined
 function createServices() {
@@ -137,6 +141,7 @@ export async function loadMembershipSession(): Promise<MembershipReader> {
     uid,
     club: access,
     permissions,
+    themePreference: fields.themePreference === 'dark' ? 'dark' : 'light',
     staffName: typeof fields.displayName === 'string' ? fields.displayName : 'CERMS staff',
     close() {
       closed = true

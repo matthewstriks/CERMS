@@ -1,6 +1,14 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomInt } from 'node:crypto'
+import {
+  validateDevMember,
+  devMemberRecord,
+  normalizeGovernmentId,
+  emptyMemberDraft,
+  durationUnits,
+} from './checkout-domain.mjs'
 const owner = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 const id = (v) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(v)
+const visitId = (v) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,260}$/.test(v)
 const cents = (v) => Number.isSafeInteger(v) && v >= 0 && v <= 999999999
 const methods = ['cash', 'card', 'giftCard', 'check', 'other']
 const exact = (v, keys) =>
@@ -12,6 +20,7 @@ function require(condition, fail, message) {
   if (!condition) fail('invalid-argument', message)
 }
 export function validateSale(d, fail) {
+  require(d && typeof d === 'object' && !Array.isArray(d), fail, 'Invalid sale request.')
   require(exact(d, [
     'business',
     'requestId',
@@ -21,6 +30,9 @@ export function validateSale(d, fail) {
     'taxRateBps',
     'note',
     'customerName',
+    ...('member' in d ? ['member'] : []),
+    ...('rentals' in d ? ['rentals'] : []),
+    ...('pendingMembers' in d ? ['pendingMembers'] : []),
   ]), fail, 'Invalid sale request.')
   require(id(d.business) &&
     /^[a-f0-9-]{36}$/.test(d.requestId) &&
@@ -61,7 +73,257 @@ export function validateSale(d, fail) {
           p.amountCents), fail, 'Check payment amounts. Cash received must cover its payment portion.')
   require(d.payments.filter((p) => p.method === 'cash').length <=
     1, fail, 'Use a single cash payment portion.')
+  function validateMember(m, pending = false) {
+    require(m && typeof m === 'object' && !Array.isArray(m), fail, 'Invalid linked member.')
+    require(exact(m, ['id', 'name', ...('draft' in m ? ['draft'] : [])]) &&
+      id(m.id) &&
+      typeof m.name === 'string' &&
+      m.name.length <= 200, fail, 'Invalid linked member.')
+    if (pending || m.draft !== undefined)
+      require(exact(m.draft, Object.keys(emptyMemberDraft())), fail, 'Invalid new member details.')
+  }
+  if (d.member !== undefined) validateMember(d.member)
+  if (d.pendingMembers !== undefined) {
+    require(Array.isArray(d.pendingMembers) &&
+      d.pendingMembers.length <= 20 &&
+      new Set(d.pendingMembers.map((m) => m?.id)).size === d.pendingMembers.length &&
+      !d.member?.draft, fail, 'Invalid pending memberships.')
+    for (const m of d.pendingMembers) validateMember(m, true)
+  }
+  if (d.rentals !== undefined) {
+    require(Array.isArray(d.rentals) && d.rentals.length <= 100, fail, 'Use at most 100 rentals.')
+    for (const r of d.rentals)
+      require(exact(r, [
+        'productId',
+        'assignedRoom',
+        ...('id' in r ? ['id'] : []),
+        ...('memberId' in r ? ['memberId'] : []),
+        ...('renewalVisitId' in r ? ['renewalVisitId'] : []),
+      ]) &&
+        id(r.productId) &&
+        (r.id === undefined || /^[a-f0-9-]{36}$/.test(r.id)) &&
+        (r.memberId === undefined || id(r.memberId)) &&
+        (r.renewalVisitId === undefined || visitId(r.renewalVisitId)) &&
+        typeof r.assignedRoom === 'string' &&
+        r.assignedRoom.trim().length > 0 &&
+        r.assignedRoom.length <=
+          120, fail, 'Every rental needs a member and an Assigned Room/Number.')
+    require(new Set(d.rentals.map((r) => r.id ?? r.productId)).size ===
+      d.rentals.length, fail, 'Each rental needs a unique assignment.')
+  }
   return d
+}
+// Every participant is resolved server-side; all reads precede all fulfillment writes.
+async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
+  const productMap = new Map(d.lines.map((l, i) => [l.productId, products[i].data()]))
+  const assignments = (d.rentals ?? []).map((r) => ({ ...r, memberId: r.memberId ?? d.member?.id }))
+  require(new Set(assignments.filter((r) => r.renewalVisitId).map((r) => r.renewalVisitId)).size ===
+    assignments.filter((r) => r.renewalVisitId)
+      .length, fail, 'Renew each visit only once per order.')
+  const renewals = []
+  const pending = d.pendingMembers ?? (d.member?.draft ? [d.member] : [])
+  if (pending.length && (uid !== owner || d.business !== 'dev'))
+    fail('permission-denied', 'New membership checkout is owner-only in Dev System.')
+  require(pending.length <= 20, fail, 'Use at most 20 new memberships per order.')
+  const pendingIds = new Set(pending.map((m) => m.id))
+  const memberIds = new Set([
+    ...(d.member ? [d.member.id] : []),
+    ...pendingIds,
+    ...assignments.map((r) => r.memberId),
+  ])
+  require(memberIds.size <= 50 &&
+    [...memberIds].every(id), fail, 'Every rental needs a member in this business.')
+  for (const l of d.lines) {
+    const p = productMap.get(l.productId)
+    const assignedRentals = assignments.filter((r) => r.productId === l.productId)
+    const assignedMemberships = pending.filter((m) => m.draft.membershipProductId === l.productId)
+    require(p.rental
+      ? assignedRentals.length === l.quantity
+      : assignedRentals.length === 0, fail, 'Assign every rental unit exactly once.')
+    require(p.membership
+      ? assignedMemberships.length === l.quantity
+      : assignedMemberships.length ===
+          0, fail, 'Each membership unit needs its own new member details.')
+  }
+  require(assignments.every((r) => productMap.get(r.productId)?.rental) &&
+    pending.every(
+      (m) => productMap.get(m.draft.membershipProductId)?.membership,
+    ), fail, 'A membership or rental assignment is missing its product.')
+  const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+  const records = new Map(),
+    identityKeys = new Set(),
+    numbers = new Set()
+  for (const memberId of memberIds) {
+    const ref = db.doc(`members/${memberId}`),
+      snapshot = await tx.get(ref)
+    const entry = { ref, member: snapshot.data(), isNew: false, visits: [] }
+    const input = pending.find((m) => m.id === memberId)
+    if (input) {
+      require(/^[a-f0-9-]{36}$/.test(memberId), fail, 'Invalid new member ID.')
+      let draft
+      try {
+        draft = validateDevMember(input.draft)
+      } catch (e) {
+        fail('invalid-argument', e.message)
+      }
+      if (snapshot.exists)
+        fail('failed-precondition', 'This member already exists. Link the existing member instead.')
+      const p = productMap.get(draft.membershipProductId)
+      const durationSeconds = p.membershipLengthRaw * durationUnits[p.membershipLengthType]
+      require(Number.isSafeInteger(durationSeconds) &&
+        durationSeconds > 0 &&
+        !p.payout, fail, 'Invalid membership duration.')
+      const identity = hash([
+        'dev',
+        draft.governmentIdType,
+        normalizeGovernmentId(draft.governmentId),
+        draft.birthDate,
+      ])
+      require(!identityKeys.has(
+        identity,
+      ), fail, 'Two pending members have the same ID and date of birth.')
+      identityKeys.add(identity)
+      entry.identityRef = db.doc(`system/dev/memberIdentities/${identity}`)
+      if ((await tx.get(entry.identityRef)).exists)
+        fail('failed-precondition', 'A member with this ID and date of birth already exists.')
+      let number = null
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const candidate = randomInt(100000000, 1000000000)
+        if (numbers.has(candidate)) continue
+        entry.numberRef = db.doc(`system/dev/memberNumbers/${candidate}`)
+        if (!(await tx.get(entry.numberRef)).exists) {
+          number = candidate
+          break
+        }
+      }
+      if (number === null)
+        fail('unavailable', 'Unable to reserve a member number. Retry the same order.')
+      numbers.add(number)
+      entry.member = {
+        ...devMemberRecord(
+          draft,
+          uid,
+          number,
+          identity,
+          hash(draft),
+          { id: draft.membershipProductId, name: p.name, durationSeconds },
+          new Date(now),
+        ),
+        creation_time: timestamp(),
+        orderId: d.requestId,
+      }
+      entry.isNew = true
+    } else if (!entry.member || entry.member.access !== d.business) {
+      fail('permission-denied', 'An assigned member is unavailable in this business.')
+    }
+    const rentals = assignments.filter((r) => r.memberId === memberId && !r.renewalVisitId)
+    for (const r of assignments.filter((r) => r.memberId === memberId && r.renewalVisitId)) {
+      require(!entry.isNew, fail, 'Renewal requires an existing member.')
+      const ref = db.doc(`activity/${r.renewalVisitId}`),
+        snapshot = await tx.get(ref),
+        v = snapshot.data()
+      const p = productMap.get(r.productId),
+        seconds = p.rentalLengthRaw * durationUnits[p.rentalLengthType]
+      if (
+        !v ||
+        v.access !== d.business ||
+        v.memberID !== memberId ||
+        v.active !== true ||
+        v.goingInactive === true ||
+        v.lockerRoomStatus?.[0] !== true
+      )
+        fail('failed-precondition', 'This rental is no longer active in this business.')
+      require(Number.isSafeInteger(seconds) &&
+        seconds > 0 &&
+        !p.payout &&
+        Number.isFinite(v.lockerRoomStatus[5]), fail, 'Invalid rental duration or expiry.')
+      const status = [...v.lockerRoomStatus]
+      status[5] = Math.max(status[5], Math.floor(now / 1000)) + seconds
+      require(Number.isSafeInteger(status[5]), fail, 'Rental expiry exceeds the supported range.')
+      renewals.push({ ref, status })
+      r.assignedRoom = String(status[1])
+    }
+    if (rentals.length) {
+      entry.visitClaimRef = db.doc(`system/${d.business}/memberVisits/${memberId}`)
+      const claim = await tx.get(entry.visitClaimRef)
+      if (
+        entry.member.dna === true ||
+        !Number.isFinite(Number(entry.member.id_expiration)) ||
+        Number(entry.member.id_expiration) * 1000 <= now
+      )
+        fail('failed-precondition', 'Only active, admitted memberships can check in.')
+      if (entry.member.checkedIn === true || claim.exists)
+        fail('failed-precondition', 'An assigned member already has an active visit.')
+      entry.visits = rentals.map((r) => {
+        const p = productMap.get(r.productId),
+          seconds = p.rentalLengthRaw * durationUnits[p.rentalLengthType]
+        require(Number.isSafeInteger(seconds) &&
+          seconds > 0 &&
+          !p.payout, fail, 'Invalid rental duration.')
+        return {
+          id: `${d.requestId}_${r.id ?? r.productId}`,
+          data: {
+            access: d.business,
+            memberID: memberId,
+            active: true,
+            goingInactive: false,
+            waitlist: false,
+            currIn: true,
+            timeIn: timestamp(),
+            notes: '',
+            removed: false,
+            orderId: d.requestId,
+            productId: r.productId,
+            createdBy: uid,
+            lockerRoomStatus: [
+              true,
+              r.assignedRoom.trim(),
+              p.name,
+              r.productId,
+              Math.floor(now / 1000),
+              Math.floor(now / 1000) + seconds,
+            ],
+          },
+        }
+      })
+    }
+    records.set(memberId, entry)
+  }
+  const snapshots = [...records].map(([id, e]) => ({
+    id,
+    name: e.member.name,
+    number: String(e.member.id_number),
+  }))
+  return {
+    member: snapshots.find((m) => m.id === d.member?.id) ?? null,
+    members: snapshots,
+    memberships: pending.map((m) => ({ productId: m.draft.membershipProductId, memberId: m.id })),
+    rentals: assignments,
+    apply() {
+      for (const r of renewals)
+        tx.update(r.ref, {
+          lockerRoomStatus: r.status,
+          renewedAt: timestamp(),
+          renewedBy: uid,
+          renewalOrderId: d.requestId,
+        })
+      for (const [memberId, e] of records) {
+        if (e.isNew) {
+          tx.create(e.ref, { ...e.member, checkedIn: e.visits.length > 0 })
+          const claim = { access: 'dev', memberId }
+          tx.create(e.identityRef, claim)
+          tx.create(e.numberRef, claim)
+        } else if (e.visits.length) tx.update(e.ref, { checkedIn: true })
+        if (e.visits.length)
+          tx.create(e.visitClaimRef, {
+            memberId,
+            orderId: d.requestId,
+            visitIds: e.visits.map((v) => v.id),
+          })
+        for (const visit of e.visits) tx.create(db.doc(`activity/${visit.id}`), visit.data)
+      }
+    },
+  }
 }
 async function access(tx, db, business, uid, fail, admin = false) {
   if (!uid || !id(business)) fail('permission-denied', 'Sign in to your business.')
@@ -117,7 +379,7 @@ export async function savePosSettings(request, { db, fail, timestamp }) {
   })
   return { saved: true }
 }
-export async function completeSale(request, { db, fail, timestamp }) {
+export async function completeSale(request, { db, fail, timestamp, now = () => Date.now() }) {
   const d = validateSale(request.data, fail),
     uid = request.auth?.uid
   const fingerprint = createHash('sha256').update(JSON.stringify(d)).digest('hex')
@@ -229,6 +491,7 @@ export async function completeSale(request, { db, fail, timestamp }) {
         'The register does not have enough recorded cash for this payout.',
       )
     const cash = payments.find((p) => p.method === 'cash')
+    const fulfilled = await fulfillment(tx, db, d, products, uid, timestamp, fail, now())
     const receipt = {
       schemaVersion: 1,
       business: d.business,
@@ -236,7 +499,11 @@ export async function completeSale(request, { db, fail, timestamp }) {
       registerId: d.registerId,
       cashierUid: uid,
       cashierName: profile.displayName || uid,
-      customerName: d.customerName,
+      customerName: fulfilled.member?.name ?? d.customerName,
+      ...(fulfilled.member ? { member: fulfilled.member } : {}),
+      rentals: fulfilled.rentals,
+      members: fulfilled.members,
+      memberships: fulfilled.memberships,
       note: d.note,
       lines,
       payments,
@@ -251,6 +518,7 @@ export async function completeSale(request, { db, fail, timestamp }) {
       createdAt: timestamp(),
       fingerprint,
     }
+    fulfilled.apply()
     tx.create(saleRef, receipt)
     tx.set(totalsRef, {
       schemaVersion: 1,
@@ -279,4 +547,60 @@ export async function completeSale(request, { db, fail, timestamp }) {
     }
     return { saleId: d.requestId }
   })
+}
+
+// Restricted field edit; no time, product, member, admission or billing mutations.
+export async function updateRental(request, { db, fail, timestamp }) {
+  const d = request.data
+  require(exact(d, [
+    'business',
+    'visitId',
+    'expectedRevision',
+    'assignedRoom',
+    'notes',
+    'inside',
+    'waiting',
+  ]) &&
+    id(d.business) &&
+    visitId(d.visitId) &&
+    Number.isSafeInteger(d.expectedRevision) &&
+    d.expectedRevision >= 0 &&
+    typeof d.assignedRoom === 'string' &&
+    !!d.assignedRoom.trim() &&
+    d.assignedRoom.length <= 120 &&
+    typeof d.notes === 'string' &&
+    d.notes.length <= 1000 &&
+    typeof d.inside === 'boolean' &&
+    typeof d.waiting === 'boolean', fail, 'Check the rental details.')
+  await db.runTransaction(async (tx) => {
+    await access(tx, db, d.business, request.auth?.uid, fail)
+    const ref = db.doc(`activity/${d.visitId}`),
+      snapshot = await tx.get(ref),
+      v = snapshot.data()
+    if (
+      !v ||
+      v.access !== d.business ||
+      v.active !== true ||
+      v.goingInactive === true ||
+      v.lockerRoomStatus?.[0] !== true
+    )
+      fail('failed-precondition', 'This rental is no longer active in this business.')
+    if ((v.editRevision ?? 0) !== d.expectedRevision)
+      fail(
+        'failed-precondition',
+        'This rental was edited by someone else. Reopen it and review the latest details.',
+      )
+    const status = [...v.lockerRoomStatus]
+    status[1] = d.assignedRoom.trim()
+    tx.update(ref, {
+      lockerRoomStatus: status,
+      notes: d.notes.trim(),
+      currIn: d.inside,
+      waitlist: d.waiting,
+      editRevision: d.expectedRevision + 1,
+      updatedAt: timestamp(),
+      updatedBy: request.auth.uid,
+    })
+  })
+  return { saved: true }
 }

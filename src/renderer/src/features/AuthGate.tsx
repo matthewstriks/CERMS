@@ -1,3 +1,4 @@
+import ServiceStatus from '../components/ServiceStatus'
 import BrandLogo from '../components/BrandLogo'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -63,6 +64,7 @@ function Login() {
   }
   return (
     <main className="login-screen">
+      <ServiceStatus />
       <div className="login-brand">
         <BrandLogo />
         <strong>CERMS</strong>
