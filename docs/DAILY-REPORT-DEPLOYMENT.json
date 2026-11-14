@@ -1,0 +1,45 @@
+{
+  "verifiedAt": "2026-11-14T18:08:40.836Z",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/sendDevDailyReport",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-14T18:07:52.074042288Z",
+    "serviceAccount": "cerms5-reports@cerms-7af24.iam.gserviceaccount.com"
+  },
+  "recipient": "matthew@rocmtssolutions.com",
+  "business": "dev",
+  "database": "cerms",
+  "schedule": "0 7 * * *",
+  "timeZone": "America/Chicago",
+  "allExistingFunctionsAndSchedulesUnchanged": true,
+  "allRulesDatabaseSettingsAndIndexesUnchanged": true,
+  "allExistingBucketSettingsAndIamUnchanged": true,
+  "legacySmtpSecretPolicyUnchanged": true,
+  "onlyProjectIamAdditionIsDatabaseScopedReportIdentity": true,
+  "reportEndpointPublic": false,
+  "smtpAuthVerifiedWithoutSendingEmail": true,
+  "productionTestEmailsSent": true,
+  "userRequestedTestEmail": {
+    "reportDate": "2026-11-14",
+    "recipient": "matthew@rocmtssolutions.com",
+    "sentAt": "2026-11-14T18:00:43.569Z",
+    "smtpAccepted": true,
+    "attachmentSha256": "ca1eb7290f71e8988ecaa85e01d1e67af587f68d9e3aab3b6be1d92dff5512fc",
+    "orderCount": 1,
+    "closedRegisterCount": 1,
+    "auditPath": "system/dev/dailyReports/2026-11-14",
+    "fullScheduledReportNotSuppressedByTest": true
+  },
+  "productionTestBusinessWrites": false,
+  "existingAuthAccountsModified": false,
+  "privateAttachmentOnlyNoPublicReportUploads": true,
+  "syntheticReportTests": 11,
+  "sourceSha256": {
+    "config.mjs": "e87f5a595935b876fca7f51003cbc9614644759c10ae9c8f724eb03ab352f1e7",
+    "index.mjs": "613c1135abe53585bfa96e39f1682cfd9328b477e1f7f9109bba94528839b700",
+    "delivery.mjs": "7c66c9f90fad3598bd94739d1fcaa4b6e2a0c917cce913ada3d96404270626a2",
+    "report-data.mjs": "0e6a5be363576169dedc2721f9f131d0d1957e1cd6199ab6d31f03c4173edb3f",
+    "report-render.mjs": "40c6ff11c4c619eedb384072c0e940ec7d550a6f79a9b4a2526bda444fe6f1d2",
+    "package-lock.json": "f7338c38b38a3574bdb487269ed8f0c715482287cc34273d93012086b7b9b296"
+  }
+}

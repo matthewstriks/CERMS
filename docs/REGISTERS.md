@@ -42,4 +42,46 @@ New closes save verified `closedByUid` and `closedByName` with the server closin
 
 Verification: 18 focused client checks, four staff-service checks, 311 required synthetic rules checks, build, and intercepted Electron opening/closing plus manager closeout flow passed. No live register writes were performed.
 
+## Printable drawer closeout — November 14, 2026
+
+After a successful close, CERMS opens a **Register closeout report** preview. Staff
+select the installed receipt printer and click **Print closeout report**. Closed
+register rows also have **Print closeout** for reprints. Printing is deliberate;
+closing does not automatically spool a job. The same printer and 80 mm/58 mm paper
+preferences are shared with sale receipts, including the Rongta RP326 option.
+
+The report contains the current business receipt header/address, business and
+register identifiers, original cashier, actual closer when recorded, saved open
+and close times, transaction count, net sales/tax, each payment method, opening
+cash, cash received/change/payouts, expected and counted cash, over/short, every
+opening/closing denomination count, closing note and a verifier signature line.
+Missing historical closer information is labeled **Not recorded**. Payment totals
+use only this register's CERMS 5 POS ledger, with the existing no-POS-record
+fallback; no legacy sales or cash movements are inferred. The business header is
+read from current receipt settings at print time, rather than an immutable header
+snapshot. Saved register counts and closed POS totals remain unchanged on reprint.
+
+Report loading reads the saved closed register and server-owned payment totals in
+the signed-in staff member's saved business. Open/unconfirmed registers and
+inconsistent counts/totals cannot be printed as a completed closeout. No additional
+permission or backend/rules deployment is needed: existing business-scoped read
+rights apply. No profile, register, receipt or ledger writes are added by printing.
+
+A failed report load disables printing and offers **Retry loading report**. A
+printer failure keeps the preview available for retry and explicitly confirms
+that the register remains closed; neither error repeats closing or rolls it back.
+The existing trusted-window print IPC, installed-driver validation, escaped print
+HTML and native print dialog are reused. The native error fallback now refers to
+the saved record so it applies to both sale receipts and closeout reports.
+
+Validation: 190 client checks passed (two existing tests skipped), production
+build/typecheck passed, and intercepted Electron register/POS flows passed. The
+register flow covers report contents, denied-close behavior, load retry, print
+failure/retry, 80/58 mm output, manager closeouts, history reprint and unchanged
+saved documents. Sale receipt printing/reopening and checkout still pass. All
+Firebase requests and print jobs were intercepted; physical RP326 output remains
+to be checked with its installed driver. Screenshot:
+`artifacts/register-closeout-report.png`. No live business writes, real print jobs,
+Firebase deployments or alpha publications were performed for this feature.
+
 Deployed under standing approval. Current rules archive: `firebase/releases/register-managers-2026-09-30.rules`. Evidence: [manager deployment](REGISTER-MANAGERS-DEPLOYMENT.json); legacy configuration and services verified unchanged.

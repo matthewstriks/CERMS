@@ -1,84 +1,117 @@
-# Windows and Mac installers and updates
+# Desktop installers and updates
 
-The first local builds are version `5.0.0-alpha.1`:
+Windows alpha updates are distributed from the isolated Cloud Storage bucket
+`cerms-7af24-cerms5-releases` in the Firebase project. GitHub is not required to
+publish an alpha. The client installs the Firebase-enabled Windows alpha once,
+then receives newer published versions through `electron-updater`.
 
-- Windows 64-bit: `release/CERMS-5-5.0.0-alpha.1-win-x64.exe` — NSIS installer, GitHub updater enabled.
-- Mac Intel + Apple Silicon: `release/CERMS-5-5.0.0-alpha.1-mac-universal.dmg` — universal installer preview; signing is deferred, so updates are manual.
-- Mac ZIP and platform `.yml`/`.blockmap` files are update assets, not the normal installation download.
+## Send the first installer
 
-Windows auto-update has been implemented and packaged; it can receive updates after the new public `matthewstriks/CERMS-5` repository has published higher-version releases. There is no GitHub release online yet. A normal code push does not distribute an update: a new version tag does. This keeps unfinished work out of installed apps.
+Download link for `5.0.0-alpha.1`:
 
-## Put the project in its new repository
+https://storage.googleapis.com/cerms-7af24-cerms5-releases/windows/CERMS-5-5.0.0-alpha.1-win-x64.exe
 
-Use a **public** `CERMS-5` repository for token-free update downloads. Never embed a GitHub token in the desktop. The source may be kept private in a more advanced split setup, but this workflow intentionally uses one public source/release repository.
+The local copy is `release/CERMS-5-5.0.0-alpha.1-win-x64.exe`. This Windows build
+replaces the earlier local GitHub-feed build. Use this Firebase-enabled installer
+for the client. Already-installed GitHub-feed previews require this installer once;
+the update host is embedded at packaging time. App ID and the separate CERMS 5
+user-data directory are preserved.
 
-The existing workspace's `origin` is the legacy `matthewstriks/CERMS` repository. Do not push this release there or change that repository's contents. The source ZIP produced by `python3 scripts/export-desktop-source.py` contains a fresh source snapshot with no `.git` history/remotes, ignored `.env.local`, build output or dependencies. Extract it to a separate folder for the new repository. Public Firebase client identifiers are deliberately included in `config/firebase-client.json` so installers can sign in without requiring a user's `.env.local`; they are not Admin credentials. Database clients remain fixed to named `cerms`.
+## Publish another alpha
 
-One-time setup with GitHub Desktop:
-
-1. Extract `release/CERMS-5-source-5.0.0-alpha.1.zip` into a separate folder.
-2. In GitHub Desktop, add that folder and choose to create a repository there when prompted.
-3. Commit the files, then **Publish repository**, name `CERMS-5`, under `matthewstriks`. Uncheck **Keep this code private**.
-4. On GitHub, open **Actions → Desktop installers and releases → Run workflow** to get fresh unsigned preview installers. Download them from that run's `cerms-windows` / `cerms-macos` artifacts.
-5. To publish the first installable prerelease, push tag `v5.0.0-alpha.1` on that source commit. GitHub Desktop's **Repository → Open in Terminal** can be used for the commands below.
-
-If the empty repository is created in GitHub's website first, clone it into a separate folder, copy the extracted source there, and commit/push it. Never copy `.env.local`, certificates or signing credentials. The GitHub connector available in this session cannot create a repository or upload release binaries, and no GitHub CLI credential is configured on this Mac; local installers and source are provided independently of that setup.
+From this project folder, with the Firebase CLI logged into the publishing account:
 
 ```sh
-# Run in the NEW CERMS-5 repository, after committing the initial source.
-git tag v5.0.0-alpha.1
-git push origin v5.0.0-alpha.1
+npm run release:alpha
 ```
 
-The workflow runs tests, builds on Windows/macOS runners, verifies both installers and update metadata against hashes and sizes, uploads all files to a draft, then publishes only after the complete asset set is present. `v5.0.0-alpha.1` becomes a GitHub prerelease. The Windows installer automatically checks that repository; no GitHub account/token is required on users' machines.
+This increments `5.0.0-alpha.1` to `5.0.0-alpha.2` (and so on), synchronizes the
+lockfile, runs client checks and publisher tests, builds a Windows x64 installer,
+verifies the packaged feed and enabled updater, uploads immutable version files,
+verifies their public download hashes, then updates `windows/alpha.yml` last.
+The command prints the installer link. It does not create a Git commit/tag, push
+source, or publish to GitHub. Commit source and version changes using your usual
+workflow.
 
-## Publish the next version
+If the build/upload fails, the version remains incremented. Retry that same version
+with `npm run release:win`; use `npm run release:upload` to retry just the upload of
+an already-built version. Identical uploads can be retried; different bytes cannot
+replace an existing version. After a successful publication, use `release:alpha`
+for the next update. Never reuse an announced version number.
 
-Commit the code changes first. From a clean checkout of the new repository:
+The release command works on the current Mac using electron-builder's Windows
+cross-build tooling, or on Windows with Node and the Firebase CLI installed.
+Publishing credentials stay in the local CLI login; they are never in the app.
+If the login expires, run `firebase login --reauth` and retry.
 
-```sh
-npm version prerelease --preid=alpha  # alpha.1 → alpha.2; updates lockfile and creates a version commit/tag
-git push origin main --follow-tags
-```
+## What the client sees
 
-For the first stable release use `npm version 5.0.0`; later stable fixes use `npm version patch`. Tags must exactly match `package.json` and the lockfile. Do not replace assets or reuse an already-published version. The pipeline refuses to overwrite a published release. Alpha installs accept newer prereleases and stable releases; stable installs stay on stable releases. Downgrades are disabled.
+The installed alpha checks 15 seconds after launch and every five minutes while
+open. **Help → Check for Updates…** and **Settings → Software updates** check
+immediately. A published newer alpha downloads automatically, displays progress,
+and becomes ready to install on normal quit. **Install and restart** requires an
+explicit native confirmation. No restart is forced during work. An offline or
+failed check/download leaves the current app usable and supports retry.
 
-Install the `.exe` on Windows or drag CERMS 5 from the `.dmg` to Applications on Mac. Current unsigned installers can produce operating-system publisher/security prompts. Signing is optional for this first testing stage; it is not silently bypassed in the app.
+The client does not download another installer manually for subsequent versions.
+The app must still quit/restart to run the new version. Firebase sign-in is
+memory-only, so staff sign in again after restart.
 
-## Update behavior
+Stable builds check every four hours and use `latest.yml`; alphas use `alpha.yml`.
+Alphas never update the stable feed. A future stable publication also updates the
+alpha/beta/rc feeds so testing installs can advance to stable. Beta/rc promotion
+from alpha is not automatic. Downgrades are blocked. Concurrent uploads use
+Storage generation preconditions, so an older publisher cannot overwrite a feed
+changed after it started.
 
-Windows release builds check approximately 15 seconds after launch and every four hours. **Help → Check for Updates…** (Windows) / **CERMS → Check for Updates…** (Mac) and **Settings → Software updates** expose manual checks. New Windows versions download in the background, display progress and an update-ready notice, then install on normal quit. **Install and restart** requires an explicit native confirmation reminding staff to finish checkout/save forms. An update never forces an automatic restart during work. A failed check/download leaves the current app usable and offers retry. Data stays in the separate `CERMS-5` user-data directory; Firebase sessions remain memory-only and require signing in after restart.
+## Release storage and isolation
 
-An unsigned Mac preview explicitly disables the updater; install a new `.dmg` manually. After Apple signing is enabled, install the **first signed Mac build manually**. Subsequent signed Mac releases support the same automatic workflow. Existing unsigned Mac installations cannot be converted to working Squirrel updates merely by uploading a signed next version.
+Only the new release bucket is publicly readable. Installer and blockmap filenames
+include the full version and are immutable; a version's metadata is also archived
+under `windows/releases/{version}.yml`. Channel announcements use `no-store` caching.
+Bucket object versioning preserves channel history. Public read access grants no
+upload/edit rights. This bucket must contain release artifacts only, never member
+records, credentials, or other private data.
 
-## Signing later — optional now
+No legacy bucket, product-image bucket, shared Storage rules, database, Auth account,
+function or project IAM changes are needed. The desktop uses HTTPS downloads and
+does not gain Storage write permissions. The existing Firebase request guard stays
+unchanged. `config/desktop-releases.json` contains only public release endpoints.
 
-For Mac automatic updates, enroll in the Apple Developer Program and create a **Developer ID Application** certificate for distribution outside the App Store. Export the certificate **with its private key** to a password-protected `.p12`. In the NEW repository's **Settings → Secrets and variables → Actions**, configure:
+`node scripts/publish-firebase-release.mjs --setup` creates/configures only the
+fixed isolated bucket. It is a one-time setup, not part of each publish. Read-only
+before/after compatibility evidence is in `docs/DESKTOP-FIREBASE-DEPLOYMENT.json`.
+No fake production release, test sale, business record, image or account is created
+for updater tests.
 
-| Secret                        | Value                                        |
-| ----------------------------- | -------------------------------------------- |
-| `CSC_LINK`                    | Base64-encoded signing `.p12`                |
-| `CSC_KEY_PASSWORD`            | `.p12` export password                       |
-| `APPLE_ID`                    | Apple Developer account email                |
-| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific Apple password for notarization |
-| `APPLE_TEAM_ID`               | Apple Developer Team ID                      |
+## Mac and CI
 
-All five must be present before the workflow enables signing/notarization and Mac updates. Until then, Mac builds continue as unsigned/manual-update previews without blocking Windows releases. Keep the same app ID and Apple signing team for later updates. Do not put any of these values in chat, code, or the source ZIP.
+Mac previews remain unsigned and require manual DMG installation. Mac auto-updates
+are disabled until Apple signing/notarization is configured, and moving Mac to a
+Firebase feed is outside this Windows alpha setup. The first signed Mac build must
+be installed manually. Subsequent signed releases can then auto-update.
 
-Optional Windows certificate-based signing uses `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`. Windows updates do not require disabling signature validation in code; the library retains its normal checksum and publisher validation behavior. A cloud/HSM signing provider can be added later if preferred.
+The existing GitHub Actions workflow still builds Windows and universal Mac
+artifacts on tags/manual requests, but no longer publishes GitHub Releases.
+Windows artifacts embed the Firebase feed. Local `dist`/`package` commands never
+publish, and previews do not enable updates by default. `release:win` explicitly
+enables the Windows updater. No GitHub credentials or public source repo are
+needed for this local alpha publishing flow.
 
-Official references: [electron-builder 26 auto-update requirements](https://www.electron.build/v26/docs/features/auto-update/), [publishing](https://www.electron.build/v26/docs/publish/), and [Electron signing guidance](https://www.electronjs.org/docs/latest/tutorial/code-signing).
+Optional Mac signing requires `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`, plus
+`CERMS_MAC_SIGNED_RELEASE=1` in a release build. Windows certificates can use
+`WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`. No signature verification bypass is
+added. Never embed certificates, private keys or tokens in source or binaries.
 
-## Local builds and checks
+## Validation
 
-```sh
-npm ci
-npm run check
-npm run test:updates
-npm run dist:win   # Native Windows runner recommended; cross-build from Mac also works in this workspace
-npm run dist:mac   # Unsigned universal preview by default
-```
+`npm run test:updates` covers controller behavior, release validation/publishing,
+the Electron update UI and a synthetic loopback-only Windows feed. The real updater
+downloads inert synthetic bytes, rejects corruption/downgrades and keeps stable
+installs separate; it never runs an installer. `npm run check` runs client tests,
+type checking and the production build.
 
-Local `dist`/`package` commands never publish. `CERMS_RELEASE_BUILD=1 CERMS_RELEASE_PLATFORM=windows npm run dist:win` opts a local Windows installer into the configured GitHub update feed. A signed local Mac release additionally requires `CERMS_MAC_SIGNED_RELEASE=1` and the signing/notarization variables. CI sets these explicitly.
-
-Validation in this session: 186 client checks and build; updater state/permission-flow tests; release completeness/hash checks; synthetic Electron progress/ready/retry/install-request checks; real Windows NSIS build and universal Mac DMG/ZIP build; valid DMG checksum; correct Windows/Mac updater opt-in metadata; and archive inspection excluding local secrets/backend files. Native Windows installation and a real published N→N+1 update require a Windows machine and published releases and have not been claimed as tested. No real sign-ins, account writes, checkout writes, Firebase deployments, signed builds or public releases were performed for this work.
+A physical Windows installation and actual N-to-N+1 installer execution still
+require a Windows machine. Successful synthetic downloads are not claimed as a
+physical end-to-end Windows installation test.

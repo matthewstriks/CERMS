@@ -12,7 +12,8 @@ const themeSmoke = process.argv.includes('--theme')
 let failThemeNext = false
 const catalogSmoke = process.argv.includes('--catalog')
 const groupSmoke = process.argv.includes('--group')
-const membershipSmoke = process.argv.includes('--members') || groupSmoke
+const renewalSmoke = process.argv.includes('--membership-renewal')
+const membershipSmoke = process.argv.includes('--members') || groupSmoke || renewalSmoke
 const club = membershipSmoke ? 'dev' : 'club-a'
 const fixture = posFixture(),
   docs = fixture.docs,
@@ -46,7 +47,7 @@ if (membershipSmoke) {
     inventory: null,
   })
 }
-if (groupSmoke) {
+if (groupSmoke || renewalSmoke) {
   for (const [id, name, number] of [
     ['buyer', 'Alex Buyer', 101],
     ['friend', 'Casey Friend', 102],
@@ -487,6 +488,133 @@ try {
     console.log(
       'POS catalog passed: image tiles, accessible names, text/error fallback, collapsible categories, persistent top favorites, filtering, keyboard toggles, deduplicated image reads and cart additions. All HTTPS intercepted.',
     )
+  } else if (renewalSmoke) {
+    const oldExpiry = docs.get('members/buyer').id_expiration
+    const memberBefore = structuredClone(docs.get('members/buyer'))
+    async function createBuyerOrder() {
+      await page.getByRole('link', { name: 'Members', exact: true }).click()
+      const row = page.getByRole('row').filter({ hasText: 'Alex Buyer' })
+      await row.getByRole('button', { name: 'Create order', exact: true }).click()
+      await expect(page.getByText('Your register is open')).toBeVisible()
+    }
+    await createBuyerOrder()
+    await expect(
+      page.getByRole('dialog', { name: 'Add membership to order', exact: true }),
+    ).toHaveCount(0)
+    async function chooseMembership(mode) {
+      await expandCategories(page)
+      await page.locator('.pos-product').filter({ hasText: 'Monthly plan' }).click()
+      const choice = page.getByRole('dialog', { name: 'Add membership to order', exact: true })
+      await choice.getByRole('button', { name: 'Find membership recipient', exact: true }).click()
+      const picker = page.getByRole('dialog', { name: 'Choose existing member' })
+      await picker.getByRole('button').filter({ hasText: 'Alex Buyer' }).click()
+      await expect(choice.locator('.membership-renewal-options')).toBeVisible()
+      await expect(choice.locator('.membership-renewal-option')).toHaveCount(2)
+      const restartDate = await page.evaluate(
+        (value) =>
+          new Date(value).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+        Date.now() + 30 * 86400000,
+      )
+      const extendDate = await page.evaluate(
+        (value) =>
+          new Date(value).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+        docs.get('members/buyer').id_expiration * 1000 + 30 * 86400000,
+      )
+      await expect(choice.locator('.membership-renewal-option').first()).toContainText(restartDate)
+      await expect(choice.locator('.membership-renewal-option').last()).toContainText(extendDate)
+      await choice
+        .getByRole('radio', {
+          name: mode === 'restart' ? 'Start from today' : 'Add to existing expiration',
+          exact: true,
+        })
+        .check()
+      await mkdir('artifacts', { recursive: true })
+      await choice.screenshot({ path: 'artifacts/membership-renewal-active.png' })
+      await choice.getByRole('button', { name: 'Add membership to order', exact: true }).click()
+      await expect(choice).toHaveCount(0)
+    }
+    await chooseMembership('extend')
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    let payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByRole('button', { name: 'Back to cart' }).click()
+    assert.deepEqual(docs.get('members/buyer'), memberBefore)
+    assert.equal(fixture.commits(), 0)
+    // Draft survives leaving POS and retains its explicit recipient and mode.
+    await page.getByRole('link', { name: 'Registers', exact: true }).click()
+    await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
+    await expect(page.getByText('Membership renewal for', { exact: false })).toContainText(
+      'Alex Buyer',
+    )
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByLabel('Payment amount 1').dblclick()
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    await expect(payment.getByRole('button', { name: 'Retry same sale' })).toBeVisible()
+    await payment.getByRole('button', { name: 'Retry same sale' }).click()
+    let receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+    await expect(receipt.locator('pre')).toContainText('Membership renewal: Alex Buyer')
+    await expect(receipt.locator('pre')).toContainText('Add to existing expiration')
+    assert.equal(docs.get('members/buyer').id_expiration, oldExpiry + 30 * 86400)
+    assert.equal(fixture.commits(), 1)
+    const extended = docs.get('members/buyer').id_expiration
+    await receipt.getByRole('button', { name: 'Done', exact: true }).click()
+    await chooseMembership('restart')
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByLabel('Payment amount 1').dblclick()
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+    await expect(receipt.locator('pre')).toContainText('Start from today')
+    assert.ok(docs.get('members/buyer').id_expiration < extended)
+    assert.ok(
+      Math.abs(
+        docs.get('members/buyer').id_expiration - (Math.floor(Date.now() / 1000) + 30 * 86400),
+      ) < 5,
+    )
+    assert.equal(fixture.commits(), 2)
+    assert.equal(docs.get('members/buyer').id_number, memberBefore.id_number)
+    await receipt.getByRole('button', { name: 'Done', exact: true }).click()
+    const expired = Math.floor(Date.now() / 1000) - 86400
+    docs.get('members/buyer').id_expiration = expired
+    await createBuyerOrder()
+    const automatic = page.getByRole('dialog', { name: 'Add membership to order', exact: true })
+    await expect(automatic.getByRole('heading', { name: 'Renew expired membership' })).toBeVisible()
+    await expect(automatic.getByRole('combobox', { name: 'Membership recipient' })).toHaveValue(
+      'buyer',
+    )
+    await expect(automatic.getByRole('combobox', { name: 'Membership recipient' })).toBeDisabled()
+    await expect(automatic.getByLabel('Membership product')).toHaveValue('plan')
+    await automatic.getByRole('button', { name: 'Cancel', exact: true }).click()
+    assert.equal(docs.get('members/buyer').id_expiration, expired)
+    assert.equal(fixture.commits(), 2)
+    await page.getByRole('link', { name: 'Registers', exact: true }).click()
+    await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
+    await expect(automatic).toHaveCount(0)
+    await createBuyerOrder()
+    await expect(automatic.getByRole('radio')).toHaveCount(0)
+    await expect(automatic.getByRole('status')).toContainText('Starts from now automatically')
+    await expect(automatic.locator('.membership-auto-start')).toContainText('Expires')
+    await automatic.screenshot({ path: 'artifacts/membership-renewal-expired.png' })
+    await automatic.getByRole('button', { name: 'Add membership to order', exact: true }).click()
+    const draft = await page.evaluate(
+      ({ uid, club }) => JSON.parse(localStorage.getItem(`cerms.pos.${uid}.${club}`)),
+      { uid, club },
+    )
+    assert.equal(draft.cart[0].memberships[0].mode, 'restart')
+    assert.equal(docs.get('members/buyer').id_expiration, expired)
+    assert.equal(fixture.commits(), 2)
+    assert.deepEqual(errors, [])
+    console.log(
+      'Membership renewal POS passed: active/expired Create order prompts, preselected recipient, canceled prompt, existing recipient, cancel without mutation, draft restoration, extension, lost-response retry, restart and receipt snapshots. All HTTPS intercepted.',
+    )
   } else if (membershipSmoke) {
     await page.getByRole('link', { name: 'Members', exact: true }).click()
     await page.getByRole('button', { name: 'Create membership', exact: true }).click()
@@ -507,6 +635,10 @@ try {
     if (groupSmoke) {
       firstPendingId = await page.getByLabel('Order linked to', { exact: true }).inputValue()
       await page.getByRole('button', { name: 'Add membership', exact: true }).click()
+      await page
+        .getByRole('dialog', { name: 'Add membership to order', exact: true })
+        .getByRole('button', { name: 'Create new membership', exact: true })
+        .click()
       const another = page.getByRole('dialog', { name: 'Create member · Dev System' })
       await another.getByLabel('First name', { exact: true }).fill('Second')
       await another.getByLabel('Last name', { exact: true }).fill('Guest')
@@ -823,6 +955,9 @@ try {
     await expect(
       page.getByText('Register closed. Your ending count is saved in Closed registers.'),
     ).toBeVisible()
+    const closeout = page.getByRole('dialog', { name: 'Register closeout report' })
+    await expect(closeout.locator('pre')).toContainText('REGISTER CLOSEOUT')
+    await closeout.getByRole('button', { name: 'Done', exact: true }).click()
     await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
     await expect(
       page.getByText('Open your register before checkout.', { exact: false }),

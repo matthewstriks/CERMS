@@ -9,6 +9,7 @@ import {
 } from '../../../../domain/registers'
 import { registerError, type RegisterClient } from '../../../../data/firebase-registers'
 import { money } from '../../lib/data'
+import { displayReference } from '../../../../domain/display-reference'
 
 export default function RegisterCountDialog({
   mode,
@@ -58,7 +59,8 @@ export default function RegisterCountDialog({
       <h2>{title}</h2>
       {record && (
         <p>
-          {record.ownerName || record.ownerUid} · Opened {time(record.openedAt)}
+          {displayReference('register', record.id)} · {record.ownerName || record.ownerUid} · Opened{' '}
+          {time(record.openedAt)}
         </p>
       )}
       {mode === 'view' && record ? (

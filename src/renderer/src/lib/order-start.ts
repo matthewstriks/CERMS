@@ -4,6 +4,7 @@ export interface OrderStart {
   member: OrderMember
   cart: CartLine[]
   rentalsOnly?: boolean
+  promptMembership?: boolean
 }
 export function startMemberOrder(reader: MembershipReader, order: OrderStart) {
   const key = `cerms.pos.${reader.uid}.${reader.club}`
@@ -25,6 +26,7 @@ export function startMemberOrder(reader: MembershipReader, order: OrderStart) {
       note: '',
       pending: null,
       rentalsOnly: order.rentalsOnly ?? false,
+      promptMembership: order.promptMembership === true,
     }),
   )
   window.location.hash = 'sales'

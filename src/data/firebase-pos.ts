@@ -60,6 +60,29 @@ export function createPos(reader: Pick<MembershipReader, 'uid' | 'club'>) {
     return { ...d, id: snapshot.id, createdAt: d.createdAt.toMillis() } as SaleReceipt
   }
   return {
+    async membershipRecipient(
+      id: string,
+    ): Promise<{ id: string; name: string; expiresAt: number | null }> {
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw new Error('Invalid member reference.')
+      await session()
+      const snapshot = await getDoc(doc(db, 'members', id))
+      await session()
+      const member = snapshot.data()
+      if (!member || member.access !== reader.club)
+        throw new Error('This member is unavailable in your business.')
+      const expiration = Number(member.id_expiration)
+      return {
+        id,
+        name: typeof member.name === 'string' ? member.name : id,
+        expiresAt:
+          member.id_expiration != null &&
+          Number.isFinite(expiration) &&
+          expiration >= 0 &&
+          expiration * 1000 <= 8640000000000000
+            ? expiration * 1000
+            : null,
+      }
+    },
     async settings(): Promise<PosSettings> {
       await session()
       const [system, settings] = await Promise.all([

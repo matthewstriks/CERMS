@@ -84,27 +84,5 @@ jobs:
             release/beta*.yml
             release/rc*.yml
 
-  publish:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, build]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - uses: actions/download-artifact@v6
-        with:
-          pattern: cerms-*
-          merge-multiple: true
-          path: release-assets
-      - name: Publish only after both installers and update files are complete
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/publish-release.mjs
+  # Firebase Windows alpha releases are published deliberately from the developer
+  # machine with npm run release:alpha. CI remains build-only; no cloud keys here.

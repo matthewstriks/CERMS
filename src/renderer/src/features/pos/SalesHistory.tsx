@@ -3,6 +3,7 @@ import type { PosClient } from '../../../../data/firebase-pos'
 import { paymentMethods, type SaleReceipt, type PaymentMethod } from '../../../../domain/pos'
 import { money } from '../../lib/data'
 import ReceiptDialog from './ReceiptDialog'
+import { displayReference, matchesDisplayReference } from '../../../../domain/display-reference'
 export default function SalesHistory({ client }: { client: PosClient }) {
   const [rows, setRows] = useState<SaleReceipt[]>([]),
     [more, setMore] = useState(false),
@@ -35,6 +36,8 @@ export default function SalesHistory({ client }: { client: PosClient }) {
       (!method || r.payments.some((p) => p.method === method)) &&
       (!day || new Date(r.createdAt).toLocaleDateString('en-CA') === day) &&
       (!search ||
+        matchesDisplayReference('order', r.receiptNumber, search) ||
+        matchesDisplayReference('register', r.registerId, search) ||
         `${r.receiptNumber} ${r.cashierName} ${r.customerName} ${r.registerId} ${(r.members ?? []).map((m) => `${m.name} ${m.number ?? ''} ${m.id}`).join(' ')} ${r.payments.map((p) => p.reference).join(' ')}`
           .toLowerCase()
           .includes(search.toLowerCase())),
@@ -104,7 +107,10 @@ export default function SalesHistory({ client }: { client: PosClient }) {
               <tr key={r.id}>
                 <td>
                   {new Date(r.createdAt).toLocaleString()}
-                  <small className="pos-block">{r.receiptNumber}</small>
+                  <small className="pos-block">{displayReference('order', r.receiptNumber)}</small>
+                  <small className="pos-block">
+                    Register {displayReference('register', r.registerId)}
+                  </small>
                 </td>
                 <td>
                   {r.cashierName}

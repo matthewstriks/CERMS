@@ -1,4 +1,6 @@
 const { build } = require('./package.json')
+const { version } = require('./package.json')
+const { windowsFeed } = require('./config/desktop-releases.json')
 const slug = process.env.CERMS_RELEASE_REPOSITORY || 'matthewstriks/CERMS-5'
 if (!/^[a-zA-Z0-9-]+\/[a-zA-Z0-9_.-]+$/.test(slug))
   throw new Error('Set CERMS_RELEASE_REPOSITORY to owner/repository.')
@@ -16,7 +18,17 @@ module.exports = {
   ...build,
   artifactName: 'CERMS-5-${version}-${os}-${arch}.${ext}',
   electronUpdaterCompatibility: '>=6.8.12',
-  publish: [{ provider: 'github', owner, repo, private: false, releaseType: 'draft' }],
+  publish:
+    platform === 'windows'
+      ? [
+          {
+            provider: 'generic',
+            url: windowsFeed,
+            channel: version.split('-')[1]?.split('.')[0] || 'latest',
+            useMultipleRangeRequest: false,
+          },
+        ]
+      : [{ provider: 'github', owner, repo, private: false, releaseType: 'draft' }],
   extraMetadata: {
     cermsRelease: { updatesEnabled: release && (platform !== 'macos' || signedMac) },
   },

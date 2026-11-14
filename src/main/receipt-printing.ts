@@ -57,7 +57,9 @@ export async function printReceipt(source: BrowserWindow, request: unknown): Pro
         (ok, reason) =>
           ok
             ? resolve()
-            : reject(new Error(reason || 'Receipt printing failed. The sale remains saved.')),
+            : reject(
+                new Error(reason || 'Receipt printing failed. The saved record is unchanged.'),
+              ),
       ),
     )
   } finally {

@@ -45,7 +45,13 @@ export function isPosRequest(url: string, body?: string): boolean {
     return (
       url === posEndpoints.completeSale &&
       Object.keys(d)
-        .filter((k) => k !== 'member' && k !== 'rentals' && k !== 'pendingMembers')
+        .filter(
+          (k) =>
+            k !== 'member' &&
+            k !== 'rentals' &&
+            k !== 'pendingMembers' &&
+            k !== 'membershipAssignments',
+        )
         .sort()
         .join() === 'business,customerName,lines,note,payments,registerId,requestId,taxRateBps' &&
       (d.member === undefined ||
@@ -67,6 +73,21 @@ export function isPosRequest(url: string, body?: string): boolean {
               m.draft &&
               typeof m.draft === 'object' &&
               typeof m.draft.membershipProductId === 'string',
+          ))) &&
+      (d.membershipAssignments === undefined ||
+        (Array.isArray(d.membershipAssignments) &&
+          d.membershipAssignments.length <= 100 &&
+          d.membershipAssignments.every(
+            (a: { id: string; productId: string; memberId: string; mode: string }) =>
+              a &&
+              Object.keys(a).sort().join() === 'id,memberId,mode,productId' &&
+              typeof a.id === 'string' &&
+              /^[a-f0-9-]{36}$/.test(a.id) &&
+              typeof a.productId === 'string' &&
+              /^[a-zA-Z0-9_-]{1,128}$/.test(a.productId) &&
+              typeof a.memberId === 'string' &&
+              /^[a-zA-Z0-9_-]{1,128}$/.test(a.memberId) &&
+              ['restart', 'extend'].includes(a.mode),
           ))) &&
       (d.rentals === undefined ||
         (Array.isArray(d.rentals) &&

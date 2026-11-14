@@ -1,0 +1,9 @@
+{
+  "functions": [
+    {
+      "source": "report-functions",
+      "codebase": "cerms-reports",
+      "ignore": ["node_modules", "*.test.mjs", "fixtures.mjs"]
+    }
+  ]
+}

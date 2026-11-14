@@ -1,0 +1,7 @@
+Prompts to run
+
+I need a checkout feature for the overview/admission page so rentals can be checked out. This will need a confirmation that the rental is completed and all items required have been returned 
+
+I need to be able to leave notes about a member. The member view should have a notes section. Each note inputted by a staff member should be labeled with the name of the staff member putting in the note and the time like a log. Admin permisison to be able to remove notes. If read notes is checked then we need to make it so when creating an order a popup appears with the notes and a confirm read button. If someone is checking DNA then a reason needs to be put in which will show in the notes as well highlighted as a DNA (do not admit) note 
+
+Implement the messaging system. I should be able to pick other staff members and send them a message. Read reciepts, times, search for members, chat history, ect. 

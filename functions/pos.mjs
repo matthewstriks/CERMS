@@ -5,6 +5,7 @@ import {
   normalizeGovernmentId,
   emptyMemberDraft,
   durationUnits,
+  membershipRenewalExpiry,
 } from './checkout-domain.mjs'
 const owner = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 const id = (v) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(v)
@@ -33,6 +34,7 @@ export function validateSale(d, fail) {
     ...('member' in d ? ['member'] : []),
     ...('rentals' in d ? ['rentals'] : []),
     ...('pendingMembers' in d ? ['pendingMembers'] : []),
+    ...('membershipAssignments' in d ? ['membershipAssignments'] : []),
   ]), fail, 'Invalid sale request.')
   require(id(d.business) &&
     /^[a-f0-9-]{36}$/.test(d.requestId) &&
@@ -83,6 +85,14 @@ export function validateSale(d, fail) {
       require(exact(m.draft, Object.keys(emptyMemberDraft())), fail, 'Invalid new member details.')
   }
   if (d.member !== undefined) validateMember(d.member)
+  if (d.membershipAssignments !== undefined) {
+    require(Array.isArray(d.membershipAssignments) && d.membershipAssignments.length <= 100 &&
+      new Set(d.membershipAssignments.map(a => a?.id)).size === d.membershipAssignments.length,
+      fail, 'Use at most 100 uniquely assigned membership units.')
+    for (const a of d.membershipAssignments)
+      require(exact(a, ['id','productId','memberId','mode']) && /^[a-f0-9-]{36}$/.test(a.id) &&
+        id(a.productId) && id(a.memberId) && ['restart','extend'].includes(a.mode), fail, 'Assign each membership and choose its renewal mode.')
+  }
   if (d.pendingMembers !== undefined) {
     require(Array.isArray(d.pendingMembers) &&
       d.pendingMembers.length <= 20 &&
@@ -122,6 +132,8 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
       .length, fail, 'Renew each visit only once per order.')
   const renewals = []
   const pending = d.pendingMembers ?? (d.member?.draft ? [d.member] : [])
+  const membershipAssignments = d.membershipAssignments ?? []
+  const membershipReceipts = []
   if (pending.length && (uid !== owner || d.business !== 'dev'))
     fail('permission-denied', 'New membership checkout is owner-only in Dev System.')
   require(pending.length <= 20, fail, 'Use at most 20 new memberships per order.')
@@ -130,13 +142,17 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
     ...(d.member ? [d.member.id] : []),
     ...pendingIds,
     ...assignments.map((r) => r.memberId),
+    ...membershipAssignments.map(a => a.memberId),
   ])
   require(memberIds.size <= 50 &&
     [...memberIds].every(id), fail, 'Every rental needs a member in this business.')
   for (const l of d.lines) {
     const p = productMap.get(l.productId)
     const assignedRentals = assignments.filter((r) => r.productId === l.productId)
-    const assignedMemberships = pending.filter((m) => m.draft.membershipProductId === l.productId)
+    const assignedMemberships = [
+      ...pending.filter((m) => m.draft.membershipProductId === l.productId),
+      ...membershipAssignments.filter(a => a.productId === l.productId),
+    ]
     require(p.rental
       ? assignedRentals.length === l.quantity
       : assignedRentals.length === 0, fail, 'Assign every rental unit exactly once.')
@@ -146,6 +162,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
           0, fail, 'Each membership unit needs its own new member details.')
   }
   require(assignments.every((r) => productMap.get(r.productId)?.rental) &&
+    membershipAssignments.every(a => productMap.get(a.productId)?.membership) &&
     pending.every(
       (m) => productMap.get(m.draft.membershipProductId)?.membership,
     ), fail, 'A membership or rental assignment is missing its product.')
@@ -215,6 +232,27 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
       entry.isNew = true
     } else if (!entry.member || entry.member.access !== d.business) {
       fail('permission-denied', 'An assigned member is unavailable in this business.')
+    }
+    const memberPurchases = membershipAssignments.filter(a => a.memberId === memberId)
+    if (memberPurchases.length) {
+      require(!entry.isNew, fail, 'Use the new-member assignment for a pending membership.')
+      if (entry.member.dna === true) fail('failed-precondition', 'A do-not-admit member cannot renew through checkout.')
+      const first = memberPurchases[0]
+      require(memberPurchases.every(a => a.productId === first.productId && a.mode === first.mode),
+        fail, 'Use the same membership product and renewal mode for each unit assigned to one member.')
+      const p = productMap.get(first.productId)
+      const duration = p.membershipLengthRaw * durationUnits[p.membershipLengthType]
+      require(!p.payout, fail, 'A payout product cannot renew a membership.')
+      let expiry
+      try { expiry = membershipRenewalExpiry(entry.member.id_expiration, duration * memberPurchases.length, first.mode, now) }
+      catch (e) { fail('invalid-argument', e.message) }
+      entry.membershipUpdate = { membership_type: p.name, id_expiration: expiry }
+      for (const a of memberPurchases) membershipReceipts.push({
+        id: a.id, productId: a.productId, memberId, action: 'renewal', mode: a.mode,
+        previousExpiresAt: entry.member.id_expiration != null && Number.isFinite(Number(entry.member.id_expiration)) ? Number(entry.member.id_expiration) : null,
+        expiresAt: expiry,
+      })
+      entry.member = { ...entry.member, ...entry.membershipUpdate }
     }
     const rentals = assignments.filter((r) => r.memberId === memberId && !r.renewalVisitId)
     for (const r of assignments.filter((r) => r.memberId === memberId && r.renewalVisitId)) {
@@ -297,7 +335,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
   return {
     member: snapshots.find((m) => m.id === d.member?.id) ?? null,
     members: snapshots,
-    memberships: pending.map((m) => ({ productId: m.draft.membershipProductId, memberId: m.id })),
+    memberships: [...pending.map((m) => ({ productId: m.draft.membershipProductId, memberId: m.id })), ...membershipReceipts],
     rentals: assignments,
     apply() {
       for (const r of renewals)
@@ -313,7 +351,9 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
           const claim = { access: 'dev', memberId }
           tx.create(e.identityRef, claim)
           tx.create(e.numberRef, claim)
-        } else if (e.visits.length) tx.update(e.ref, { checkedIn: true })
+        } else if (e.visits.length || e.membershipUpdate) tx.update(e.ref, {
+          ...(e.membershipUpdate ?? {}), ...(e.visits.length ? { checkedIn: true } : {}),
+        })
         if (e.visits.length)
           tx.create(e.visitClaimRef, {
             memberId,

@@ -35,6 +35,9 @@ import SalesHistory from './pos/SalesHistory'
 import CreateMemberDialog from './members/CreateMemberDialog'
 import OrderMemberPicker from './pos/OrderMemberPicker'
 import PosCatalog from './pos/PosCatalog'
+import MembershipPurchaseDialog from './pos/MembershipPurchaseDialog'
+import type { MembershipRenewalMode } from '../../../domain/membership-renewal'
+import { displayReference } from '../../../domain/display-reference'
 import { canCreateDevMember } from '../../../shared/dev-member-policy'
 import './pos/Pos.css'
 type Tender = PaymentEntry
@@ -48,6 +51,7 @@ function readDraft(key: string): {
   existingMembers?: OrderMember[]
   rentalsOnly?: boolean
   choosingRentals?: boolean
+  promptMembership?: boolean
 } {
   const empty = { cart: [], customerName: '', note: '', pending: null }
   let preservedPending: SaleRequest | null = null
@@ -96,6 +100,19 @@ function readDraft(key: string): {
             (m: OrderMember) =>
               m && typeof m.id === 'string' && typeof m.name === 'string' && !m.draft,
           ))) ||
+      d.cart.some(
+        (l: CartLine) =>
+          l.memberships !== undefined &&
+          (!Array.isArray(l.memberships) ||
+            l.memberships.length > l.quantity ||
+            l.memberships.some(
+              (a) =>
+                !a ||
+                typeof a.id !== 'string' ||
+                typeof a.memberId !== 'string' ||
+                !['restart', 'extend'].includes(a.mode),
+            )),
+      ) ||
       d.cart.some(
         (l: CartLine) =>
           l.rentals !== undefined &&
@@ -173,6 +190,11 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     initialDraft.existingMembers ?? [],
   )
   const [addingMembership, setAddingMembership] = useState<{ productId?: string } | null>(null)
+  const [membershipPurchase, setMembershipPurchase] = useState<{
+    productId?: string
+    renewalPrompt?: boolean
+  } | null>(initialDraft.promptMembership === true ? { renewalPrompt: true } : null)
+  const [catalogLoaded, setCatalogLoaded] = useState(false)
   const [pickingMember, setPickingMember] = useState<{ rentalId?: string } | null>(null)
   const orderMembers = [...existingMembers, ...pendingMembers]
   const canAddMembership = !!reader && canCreateDevMember(reader.uid, reader.club)
@@ -199,6 +221,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           existingMembers,
           rentalsOnly,
           choosingRentals,
+          promptMembership: membershipPurchase?.renewalPrompt === true,
         }),
       )
     } catch {
@@ -214,6 +237,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     existingMembers,
     rentalsOnly,
     choosingRentals,
+    membershipPurchase?.renewalPrompt,
     key,
   ])
   async function refresh() {
@@ -236,6 +260,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           if (all.length > 10000) throw new Error('Catalog exceeds 10,000 products.')
         }
         setProducts(all)
+        setCatalogLoaded(true)
         if (!pending)
           setCart((rows) =>
             rows.map((l) => {
@@ -273,7 +298,6 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
         (p) =>
           p.data.active &&
           (!choosingRentals || p.data.rental) &&
-          (!p.data.membership || canAddMembership) &&
           (!p.data.restricted || p.data.restrictedUsers.includes(reader?.uid ?? '')),
       ),
     [products, choosingRentals, canAddMembership, reader?.uid],
@@ -295,8 +319,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
   function add(p: CatalogRecord<CatalogProduct>) {
     if (locked) return
     if (p.data.membership) {
-      if (canAddMembership) setAddingMembership({ productId: p.id })
-      else setError('New memberships are available to the owner in Dev System.')
+      setMembershipPurchase({ productId: p.id })
       return
     }
     if (choosingRentals && !p.data.rental) {
@@ -373,9 +396,9 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     setCart((rows) =>
       rows.flatMap((l) => {
         if (l.product.data.membership) {
-          const quantity = remaining.filter(
-            (m) => m.draft?.membershipProductId === l.product.id,
-          ).length
+          const quantity =
+            remaining.filter((m) => m.draft?.membershipProductId === l.product.id).length +
+            (l.memberships?.length ?? 0)
           return quantity ? [{ ...l, quantity }] : []
         }
         return [
@@ -419,6 +442,67 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
       setMember({ id: m.id, name: m.name })
       setCustomerName(m.name)
     }
+  }
+  function assignMembership(
+    m: OrderMember,
+    product: CatalogRecord<CatalogProduct>,
+    mode: MembershipRenewalMode,
+  ) {
+    if (locked) return
+    if (cart.reduce((count, l) => count + (l.memberships?.length ?? 0), 0) >= 100)
+      throw new Error('Use at most 100 existing-member membership units per order.')
+    if (!existingMembers.some((p) => p.id === m.id) && orderMembers.length >= 50)
+      throw new Error('Use at most 50 members per order.')
+    if (cart.length >= 100 && !cart.some((l) => l.product.id === product.id))
+      throw new Error('Use at most 100 products per order.')
+    if (
+      cart.some((l) =>
+        l.memberships?.some((a) => a.memberId === m.id && l.product.id !== product.id),
+      )
+    )
+      throw new Error('Use one membership product per existing member in an order.')
+    const assignment = { id: crypto.randomUUID(), memberId: m.id, mode }
+    setExistingMembers((rows) => (rows.some((p) => p.id === m.id) ? rows : [...rows, m]))
+    setCart((rows) => {
+      const exists = rows.find((l) => l.product.id === product.id)
+      return exists
+        ? rows.map((l) =>
+            l === exists
+              ? {
+                  ...l,
+                  quantity: l.quantity + 1,
+                  memberships: [
+                    ...(l.memberships ?? []).map((a) => (a.memberId === m.id ? { ...a, mode } : a)),
+                    assignment,
+                  ],
+                }
+              : l,
+          )
+        : [
+            ...rows,
+            {
+              product,
+              quantity: 1,
+              unitPriceCents: product.data.priceCents,
+              memberships: [assignment],
+            },
+          ]
+    })
+    if (!member) {
+      setMember(m)
+      setCustomerName(m.name)
+    }
+    setMembershipPurchase(null)
+  }
+  function removeAssignedMembership(id: string) {
+    setCart((rows) =>
+      rows.flatMap((l) => {
+        if (!l.memberships?.some((a) => a.id === id)) return [l]
+        const memberships = l.memberships.filter((a) => a.id !== id)
+        const quantity = l.quantity - 1
+        return quantity ? [{ ...l, memberships, quantity }] : []
+      }),
+    )
   }
   function scan() {
     const matches = products.filter(
@@ -568,7 +652,8 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
               <span>
                 {register ? (
                   <>
-                    <strong>Your register is open</strong> · Expected cash{' '}
+                    <strong>Your register is open</strong> ·{' '}
+                    {displayReference('register', register.id)} · Expected cash{' '}
                     {money((registerTotals?.expectedCashCents ?? register.openingTotalCents) / 100)}{' '}
                     · Card {money((registerTotals?.netByMethod.card ?? 0) / 100)}
                   </>
@@ -709,12 +794,12 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     >
                       Find existing member
                     </button>
-                    {canAddMembership && (
+                    {canSell && (
                       <button
                         disabled={
                           locked || pendingMembers.length >= 20 || orderMembers.length >= 50
                         }
-                        onClick={() => setAddingMembership({})}
+                        onClick={() => setMembershipPurchase({})}
                       >
                         Add membership
                       </button>
@@ -747,6 +832,28 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                                 </button>
                               </div>
                             ))}
+                        {l.memberships?.map((a) => (
+                          <div className="pos-membership-assignment" key={a.id}>
+                            <span>
+                              Membership renewal for{' '}
+                              <strong>
+                                {existingMembers.find((m) => m.id === a.memberId)?.name ??
+                                  a.memberId}
+                              </strong>{' '}
+                              ·{' '}
+                              {a.mode === 'restart'
+                                ? 'Start from today'
+                                : 'Add to existing expiration'}
+                            </span>
+                            <button
+                              disabled={locked}
+                              aria-label={`Remove assigned membership ${a.id}`}
+                              onClick={() => removeAssignedMembership(a.id)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
                         {l.product.data.rental &&
                           l.rentals?.map((r, index) => (
                             <div className="pos-rental-assignment" key={r.id}>
@@ -878,11 +985,16 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                           aria-label={`Remove ${l.product.data.name}`}
                           onClick={() =>
                             l.product.data.membership
-                              ? removeMemberships(
-                                  pendingMembers
-                                    .filter((m) => m.draft?.membershipProductId === l.product.id)
-                                    .map((m) => m.id),
-                                )
+                              ? (() => {
+                                  removeMemberships(
+                                    pendingMembers
+                                      .filter((m) => m.draft?.membershipProductId === l.product.id)
+                                      .map((m) => m.id),
+                                  )
+                                  setCart((rows) =>
+                                    rows.filter((r) => r.product.id !== l.product.id),
+                                  )
+                                })()
                               : setCart((rows) => rows.filter((r) => r !== l))
                           }
                         >
@@ -954,6 +1066,15 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     ) ||
                     pendingMembers.some(
                       (m) => !cart.some((l) => l.product.id === m.draft?.membershipProductId),
+                    ) ||
+                    cart.some(
+                      (l) =>
+                        l.product.data.membership &&
+                        l.quantity !==
+                          pendingMembers.filter(
+                            (m) => m.draft?.membershipProductId === l.product.id,
+                          ).length +
+                            (l.memberships?.length ?? 0),
                     ) ||
                     cart.some(
                       (l) =>
@@ -1116,6 +1237,9 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     note: note.trim(),
                     ...(member ? { member } : {}),
                     pendingMembers,
+                    membershipAssignments: cart.flatMap((l) =>
+                      (l.memberships ?? []).map((a) => ({ ...a, productId: l.product.id })),
+                    ),
                     rentals: cart
                       .filter((l) => l.product.data.rental)
                       .flatMap((l) =>
@@ -1146,6 +1270,26 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           )}
         </div>
       </dialog>
+      {membershipPurchase && catalogLoaded && !locked && (
+        <MembershipPurchaseDialog
+          reader={reader}
+          products={permittedProducts.filter((p) => p.data.membership && !p.data.payout)}
+          initialProductId={membershipPurchase.productId}
+          renewalPrompt={membershipPurchase.renewalPrompt}
+          initialMember={existingMembers.find((m) => m.id === member?.id)}
+          members={existingMembers}
+          assignments={cart.flatMap((l) =>
+            (l.memberships ?? []).map((a) => ({ productId: l.product.id, memberId: a.memberId })),
+          )}
+          canCreate={canAddMembership && !membershipPurchase.renewalPrompt}
+          onClose={() => setMembershipPurchase(null)}
+          onCreate={(productId) => {
+            setMembershipPurchase(null)
+            setAddingMembership({ productId })
+          }}
+          onAssign={assignMembership}
+        />
+      )}
       {addingMembership && (
         <CreateMemberDialog
           uid={reader.uid}

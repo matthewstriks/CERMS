@@ -1,0 +1,208 @@
+.membership-purchase-dialog {
+  width: min(680px, calc(100vw - 2rem));
+  padding: 28px;
+}
+.membership-purchase-heading,
+.membership-section-heading,
+.membership-new-member,
+.membership-plan-details {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.membership-purchase-heading {
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.membership-purchase-heading h2 {
+  margin: 4px 0 8px;
+}
+.membership-purchase-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+.membership-purchase-heading > button {
+  padding: 5px 12px;
+  font-size: 22px;
+}
+.membership-purchase-heading .membership-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  color: var(--success-ink, #21593d);
+}
+.membership-purchase-section {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.membership-field {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.membership-field select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+.membership-plan-details {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.membership-plan-details strong {
+  color: var(--success-ink, #21593d);
+  font-size: 20px;
+}
+.membership-section-heading {
+  margin-bottom: 14px;
+}
+.membership-section-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.membership-current-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+.membership-current-status > div,
+.membership-new-member > div {
+  display: grid;
+  gap: 5px;
+}
+.membership-current-status span:not(.membership-status-badge),
+.membership-new-member > div > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.membership-current-status p {
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+}
+.membership-status-badge {
+  border-radius: 99px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.membership-status-badge.is-active {
+  background: var(--success-bg, #eaf3ee);
+  color: var(--success-ink, #21593d);
+}
+.membership-status-badge.is-expired {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.membership-renewal-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  border: 0;
+  padding: 0;
+  margin: 20px 0 0;
+}
+.membership-renewal-options legend {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.membership-renewal-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.membership-renewal-option.is-selected {
+  border-color: var(--success-line, #659e7c);
+  background: var(--success-bg, #eaf3ee);
+}
+.membership-renewal-option:focus-within {
+  outline: 2px solid var(--success-line, #659e7c);
+  outline-offset: 2px;
+}
+.membership-renewal-option input {
+  margin: 3px 0 0;
+  accent-color: var(--success-ink, #21593d);
+}
+.membership-renewal-option > span {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+}
+.membership-renewal-option small,
+.membership-calculation {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.membership-calculation,
+.membership-expiration {
+  display: block;
+}
+.membership-expiration {
+  color: var(--success-ink, #21593d);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.membership-status-note {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+.membership-auto-start {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--success-line, #659e7c);
+  border-radius: 10px;
+  background: var(--success-bg, #eaf3ee);
+}
+.membership-auto-start p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.membership-auto-start .membership-expiration {
+  margin-top: 6px;
+}
+.membership-new-member {
+  margin: 18px 0;
+  padding: 0 2px;
+}
+.membership-new-member strong {
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .membership-purchase-dialog {
+    padding: 18px;
+  }
+  .membership-renewal-options {
+    grid-template-columns: 1fr;
+  }
+  .membership-new-member,
+  .membership-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

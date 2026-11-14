@@ -382,7 +382,7 @@ app
       () => {
         void updates.check()
       },
-      4 * 60 * 60 * 1000,
+      (app.getVersion().includes('-') ? 5 * 60 : 4 * 60 * 60) * 1000,
     )
     startupUpdate.unref()
     updateInterval.unref()

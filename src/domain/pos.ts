@@ -1,5 +1,7 @@
 import { parsePrice, type CatalogProduct, type CatalogRecord } from './catalog'
 import type { MemberDraft } from './member-creation'
+import type { MembershipRenewalMode } from './membership-renewal'
+import { displayReference } from './display-reference'
 export interface OrderMember {
   id: string
   name: string
@@ -71,12 +73,21 @@ export interface Payment {
   reference: string
 }
 export interface CartLine {
+  memberships?: CartMembership[]
   assignedRoom?: string
   rentals?: CartRental[]
   priceInput?: string
   product: CatalogRecord<CatalogProduct>
   quantity: number
   unitPriceCents: number
+}
+export interface CartMembership {
+  id: string
+  memberId: string
+  mode: MembershipRenewalMode
+}
+export interface MembershipAssignment extends CartMembership {
+  productId: string
 }
 export interface CartRental {
   renewalVisitId?: string
@@ -92,6 +103,7 @@ export interface RentalAssignment {
   memberId?: string
 }
 export interface SaleRequest {
+  membershipAssignments?: MembershipAssignment[]
   member?: OrderMember
   pendingMembers?: OrderMember[]
   rentals?: RentalAssignment[]
@@ -120,9 +132,20 @@ export interface RegisterTotals {
   changeGivenCents: number
   cashPaidOutCents: number
 }
-export interface SaleReceipt extends Omit<SaleRequest, 'lines' | 'payments' | 'requestId'> {
+export interface SaleReceipt extends Omit<
+  SaleRequest,
+  'lines' | 'payments' | 'requestId' | 'membershipAssignments'
+> {
   members?: OrderMember[]
-  memberships?: { productId: string; memberId: string }[]
+  memberships?: {
+    productId: string
+    memberId: string
+    action?: 'new' | 'renewal'
+    mode?: MembershipRenewalMode
+    previousExpiresAt?: number | null
+    expiresAt?: number
+    id?: string
+  }[]
   id: string
   receiptNumber: string
   createdAt: number
@@ -180,9 +203,9 @@ export function receiptText(r: SaleReceipt): string {
     '',
     r.totalCents < 0 ? 'PAYOUT RECEIPT' : 'SALES RECEIPT',
     new Date(r.createdAt).toLocaleString(),
-    `Receipt: ${r.receiptNumber}`,
+    `Order: ${displayReference('order', r.receiptNumber)}`,
     `Cashier: ${r.cashierName}`,
-    `Register: ${r.registerId}`,
+    `Register: ${displayReference('register', r.registerId)}`,
     r.customerName ? `Customer: ${r.customerName}` : '',
     r.member ? `Member: ${r.member.number ?? r.member.id}` : '',
     '--------------------------------',
@@ -193,7 +216,7 @@ export function receiptText(r: SaleReceipt): string {
         ?.filter((a) => a.productId === l.productId)
         .map(
           (a) =>
-            `Membership for: ${r.members?.find((m) => m.id === a.memberId)?.name ?? a.memberId}`,
+            `Membership ${a.action === 'renewal' ? 'renewal' : 'for'}: ${r.members?.find((m) => m.id === a.memberId)?.name ?? a.memberId}${a.mode ? ` · ${a.mode === 'restart' ? 'Start from today' : 'Add to existing expiration'}` : ''}${a.expiresAt !== undefined ? ` · Expires ${new Date(a.expiresAt * 1000).toLocaleString()}` : ''}`,
         ) ?? []),
       ...(r.rentals
         ?.filter((a) => a.productId === l.productId)

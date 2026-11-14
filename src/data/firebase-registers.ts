@@ -89,6 +89,13 @@ export function createRegisters(reader: Pick<MembershipReader, 'uid' | 'club'>) 
     )
   }
   return {
+    async get(id: string): Promise<RegisterRecord | null> {
+      if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid register reference.')
+      await session()
+      const saved = await read(id)
+      await session()
+      return saved
+    },
     async list(status: 'open' | 'closed', reset = true) {
       await session()
       const cursor = reset ? undefined : cursors.get(status)

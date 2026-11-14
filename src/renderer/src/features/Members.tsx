@@ -48,6 +48,7 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
         member: { id: member.id, name: member.name },
         cart: [],
         rentalsOnly,
+        promptMembership: !rentalsOnly && membershipStatus(member, Date.now()) === 'Expired',
       })
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Unable to open order.')

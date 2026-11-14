@@ -7,6 +7,8 @@ import { createRegisters, registerError } from '../../../data/firebase-registers
 import type { RegisterRecord } from '../../../domain/registers'
 import { money } from '../lib/data'
 import RegisterCountDialog from './registers/RegisterCountDialog'
+import RegisterCloseoutDialog from './registers/RegisterCloseoutDialog'
+import { displayReference, matchesDisplayReference } from '../../../domain/display-reference'
 import './registers/Registers.css'
 
 export default function Registers() {
@@ -21,6 +23,8 @@ export default function Registers() {
   const [revision, setRevision] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [closeoutId, setCloseoutId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const [editor, setEditor] = useState<{
     mode: 'open' | 'close' | 'view'
     record?: RegisterRecord
@@ -61,6 +65,14 @@ export default function Registers() {
     }
   }, [client, status, revision])
   if (!reader || !client) return null
+  const matchingRows = rows.filter(
+    (row) =>
+      !search.trim() ||
+      matchesDisplayReference('register', row.id, search) ||
+      `${row.id} ${row.ownerName} ${row.closedByName ?? ''}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()),
+  )
   return (
     <>
       <div className="toolbar">
@@ -101,6 +113,20 @@ export default function Registers() {
         Registers for {reader.club}. Each staff member can open one register. Authorized staff can
         also close other staff’s registers. Refresh to see other staff changes.
       </p>
+      <div className="toolbar">
+        <input
+          aria-label="Search registers"
+          placeholder="Register ID or staff name"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </div>
+      {search && (
+        <p className="page-note">
+          Showing {matchingRows.length} matching loaded registers. Load more registers to search
+          older records.
+        </p>
+      )}
       {notice && <p role="status">{notice}</p>}
       {error && (
         <p role="alert" className="inline-error">
@@ -113,7 +139,8 @@ export default function Registers() {
           <div>
             <h2>Your open register</h2>
             <p>
-              Opened {new Date(own.openedAt).toLocaleString()} · Opening cash{' '}
+              {displayReference('register', own.id)} · Opened{' '}
+              {new Date(own.openedAt).toLocaleString()} · Opening cash{' '}
               {money(own.openingTotalCents / 100)}
             </p>
             <RegisterLedger record={own} key={revision} />
@@ -134,13 +161,18 @@ export default function Registers() {
       {loaded && (
         <section className="panel">
           <h2>{status === 'open' ? 'Open registers' : 'Closed registers'}</h2>
-          {!rows.length ? (
-            <p className="empty">No {status} registers in this business.</p>
+          {!matchingRows.length ? (
+            <p className="empty">
+              {rows.length
+                ? 'No matching loaded registers.'
+                : `No ${status} registers in this business.`}
+            </p>
           ) : (
             <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
+                    <th>Register</th>
                     <th>Staff</th>
                     <th>Opened</th>
                     <th>Opening cash</th>
@@ -155,8 +187,9 @@ export default function Registers() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {matchingRows.map((row) => (
                     <tr key={row.id}>
+                      <td>{displayReference('register', row.id)}</td>
                       <td>
                         {row.ownerName || row.ownerUid}
                         {row.ownerUid === reader.uid && <small> · You</small>}
@@ -186,6 +219,15 @@ export default function Registers() {
                         >
                           View counts
                         </button>
+                        {row.status === 'closed' && (
+                          <button
+                            disabled={!!editor || !!closeoutId}
+                            aria-label={`Print closeout for ${row.ownerName || row.ownerUid}`}
+                            onClick={() => setCloseoutId(row.id)}
+                          >
+                            Print closeout
+                          </button>
+                        )}
                         {row.status === 'open' &&
                           hasStaffPermission(
                             reader.uid,
@@ -253,8 +295,16 @@ export default function Registers() {
                 : 'Register closed. Your ending count is saved in Closed registers.',
             )
             setEditor(null)
+            if (editor.mode === 'close' && editor.record) setCloseoutId(editor.record.id)
             setRevision((value) => value + 1)
           }}
+        />
+      )}
+      {closeoutId && (
+        <RegisterCloseoutDialog
+          key={`${reader.club}/${reader.uid}/${closeoutId}`}
+          registerId={closeoutId}
+          onClose={() => setCloseoutId(null)}
         />
       )}
     </>

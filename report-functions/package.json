@@ -1,0 +1,17 @@
+{
+  "name": "cerms-daily-report-functions",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "date-fns": "4.4.0",
+    "date-fns-tz": "3.2.0",
+    "exceljs": "4.4.0",
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.4.0",
+    "nodemailer": "10.5.0"
+  }
+}
