@@ -17,6 +17,7 @@ const Products = lazy(() => import('./features/Products'))
 const Registers = lazy(() => import('./features/Registers'))
 const PointOfSale = lazy(() => import('./features/PointOfSale'))
 const Staff = lazy(() => import('./features/Staff'))
+const Messages = lazy(() => import('./features/Messages'))
 const Settings = lazy(() => import('./features/Settings'))
 
 function readRoute(): ModuleId {
@@ -217,6 +218,8 @@ export default function App() {
               <Registers key={`${membership.reader?.uid}:${membership.reader?.club}`} />
             ) : route === 'staff' ? (
               <Staff key={`${membership.reader?.uid}:${membership.reader?.club}`} />
+            ) : route === 'messages' ? (
+              <Messages key={`${membership.reader?.uid}:${membership.reader?.club}`} />
             ) : route === 'settings' ? (
               <Settings />
             ) : (

@@ -1,0 +1,45 @@
+.member-notes-section {
+  margin-block: 20px;
+}
+.member-note-log {
+  display: grid;
+  gap: 12px;
+  margin-block: 12px;
+}
+.member-note {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+}
+.member-note p {
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.member-note-meta {
+  display: flex;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+.member-note-dna {
+  border: 2px solid #bd4a4a;
+  border-radius: 10px;
+  padding: 14px;
+  background: color-mix(in srgb, #bd4a4a 12%, transparent);
+}
+.member-notes-section fieldset {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  margin-block: 16px;
+}
+.member-notes-section textarea {
+  min-height: 90px;
+  width: 100%;
+}
+
+.member-notes-review .dialog-actions {
+  gap: 10px;
+  flex-wrap: wrap;
+}

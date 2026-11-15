@@ -83,3 +83,20 @@ describe('application updater', () => {
     expect(f.updater.quitAndInstall).not.toHaveBeenCalled()
   })
 })
+
+it('carries version-matched notes through download and clears them when checking another version', async () => {
+  const f = fixture()
+  f.updater.emit('update-available', {
+    version: '5.0.0-alpha.2',
+    releaseNotes: '### Added\n- New staff chat.',
+  })
+  expect(f.controller.state().releaseNotes).toContain('New staff chat')
+  f.updater.emit('download-progress', { percent: 75 })
+  f.updater.emit('update-downloaded', { version: '5.0.0-alpha.2' })
+  expect(f.controller.state().releaseNotes).toContain('New staff chat')
+  f.updater.emit('update-available', { version: '5.0.0-alpha.3' })
+  expect(f.controller.state().releaseNotes).toBeUndefined()
+  f.updater.emit('update-not-available')
+  expect(f.controller.state().version).toBeUndefined()
+  expect(f.controller.state().releaseNotes).toBeUndefined()
+})

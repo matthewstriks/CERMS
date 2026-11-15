@@ -1,19 +1,22 @@
+import { memberNotes } from '../functions/member-notes.mjs'
 import { saveThemePreference } from '../functions/theme.mjs'
 import { _electron as electron, expect } from 'playwright/test'
 import assert from 'node:assert/strict'
 import { readFile, mkdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { getImage } from '../functions/product-images.mjs'
-import { completeSale, savePosSettings, updateRental } from '../functions/pos.mjs'
+import { completeSale, savePosSettings, updateRental, checkOutRental } from '../functions/pos.mjs'
 import { posFixture, owner as uid, registerId } from './fixtures/pos-server.mjs'
 import { membershipProduct } from './fixtures/catalog.mjs'
 import { emptyCounts } from './fixtures/registers.mjs'
+const notesSmoke = process.argv.includes('--notes')
 const themeSmoke = process.argv.includes('--theme')
 let failThemeNext = false
 const catalogSmoke = process.argv.includes('--catalog')
 const groupSmoke = process.argv.includes('--group')
 const renewalSmoke = process.argv.includes('--membership-renewal')
-const membershipSmoke = process.argv.includes('--members') || groupSmoke || renewalSmoke
+const membershipSmoke =
+  process.argv.includes('--members') || groupSmoke || renewalSmoke || notesSmoke
 const club = membershipSmoke ? 'dev' : 'club-a'
 const fixture = posFixture(),
   docs = fixture.docs,
@@ -47,7 +50,7 @@ if (membershipSmoke) {
     inventory: null,
   })
 }
-if (groupSmoke || renewalSmoke) {
+if (groupSmoke || renewalSmoke || notesSmoke) {
   for (const [id, name, number] of [
     ['buyer', 'Alex Buyer', 101],
     ['friend', 'Casey Friend', 102],
@@ -69,6 +72,10 @@ if (groupSmoke || renewalSmoke) {
       idnum: 'FAKE-' + id,
       idstate: 'TX',
     })
+}
+if (notesSmoke) {
+  docs.get('members/buyer').tag = true
+  docs.get('members/buyer').notes = ['Original legacy note']
 }
 if (themeSmoke) docs.get('users/' + uid).themePreference = 'dark'
 docs.get('users/' + uid).email = 'matthew@striks.com'
@@ -242,6 +249,10 @@ try {
             throw new Error('Synthetic appearance failure')
           }
           result = await saveThemePreference({ auth: { uid }, data }, fixture.deps)
+        } else if (url.pathname === '/memberNotes') {
+          result = await memberNotes({ auth: { uid }, data }, fixture.deps)
+        } else if (url.pathname === '/checkOutRental') {
+          result = await checkOutRental({ auth: { uid }, data }, fixture.deps)
         } else if (url.pathname === '/updateRental') {
           result = await updateRental({ auth: { uid }, data }, fixture.deps)
         } else if (catalogSmoke && url.pathname === '/getProductImage') {
@@ -311,20 +322,25 @@ try {
       if (url.pathname.endsWith(':commit')) {
         for (const w of body.writes) {
           const p = w.update.name.slice(base.length + 1)
-          assert.ok(p.startsWith(`system/${club}/registers/`))
+          assert.ok(
+            p.startsWith(`system/${club}/registers/`) || p.startsWith(`system/${club}/memberLogs/`),
+          )
+          if (!docs.has(p)) docs.set(p, {})
           for (const [k, v] of Object.entries(w.update.fields)) {
             const decode = (v) =>
               'integerValue' in v
                 ? Number(v.integerValue)
-                : 'stringValue' in v
-                  ? v.stringValue
-                  : 'nullValue' in v
-                    ? null
-                    : 'mapValue' in v
-                      ? Object.fromEntries(
-                          Object.entries(v.mapValue.fields).map(([k, v]) => [k, decode(v)]),
-                        )
-                      : v
+                : 'booleanValue' in v
+                  ? v.booleanValue
+                  : 'stringValue' in v
+                    ? v.stringValue
+                    : 'nullValue' in v
+                      ? null
+                      : 'mapValue' in v
+                        ? Object.fromEntries(
+                            Object.entries(v.mapValue.fields).map(([k, v]) => [k, decode(v)]),
+                          )
+                        : v
             docs.get(p)[k] = decode(v)
           }
           for (const t of w.updateTransforms ?? [])
@@ -388,7 +404,88 @@ try {
     item.click()
   })
   await expect(page.getByText('Your register is open')).toBeVisible()
-  if (themeSmoke) {
+  if (notesSmoke) {
+    await page.getByRole('link', { name: 'Members', exact: true }).click()
+    await page.getByRole('button', { name: 'View Alex Buyer', exact: true }).click()
+    const details = page.getByRole('dialog', { name: 'Alex Buyer', exact: true })
+    const notes = details.getByRole('region', { name: 'Member notes', exact: true })
+    await expect(notes).toContainText('Original legacy note')
+    await notes
+      .getByLabel('Add member note', { exact: true })
+      .fill('Please verify membership card at arrival.')
+    await notes.getByRole('button', { name: 'Save note', exact: true }).click()
+    const entry = notes.locator('article').filter({ hasText: 'Please verify membership card' })
+    await expect(entry).toContainText('Matthew Test Striks')
+    await expect(entry.locator('time')).toBeVisible()
+    await notes.getByLabel('Do not admit (DNA)', { exact: true }).check()
+    await expect(notes.getByRole('button', { name: 'Save DNA status' })).toBeDisabled()
+    await notes.getByLabel('DNA reason', { exact: true }).fill('Synthetic incident reason')
+    await notes.getByRole('button', { name: 'Save DNA status' }).click()
+    await expect(notes.locator('article.member-note-dna')).toContainText(
+      'Synthetic incident reason',
+    )
+    assert.equal(docs.get('members/buyer').dna, true)
+    await mkdir('artifacts', { recursive: true })
+    await details.screenshot({ path: 'artifacts/member-notes.png' })
+    await notes.getByLabel('Do not admit (DNA)', { exact: true }).uncheck()
+    await notes.getByRole('button', { name: 'Save DNA status' }).click()
+    await expect(notes.locator('article').filter({ hasText: 'DNA cleared' })).toBeVisible()
+    await entry.getByRole('button', { name: 'Remove note' }).click()
+    await notes.getByRole('button', { name: 'Keep note' }).click()
+    await expect(entry).toBeVisible()
+    await entry.getByRole('button', { name: 'Remove note' }).click()
+    await notes.getByRole('button', { name: 'Confirm remove note' }).click()
+    await expect(entry).toHaveCount(0)
+    await details.getByRole('button', { name: 'Close', exact: true }).click()
+    const row = page.getByRole('row').filter({ hasText: 'Alex Buyer' })
+    await row.getByRole('button', { name: 'Create order', exact: true }).click()
+    let review = page.getByRole('dialog', { name: 'Read member notes', exact: true })
+    await expect(review).toBeVisible()
+    await expect(review).toContainText('Original legacy note')
+    await review.screenshot({ path: 'artifacts/member-notes-review.png' })
+    await expect(review).toContainText('Synthetic incident reason')
+    await expect(review.getByRole('button', { name: 'Confirm read', exact: true })).toBeDisabled()
+    await review.getByRole('button', { name: 'Cancel order action' }).click()
+    await expandCategories(page)
+    await page.locator('.pos-product').filter({ hasText: 'Test retail' }).click()
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    review = page.getByRole('dialog', { name: 'Read member notes', exact: true })
+    await expect(review).toBeVisible()
+    await review.getByLabel('I have read these member notes').check()
+    await review.getByRole('button', { name: 'Confirm read', exact: true }).click()
+    // Another staff note must invalidate the cashier's confirmation before payment.
+    await memberNotes(
+      {
+        auth: { uid },
+        data: {
+          business: club,
+          memberId: 'buyer',
+          action: 'add',
+          requestId: '99999999-0000-4000-8000-000000000001',
+          text: 'New note after confirmation',
+        },
+      },
+      fixture.deps,
+    )
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    await expect(review).toContainText('New note after confirmation')
+    await review.getByLabel('I have read these member notes').check()
+    await review.getByRole('button', { name: 'Confirm read', exact: true }).click()
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    const payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByLabel('Payment amount 1').dblclick()
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    await page.getByRole('button', { name: 'Retry same sale', exact: true }).click()
+    const receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+    await expect(receipt).toBeVisible()
+    await expect(receipt).not.toContainText('Synthetic incident reason')
+    await mkdir('artifacts', { recursive: true })
+    await page.screenshot({ path: 'artifacts/member-notes-checkout.png' })
+    assert.deepEqual(errors, [])
+    console.log(
+      'Member notes passed: saved actor/time, required DNA reason/highlight/clear, admin remove/cancel, tagged-order popup/cancel/read, fresh-note reconfirmation, sale retry and receipt privacy. All HTTPS intercepted.',
+    )
+  } else if (themeSmoke) {
     const profileBefore = structuredClone(docs.get('users/' + uid))
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark')
     const light = page.getByRole('button', { name: 'Switch to light mode' })
@@ -879,8 +976,57 @@ try {
     await expect(page.getByRole('dialog', { name: 'Sale receipt', exact: true })).toContainText(
       'Rental renewal',
     )
+    // Both entry points require both explicit confirmations; cancellation has no writes.
+    await page
+      .getByRole('dialog', { name: 'Sale receipt', exact: true })
+      .getByRole('button', { name: 'Done', exact: true })
+      .click()
+    for (const hash of ['overview', 'activity']) {
+      const v = docs.get('activity/' + admission.id)
+      // Restore only synthetic fixture state to exercise the same rental on each page.
+      v.active = true
+      savedMember.checkedIn = true
+      docs.set(`system/${club}/memberVisits/${admission.memberId}`, {
+        memberId: admission.memberId,
+        visitIds: [admission.id],
+      })
+      Object.assign(admission, {
+        active: true,
+        editRevision: v.editRevision,
+        expiresAt: v.lockerRoomStatus[5] * 1000,
+      })
+      await page.evaluate((h) => {
+        location.hash = h
+      }, hash)
+      await expect(page.getByText('Live updates', { exact: true })).toBeVisible()
+      await page.evaluate(
+        (row) =>
+          window.dispatchEvent(
+            new CustomEvent('admissions-fixture', {
+              detail: { rows: [row], status: 'live' },
+            }),
+          ),
+        admission,
+      )
+      await page.getByRole('button', { name: `View visit for ${savedMember.name}` }).click()
+      const details = page.getByRole('dialog', { name: savedMember.name, exact: true })
+      await details.getByRole('button', { name: 'Check out rental', exact: true }).click()
+      const confirm = details.getByRole('button', { name: 'Confirm rental checkout', exact: true })
+      await expect(confirm).toBeDisabled()
+      await details.getByLabel('The rental is completed', { exact: true }).check()
+      await expect(confirm).toBeDisabled()
+      await details.getByRole('button', { name: 'Cancel checkout' }).click()
+      assert.equal(docs.get('activity/' + admission.id).active, true)
+      await details.getByRole('button', { name: 'Check out rental', exact: true }).click()
+      await expect(details.getByLabel('The rental is completed', { exact: true })).not.toBeChecked()
+      await details.getByLabel('The rental is completed', { exact: true }).check()
+      await details.getByLabel('All required items have been returned', { exact: true }).check()
+      await confirm.click()
+      await expect(details).not.toBeVisible()
+      assert.equal(docs.get('activity/' + admission.id).active, false)
+    }
     console.log(
-      'Rental edit/in-out/waitlist on both pages and canceled/completed renewal checkout passed.',
+      'Rental edit/in-out/waitlist, canceled/completed renewal, and two-confirmation rental checkout on both pages passed.',
     )
     await mkdir('artifacts', { recursive: true })
     await page.screenshot({ path: 'artifacts/member-checkout.png' })

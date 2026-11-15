@@ -44,6 +44,49 @@ cross-build tooling, or on Windows with Node and the Firebase CLI installed.
 Publishing credentials stay in the local CLI login; they are never in the app.
 If the login expires, run `firebase login --reauth` and retry.
 
+## Edit the changelog and publish
+
+Edit [CHANGELOG.md](../CHANGELOG.md) under **Unreleased**, then run:
+
+```sh
+npm run release:alpha
+```
+
+The command validates the draft before incrementing the alpha version, records
+its notes under that version in the changelog, leaves a new empty Unreleased
+section, runs checks, builds the installer and publishes through the existing
+isolated Firebase release bucket. Use `### Added`, `### Changed` or `### Fixed`
+for groups; `##` headings are reserved for Unreleased and version numbers.
+Headings, paragraphs, bullets, numbered lists and fenced code blocks display in
+the app. Notes are public release information and are rendered as inert text;
+HTML and external links are not executed or loaded.
+
+`release:win` resumes the current version using its recorded notes; it preserves
+any new Unreleased draft. `release:upload` retries an already-built upload and
+uses the notes captured in those built artifacts. To publish changed notes,
+create a new version. Published installers and version manifests remain
+immutable, including their embedded notes. Empty or oversized notes and a
+mismatch between the installer snapshot and feed notes stop publication.
+
+`npm run changelog:prepare` records notes for the current package version without
+building or publishing. The release workflow and CI call this automatically;
+use it manually only after selecting a new package version yourself. Regular
+`npm run build`, `npm run check` and `npm run release:check` do not consume or
+change the Unreleased draft.
+
+When a newer update is offered, **What's new** is available in the update notice
+while downloading and once ready, and in **Settings → Software updates** even
+if the notice was dismissed. Opening or closing the notes does not install an
+update or change the current form. Missing notes have an explicit fallback;
+notes for a different version are never reused. Older installed builds need to
+install a build containing this UI once before they can show notes for later
+updates. This source change does not itself publish or install a version.
+
+Verification: `npm run check` and `npm run test:updates`. Release tests use
+in-memory storage and temporary inert packages; updater tests use synthetic IPC
+and a loopback-only Windows feed. No real installer is executed, fake version
+published, release bucket modified or Firebase business data written as a test.
+
 ## What the client sees
 
 The installed alpha checks 15 seconds after launch and every five minutes while
@@ -115,3 +158,11 @@ type checking and the production build.
 A physical Windows installation and actual N-to-N+1 installer execution still
 require a Windows machine. Successful synthetic downloads are not claimed as a
 physical end-to-end Windows installation test.
+
+The editable changelog integration was verified November 15, 2026 with 210 client
+checks, 13 synthetic changelog/release/publisher checks, build, release-input
+validation, the Electron notes dialog and the loopback Windows updater. Tests
+covered versioned note snapshots, changed-note publication refusal, packaged/feed
+mismatches, safe rendering, missing notes and preserved explicit installation.
+This implementation leaves the version at `5.0.0-alpha.3` and the new notes in
+Unreleased, ready for developer review before the next release command.

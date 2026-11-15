@@ -1,3 +1,5 @@
+import { isMessagingRequest, staffMessagingEndpoint } from './messaging-policy'
+import { isMemberNotesRequest, memberNotesEndpoint } from './member-notes-policy'
 import { themeEndpoint, isThemeRequest } from './theme-policy'
 import { posEndpoints, isPosRequest } from './pos-policy'
 import {
@@ -33,8 +35,12 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
   try {
     const url = new URL(rawUrl)
     if (url.protocol !== 'https:' || url.username || url.password || url.port) return false
+    if (url.href === staffMessagingEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isMessagingRequest(body))
     if (url.href === themeEndpoint)
       return method === 'OPTIONS' || (method === 'POST' && isThemeRequest(body))
+    if (url.href === memberNotesEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isMemberNotesRequest(body))
     if (Object.values(posEndpoints).some((endpoint) => endpoint === url.href))
       return method === 'OPTIONS' || (method === 'POST' && isPosRequest(url.href, body))
     if ([uploadProductImageEndpoint, getProductImageEndpoint].includes(url.href))

@@ -1,3 +1,4 @@
+import { validateNotes } from './changelog.cjs'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
@@ -53,6 +54,7 @@ export async function windowsAssets(directory, version) {
   const manifest = await readFile(join(directory, `${channel}.yml`))
   const data = load(manifest.toString())
   assert.equal(data.version, version, 'Manifest version must match package version')
+  const releaseNotes = validateNotes(data.releaseNotes)
   assert.equal(data.path, installer, 'Manifest path must name the Windows installer')
   assert.equal(data.files?.length, 1, 'Windows manifest must contain exactly one installer')
   assert.equal(data.files[0].url, installer, 'Manifest URL must be a local installer name')
@@ -71,11 +73,17 @@ export async function windowsAssets(directory, version) {
   assert.equal(feed.url, settings.windowsFeed)
   assert.equal(feed.channel, channel)
   const { default: asar } = await import('@electron/asar')
+  asar.uncache(join(directory, 'win-unpacked/resources/app.asar'))
   const pkg = JSON.parse(
     asar.extractFile(join(directory, 'win-unpacked/resources/app.asar'), 'package.json').toString(),
   )
   assert.equal(pkg.version, version)
   assert.equal(pkg.cermsRelease?.updatesEnabled, true, 'Installer must enable the release updater')
+  assert.equal(
+    pkg.cermsRelease?.releaseNotes,
+    releaseNotes,
+    'Packaged changelog must match the update manifest',
+  )
   return {
     version,
     manifest,
@@ -150,6 +158,7 @@ export function storageClient(token, request = fetch) {
 
 export async function publishWindows(assets, store) {
   const { version, manifest, files } = assets
+  validateNotes(load(manifest.toString()).releaseNotes)
   const channels = announcementChannels(version)
   // Capture generations before uploading: concurrent publishes cannot replace a newer feed.
   const previous = new Map()

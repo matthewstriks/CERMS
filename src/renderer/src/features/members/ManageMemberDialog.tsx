@@ -226,14 +226,7 @@ export default function ManageMemberDialog({
                   Set the expiration explicitly if needed.
                 </p>
                 <div className="member-edit-flags">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={draft.dna}
-                      onChange={(e) => change('dna', e.target.checked)}
-                    />
-                    Do not admit
-                  </label>
+                  <p>DNA status is managed in member notes, where a reason is required.</p>
                   <label>
                     <input
                       type="checkbox"

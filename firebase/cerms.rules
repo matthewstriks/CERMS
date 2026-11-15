@@ -46,9 +46,9 @@ service cloud.firestore {
       return switcher() && businessStaff(systemId);
     }
     function validStaffPermissions(p) {
-      return p is map && p.keys().hasOnly(['closeOtherRegisters','deleteProducts','processSales','editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
+      return p is map && p.keys().hasOnly(['removeMemberNotes','closeOtherRegisters','deleteProducts','processSales','editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
         && p.keys().hasAll(['editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
-        && p.editMembers is bool && p.deleteMembers is bool && p.manageProducts is bool
+        && p.get('removeMemberNotes',false) is bool && p.editMembers is bool && p.deleteMembers is bool && p.manageProducts is bool
         && p.openRegisters is bool && p.closeRegisters is bool && p.get('processSales',false) is bool && p.get('deleteProducts',false) is bool && p.get('closeOtherRegisters',false) is bool;
     }
     match /system/{systemId}/staffPermissions/{uid} {
@@ -192,6 +192,22 @@ service cloud.firestore {
       allow list: if logMember(systemId,memberId) && request.query.limit <= 50;
       allow create: if logMember(systemId,memberId) && eventId.matches('[a-f0-9-]{36}') && validMemberView(request.resource.data);
       allow update, delete: if false;
+    }
+    // Private staff chat metadata and immutable messages; the callable owns writes.
+    // staffChats: participantUids (2-10), names, server times/sequence, per-UID read watermark.
+    function chatParticipant(systemId, chatId) {
+      return businessStaff(systemId) && request.auth.uid in
+        get(/databases/$(database)/documents/system/$(systemId)/staffChats/$(chatId)).data.participantUids;
+    }
+    match /system/{systemId}/staffChats/{chatId} {
+      allow get: if businessStaff(systemId) && request.auth.uid in resource.data.participantUids;
+      allow list: if businessStaff(systemId) && request.auth.uid in resource.data.participantUids && request.query.limit <= 50;
+      allow create, update, delete: if false;
+      match /messages/{messageId} {
+        allow get: if chatParticipant(systemId,chatId);
+        allow list: if chatParticipant(systemId,chatId) && request.query.limit <= 50;
+        allow create, update, delete: if false;
+      }
     }
     // Catalog rights are assigned by the owner within the current business.
     function catalogAdmin(systemId) {
@@ -375,6 +391,7 @@ service cloud.firestore {
         && d.idstate in ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','military','passport','other']
         && shortText(d.email,320) && d.phone is string && (d.phone == '' || d.phone.matches('[+][1-9][0-9]{7,14}'))
         && shortText(d.membership_type,200) && d.membership_type.size() > 0
+        && d.dna == before.get('dna',false)
         && d.id_expiration is int && d.id_expiration >= 0 && d.id_expiration <= 253402300799 && d.dna is bool && d.tag is bool
         && shortText(d.searchFirst,500) && shortText(d.searchLast,500) && shortText(d.searchName,500) && shortText(d.searchId,500) && shortText(d.searchEmail,320)
         && d.updatedBy == request.auth.uid && d.updatedAt == request.time

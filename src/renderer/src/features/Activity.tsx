@@ -242,6 +242,13 @@ function VisitDetails({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
+  const [checkingOut, setCheckingOut] = useState(false)
+  const [checkoutTarget, setCheckoutTarget] = useState<{
+    revision: number
+    expiresAt: number
+  } | null>(null)
+  const [rentalCompleted, setRentalCompleted] = useState(false)
+  const [itemsReturned, setItemsReturned] = useState(false)
   const [products, setProducts] = useState<CatalogRecord<CatalogProduct>[]>([])
   const [productId, setProductId] = useState('')
   useEffect(() => {
@@ -297,6 +304,25 @@ function VisitDetails({
       setSaved('Rental details saved.')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Rental could not be saved.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function checkOut() {
+    if (!reader || busy || !rentalCompleted || !itemsReturned || !checkoutTarget) return
+    setBusy(true)
+    setError('')
+    try {
+      await createPos(reader).checkOutRental({
+        visitId: visit.id,
+        expectedRevision: checkoutTarget.revision,
+        expectedExpiresAt: checkoutTarget.expiresAt,
+        rentalCompleted: true,
+        itemsReturned: true,
+      })
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Rental checkout could not be confirmed.')
     } finally {
       setBusy(false)
     }
@@ -375,7 +401,7 @@ function VisitDetails({
       </dl>
       {canEdit ? (
         <>
-          <fieldset disabled={busy}>
+          <fieldset disabled={busy || checkingOut}>
             <legend>Edit active rental</legend>
             <label>
               Assigned Room/Number
@@ -426,7 +452,7 @@ function VisitDetails({
               Save rental changes
             </button>
           </fieldset>
-          <fieldset disabled={busy}>
+          <fieldset disabled={busy || checkingOut}>
             <legend>Renew rental</legend>
             <label>
               Rental product
@@ -451,6 +477,64 @@ function VisitDetails({
             <button disabled={!productId || dirty} onClick={renew}>
               Renew in order
             </button>
+          </fieldset>
+          <fieldset disabled={busy}>
+            <legend>Check out rental</legend>
+            {checkingOut ? (
+              <>
+                <p>
+                  Complete {visit.rental} · {visit.location} for {visit.memberName}? This ends this
+                  rental. The member stays checked in while other rentals are active.
+                </p>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={rentalCompleted}
+                    onChange={(e) => setRentalCompleted(e.target.checked)}
+                  />{' '}
+                  The rental is completed
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={itemsReturned}
+                    onChange={(e) => setItemsReturned(e.target.checked)}
+                  />{' '}
+                  All required items have been returned
+                </label>
+                <button
+                  onClick={() => {
+                    setCheckingOut(false)
+                    setRentalCompleted(false)
+                    setItemsReturned(false)
+                  }}
+                >
+                  Cancel checkout
+                </button>
+                <button
+                  className="primary"
+                  disabled={!rentalCompleted || !itemsReturned}
+                  onClick={() => void checkOut()}
+                >
+                  {busy ? 'Checking out…' : 'Confirm rental checkout'}
+                </button>
+              </>
+            ) : (
+              <>
+                {dirty && <p>Save your changes or reopen the visit before checking out.</p>}
+                <button
+                  disabled={dirty || visit.expiresAt === null}
+                  onClick={() => {
+                    setCheckoutTarget({ revision, expiresAt: visit.expiresAt! / 1000 })
+                    setCheckingOut(true)
+                    setError('')
+                    setSaved('')
+                  }}
+                >
+                  Check out rental
+                </button>
+              </>
+            )}
           </fieldset>
           {saved && <p role="status">{saved}</p>}
           {error && (

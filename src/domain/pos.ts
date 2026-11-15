@@ -103,6 +103,7 @@ export interface RentalAssignment {
   memberId?: string
 }
 export interface SaleRequest {
+  noteAcknowledgements?: { memberId: string; revision: number }[]
   membershipAssignments?: MembershipAssignment[]
   member?: OrderMember
   pendingMembers?: OrderMember[]
@@ -134,7 +135,7 @@ export interface RegisterTotals {
 }
 export interface SaleReceipt extends Omit<
   SaleRequest,
-  'lines' | 'payments' | 'requestId' | 'membershipAssignments'
+  'lines' | 'payments' | 'requestId' | 'membershipAssignments' | 'noteAcknowledgements'
 > {
   members?: OrderMember[]
   memberships?: {

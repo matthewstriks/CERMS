@@ -330,7 +330,10 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
       {selected && (
         <MemberDetails
           member={selected}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null)
+            refresh()
+          }}
           onEdit={
             hasStaffPermission(reader.uid, 'editMembers', reader.permissions)
               ? () => {

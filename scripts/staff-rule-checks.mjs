@@ -63,6 +63,18 @@ export async function staffRuleChecks({ base, seed, check, fields, str, owner })
     false,
   )
   await check('Owner saves staff permissions', base + ':commit', commit(permissionWrite()), true)
+  await check(
+    'Owner grants independent note removal admin permission',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, removeMemberNotes: true })),
+    true,
+  )
+  await check(
+    'Owner retains compatible older permission shape',
+    base + ':commit',
+    commit(permissionWrite()),
+    true,
+  )
   await check('Staff reads own permissions', permissionPath, { uid }, true)
   await check('Other staff permissions private', permissionPath, { uid: 'staff' }, false)
   await check(

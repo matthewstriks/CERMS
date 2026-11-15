@@ -1,3 +1,4 @@
+import { releaseNotesText } from '../shared/release-notes'
 import type { AppUpdater } from 'electron-updater'
 import type { UpdateState } from '../shared/updates'
 
@@ -49,12 +50,18 @@ export function createUpdateController(
   updater.allowDowngrade = false
   updater.disableWebInstaller = true
   updater.on('checking-for-update', () =>
-    set({ phase: 'checking', message: 'Checking for updates…' }),
+    set({
+      phase: 'checking',
+      version: undefined,
+      releaseNotes: undefined,
+      message: 'Checking for updates…',
+    }),
   )
   updater.on('update-available', (info) =>
     set({
       phase: 'downloading',
       version: info.version,
+      releaseNotes: releaseNotesText(info.releaseNotes, info.version),
       percent: 0,
       message: `Downloading CERMS ${info.version}…`,
     }),
@@ -70,6 +77,10 @@ export function createUpdateController(
     set({
       phase: 'ready',
       version: info.version,
+      releaseNotes:
+        info.releaseNotes == null && state.version === info.version
+          ? state.releaseNotes
+          : releaseNotesText(info.releaseNotes, info.version),
       percent: 100,
       message: `CERMS ${info.version} is ready. It will install when you quit, or you can restart now.`,
     }),
@@ -78,6 +89,7 @@ export function createUpdateController(
     set({
       phase: 'current',
       version: undefined,
+      releaseNotes: undefined,
       percent: undefined,
       message: 'You have the latest version available for this release channel.',
     }),
@@ -90,7 +102,14 @@ export function createUpdateController(
       if (!options.enabled || state.phase === 'ready' || state.phase === 'downloading')
         return Promise.resolve({ ...state })
       if (checking) return checking
-      set({ phase: 'checking', manual, percent: undefined, message: 'Checking for updates…' })
+      set({
+        phase: 'checking',
+        manual,
+        version: undefined,
+        releaseNotes: undefined,
+        percent: undefined,
+        message: 'Checking for updates…',
+      })
       checking = Promise.resolve()
         .then(() => updater.checkForUpdates())
         .then((result) => {

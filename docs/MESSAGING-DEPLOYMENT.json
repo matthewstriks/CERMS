@@ -1,0 +1,52 @@
+{
+  "feature": "Private direct and group staff messaging, directory/history search, server timestamps and read receipts",
+  "verifiedAt": "2026-11-15T17:57:35.823Z",
+  "database": "cerms",
+  "rulesChange": "Participant-only saved-business chat/message reads; all direct messaging writes denied",
+  "rulesBaseline": "firebase/releases/messaging-2026-11-15.rules",
+  "rulesSha256": "871acca51565500e22ae8c98643c7b7990bb88461d98b8cdb3cf70c0684162da",
+  "serverSha256": "e1086b69348f04173c415139ef3ab9cc586ce72da97e3c61647b1bb8c34831ad",
+  "bothDatabaseConfigurationsUnchanged": true,
+  "legacyIndexesUnchanged": true,
+  "existingCermsIndexesUnchanged": true,
+  "messagingIndex": {
+    "name": "projects/cerms-7af24/databases/cerms/collectionGroups/staffChats/indexes/CICAgJim14AK",
+    "queryScope": "COLLECTION",
+    "fields": [
+      {
+        "fieldPath": "participantUids",
+        "arrayConfig": "CONTAINS"
+      },
+      {
+        "fieldPath": "updatedAt",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "state": "READY",
+    "density": "SPARSE_ALL"
+  },
+  "legacyAndStorageRulesUnchanged": true,
+  "bothBucketsUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "clientChecks": 207,
+  "serverMessagingChecks": 8,
+  "rulesChecks": 362,
+  "buildPassed": true,
+  "interceptedMessagingFlowPassed": true,
+  "concurrentDemoEmulatorTransactionsPassed": true,
+  "admissionsEmulatorRegressionPassed": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/staffMessaging",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-15T17:51:05.145481192Z",
+      "entryPoint": "staffMessaging"
+    }
+  ]
+}

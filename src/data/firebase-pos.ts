@@ -102,6 +102,13 @@ export function createPos(reader: Pick<MembershipReader, 'uid' | 'club'>) {
         receiptFooter: d?.receiptFooter || 'Thank you for your visit.',
       }
     },
+    checkOutRental: (data: {
+      visitId: string
+      expectedRevision: number
+      expectedExpiresAt: number
+      rentalCompleted: true
+      itemsReturned: true
+    }) => call('checkOutRental', { business: reader.club, ...data }),
     updateRental: (data: {
       visitId: string
       expectedRevision: number

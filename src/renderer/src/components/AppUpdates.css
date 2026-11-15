@@ -28,3 +28,43 @@
   padding-top: 18px;
   border-top: 1px solid var(--line);
 }
+
+.release-notes-dialog {
+  width: min(680px, calc(100vw - 48px));
+}
+.release-notes-dialog .dialog-heading {
+  align-items: flex-start;
+  gap: 20px;
+}
+.release-notes-dialog h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.release-notes-body {
+  margin: 24px 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.release-notes-body p {
+  white-space: pre-wrap;
+  color: var(--ink);
+  line-height: 1.7;
+}
+.release-notes-body h3 {
+  margin-top: 24px;
+}
+.release-notes-body ul,
+.release-notes-body ol {
+  padding-left: 24px;
+}
+.release-notes-body li {
+  margin: 10px 0;
+  line-height: 1.6;
+}
+.release-notes-body pre {
+  overflow: auto;
+  padding: 14px;
+  background: var(--surface-soft, #f4f7f3);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}

@@ -1,3 +1,4 @@
+import MemberNotes from './MemberNotes'
 import MemberLog from './MemberLog'
 import { phoneLabel } from '../../../../domain/phone'
 import { dobLabel } from '../../lib/data'
@@ -27,6 +28,7 @@ export default function MemberDetails({
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const { reader } = useMembershipSession()
+  const [dnaStatus, setDnaStatus] = useState(member.dna)
   const [tab, setTab] = useState<'details' | 'history'>('details')
   const [history, setHistory] = useState<MembershipHistory | null>(null)
   const [error, setError] = useState('')
@@ -58,7 +60,7 @@ export default function MemberDetails({
       active = false
     }
   }, [member.id, reader, tab])
-  const status = membershipStatus(member, Date.now())
+  const status = membershipStatus({ ...member, dna: dnaStatus }, Date.now())
   const fields = [
     ['Date of birth', dobLabel(member.dob)],
     ['Membership number', member.number],
@@ -82,7 +84,7 @@ export default function MemberDetails({
       }}
     >
       <div className="dialog-heading">
-        <Badge>{onEdit ? 'Member record' : 'Read only'}</Badge>
+        <Badge>{reader ? 'Member record' : 'Read only'}</Badge>
         <button className="icon-button" aria-label="Close member details" onClick={onClose}>
           <X size={20} />
         </button>
@@ -92,7 +94,7 @@ export default function MemberDetails({
       </div>
       <h2 id="member-details-title">{member.name}</h2>
       <div className="member-flags">
-        <Badge tone={member.dna ? 'red' : status === 'Active' ? 'green' : 'amber'}>{status}</Badge>
+        <Badge tone={dnaStatus ? 'red' : status === 'Active' ? 'green' : 'amber'}>{status}</Badge>
         {member.tagged && <Badge tone="amber">Read notes · tagged member</Badge>}
       </div>
       <div className="tabs" role="group" aria-label="Member information">
@@ -125,15 +127,22 @@ export default function MemberDetails({
             </div>
           ))}
         </dl>
-        <h3>Member notes</h3>
-        {member.notes.length ? (
-          member.notes.map((note, index) => (
-            <p key={index} className="note">
-              {note}
-            </p>
-          ))
+        {reader ? (
+          <MemberNotes
+            key={`${reader.uid}:${reader.club}:${member.id}`}
+            reader={reader}
+            memberId={member.id}
+            onChanged={setDnaStatus}
+          />
         ) : (
-          <p className="muted">No notes recorded.</p>
+          <>
+            <h3>Member notes</h3>
+            {member.notes.map((note, i) => (
+              <p className="note" key={i}>
+                {note}
+              </p>
+            ))}
+          </>
         )}
         <MemberLog
           key={`${reader?.uid}:${reader?.club}:${member.id}`}
@@ -241,9 +250,6 @@ export default function MemberDetails({
           )}
         </>
       )}
-      <div className="notice">
-        Renewal checkout, check-in, and file changes are not implemented yet.
-      </div>
       <div className="dialog-actions">
         {onEdit && <button onClick={onEdit}>Edit member</button>}
         {onDelete && (

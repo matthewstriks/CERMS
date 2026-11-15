@@ -116,11 +116,11 @@ export const modules = [
     label: 'Messages',
     icon: MessageSquare,
     group: 'Administration',
-    description: 'Staff conversations and system announcements.',
+    description: 'Private staff conversations, history and read receipts.',
     features: [
-      'Staff-to-staff conversations (legacy navigation disabled)',
-      'Chat message subscriptions',
-      'Expiring system announcements',
+      'Direct and group staff conversations',
+      'Live messages, read receipts and timestamps',
+      'Staff search and searchable conversation history',
     ],
   },
   {

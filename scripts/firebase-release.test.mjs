@@ -20,6 +20,7 @@ function fixture(version = '5.0.0-alpha.2') {
     manifest: Buffer.from(
       JSON.stringify({
         version,
+        releaseNotes: '### Added\n- Synthetic release notes',
         path: name,
         sha512: digest(bytes),
         files: [{ url: name, size: bytes.length, sha512: digest(bytes) }],
@@ -124,7 +125,10 @@ test('validates actual packaged feed, enabled updater and every installer byte b
     )
     await writeFile(
       join(source, 'package.json'),
-      JSON.stringify({ version: f.version, cermsRelease: { updatesEnabled: true } }),
+      JSON.stringify({
+        version: f.version,
+        cermsRelease: { updatesEnabled: true, releaseNotes: JSON.parse(f.manifest).releaseNotes },
+      }),
     )
     await asar.createPackage(source, join(resources, 'app.asar'))
     assert.equal((await windowsAssets(dir, f.version)).files.length, 2)
@@ -133,7 +137,42 @@ test('validates actual packaged feed, enabled updater and every installer byte b
     await writeFile(join(dir, f.files[0].name), f.files[0].bytes)
     await writeFile(join(resources, 'app-update.yml'), 'provider: github')
     await assert.rejects(windowsAssets(dir, f.version), /generic/)
+    await writeFile(
+      join(resources, 'app-update.yml'),
+      JSON.stringify({ provider: 'generic', url: config.windowsFeed, channel: 'alpha' }),
+    )
+    await writeFile(
+      join(source, 'package.json'),
+      JSON.stringify({
+        version: f.version,
+        cermsRelease: { updatesEnabled: true, releaseNotes: 'Different packaged notes' },
+      }),
+    )
+    await asar.createPackage(source, join(resources, 'app.asar'))
+    await assert.rejects(windowsAssets(dir, f.version), /changelog must match/)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('changelog content is immutable for an announced version and archived when a newer version publishes', async () => {
+  const store = memoryStore(),
+    first = fixture()
+  await publishWindows(first, store)
+  const archive = store.data.get('windows/releases/5.0.0-alpha.2.yml').bytes
+  const changed = {
+    ...first,
+    manifest: Buffer.from(
+      JSON.stringify({ ...JSON.parse(first.manifest), releaseNotes: 'Different notes' }),
+    ),
+  }
+  await assert.rejects(publishWindows(changed, store), /cannot be replaced/)
+  await publishWindows(fixture('5.0.0-alpha.3'), store)
+  assert.deepEqual(store.data.get('windows/releases/5.0.0-alpha.2.yml').bytes, archive)
+  const missing = {
+    ...fixture('5.0.0-alpha.4'),
+    manifest: Buffer.from(JSON.stringify({ ...JSON.parse(fixture().manifest), releaseNotes: '' })),
+  }
+  await assert.rejects(publishWindows(missing, store), /Add release notes/)
+  assert.equal(store.data.has('windows/releases/5.0.0-alpha.4.yml'), false)
 })

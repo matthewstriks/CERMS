@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 export const OWNER = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 export const keys = [
+  'removeMemberNotes',
   'closeOtherRegisters',
   'deleteProducts',
   'processSales',
@@ -41,7 +42,9 @@ export function validateAccount(data, fail) {
     Object.keys(permissions).some((k) => !keys.includes(k)) ||
     !keys.every(
       (k) =>
-        (['processSales', 'deleteProducts', 'closeOtherRegisters'].includes(k) &&
+        (['processSales', 'deleteProducts', 'closeOtherRegisters', 'removeMemberNotes'].includes(
+          k,
+        ) &&
           permissions[k] === undefined) ||
         typeof permissions[k] === 'boolean',
     )
@@ -74,7 +77,12 @@ export async function createAccount(request, { db, auth, timestamp, fail }) {
         permissions: Object.fromEntries(
           Object.entries(d.permissions).filter(
             ([key, value]) =>
-              !['processSales', 'deleteProducts', 'closeOtherRegisters'].includes(key) || value,
+              ![
+                'processSales',
+                'deleteProducts',
+                'closeOtherRegisters',
+                'removeMemberNotes',
+              ].includes(key) || value,
           ),
         ),
       }),

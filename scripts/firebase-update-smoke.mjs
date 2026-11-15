@@ -26,6 +26,7 @@ async function main() {
   const manifest = (version) =>
     JSON.stringify({
       version,
+      releaseNotes: '### Added\n- Synthetic release notes from the published feed.',
       path: `CERMS-5-${version}-win-x64.exe`,
       sha512,
       files: [{ url: `CERMS-5-${version}-win-x64.exe`, size: installer.length, sha512 }],
@@ -92,6 +93,10 @@ async function main() {
     const alpha = await updater('5.0.0-alpha.1', 'alpha', 'alpha')
     const checked = await alpha.checkForUpdates()
     assert.equal(checked.updateInfo.version, '5.0.0-alpha.2')
+    assert.equal(
+      checked.updateInfo.releaseNotes,
+      '### Added\n- Synthetic release notes from the published feed.',
+    )
     const paths = await checked.downloadPromise
     assert.deepEqual(await readFile(paths[0]), installer)
     assert.equal(alpha.quitAndInstallCalled, false)

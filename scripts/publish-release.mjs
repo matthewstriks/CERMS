@@ -1,3 +1,4 @@
+import { validateNotes } from './changelog.cjs'
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
@@ -23,9 +24,14 @@ export async function validateAssets(directory, version) {
     ...expected.slice(0, 3).map((name) => `${name}.blockmap`),
   ])
   const allowed = names.filter((name) => permitted.has(name))
+  let releaseNotes
   for (const manifest of expected.slice(3)) {
     const data = load(await readFile(join(directory, manifest), 'utf8'))
     assert.equal(data.version, version)
+    const notes = validateNotes(data.releaseNotes)
+    if (releaseNotes !== undefined)
+      assert.equal(notes, releaseNotes, 'Platform release notes must match')
+    releaseNotes = notes
     assert.ok(Array.isArray(data.files) && data.files.length, 'Update manifest must list files')
     for (const file of data.files) {
       assert.equal(basename(file.url), file.url, 'Manifest files must be local release asset names')
@@ -80,8 +86,11 @@ async function publish() {
       name: `CERMS ${version}`,
       draft: true,
       prerelease,
-      generate_release_notes: true,
+      body: load(await readFile(join('release-assets', 'latest.yml'), 'utf8')).releaseNotes,
     })
+  await api(`/releases/${release.id}`, 'PATCH', {
+    body: load(await readFile(join('release-assets', 'latest.yml'), 'utf8')).releaseNotes,
+  })
   for (const asset of release.assets ?? []) {
     const r = await fetch(
       `https://api.github.com/repos/${repository}/releases/assets/${asset.id}`,

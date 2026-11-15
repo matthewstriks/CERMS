@@ -136,6 +136,8 @@ export function createMemberManagement(reader: Pick<MembershipReader, 'uid' | 'c
       await requireStaffPermission(reader.uid, reader.club, 'editMembers')
       await session()
       const draft = validateMemberEdit(input)
+      if (draft.dna !== original.draft.dna)
+        throw new Error('Change DNA status in member notes with a reason.')
       let membership = original.membershipName
       if (draft.productId) {
         const snapshot = await getDoc(doc(db, 'system', reader.club, 'products', draft.productId))

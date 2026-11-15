@@ -48,6 +48,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run changelog:prepare
       - run: npm run build
       - name: Verify release inputs and package installers
         shell: bash

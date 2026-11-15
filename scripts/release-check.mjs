@@ -1,3 +1,4 @@
+import { loadReleaseNotes } from './changelog.cjs'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 export async function validateRelease({ tag, platform, release = false, env = process.env } = {}) {
@@ -37,6 +38,7 @@ export async function validateRelease({ tag, platform, release = false, env = pr
         `Configure the ${name} GitHub signing/notarization secret before a macOS release`,
       )
   }
+  loadReleaseNotes(pkg.version)
   return { version: pkg.version, prerelease: pkg.version.includes('-') }
 }
 if (process.argv[1]?.endsWith('release-check.mjs')) {

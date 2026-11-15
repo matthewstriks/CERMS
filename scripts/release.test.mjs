@@ -30,7 +30,11 @@ test('release stays unpublished unless both platforms and hash-verified update m
     for (const name of [win, zip, dmg]) await writeFile(join(dir, name), 'synthetic installer')
     const sha = createHash('sha512').update('synthetic installer').digest('base64')
     const manifest = (name) =>
-      JSON.stringify({ version, files: [{ url: name, sha512: sha, size: 19 }] })
+      JSON.stringify({
+        version,
+        releaseNotes: 'Synthetic release notes',
+        files: [{ url: name, sha512: sha, size: 19 }],
+      })
     await writeFile(join(dir, 'latest.yml'), manifest(win))
     await writeFile(join(dir, 'latest-mac.yml'), manifest(zip))
     assert.equal((await validateAssets(dir, version)).length, 5)
@@ -68,4 +72,16 @@ test('updater enablement follows the target platform, and unsigned Mac releases 
   assert.equal(mac.extraMetadata.cermsRelease.updatesEnabled, true)
   assert.equal(mac.mac.forceCodeSigning, true)
   assert.equal(mac.mac.notarize, true)
+})
+
+test('release notes are included in builder metadata and the updater feed from one source', () => {
+  const config = JSON.parse(
+    execFileSync(
+      process.execPath,
+      ['-e', "console.log(JSON.stringify(require('./electron-builder.config.cjs')))"],
+      { encoding: 'utf8' },
+    ),
+  )
+  assert.ok(config.releaseInfo.releaseNotes.trim().length > 0)
+  assert.equal(config.extraMetadata.cermsRelease.releaseNotes, config.releaseInfo.releaseNotes)
 })

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { completeSale, savePosSettings, updateRental } from './pos.mjs'
+import { completeSale, savePosSettings, updateRental, checkOutRental } from './pos.mjs'
 import { posFixture, owner, business, registerId } from '../scripts/fixtures/pos-server.mjs'
 test('split payment saves receipt, change, register ledger and inventory atomically; retry after close never doubles totals', async () => {
   const f = posFixture()
@@ -150,6 +150,12 @@ test('membership, identity/number, rental visits, linked receipt and totals comm
   assert.equal(m.checkedIn, true)
   assert.equal(m.orderId, saleId)
   assert.equal(m.phone, '+12105550123')
+  assert.deepEqual(m.notes, [])
+  const initialNote = f.docs.get(`system/dev/memberNotes/${memberId}/entries/${memberId}`)
+  assert.equal(initialNote.text, 'Synthetic notes')
+  assert.equal(initialNote.actorName, 'Matthew Test Striks')
+  assert.equal(initialNote.actorUid, owner)
+  assert.ok(initialNote.createdAt)
   assert.equal(m.id_expiration, Math.floor(f.deps.now() / 1000) + 30 * 86400)
   assert.equal(f.docs.get('system/dev/memberNumbers/' + m.id_number).memberId, memberId)
   assert.equal(f.docs.get('system/dev/memberIdentities/' + m.identityKey).memberId, memberId)
@@ -561,4 +567,144 @@ test('assigned cashier can edit and renew rentals; revoked permissions fail with
   f.docs.get(`system/dev/staffPermissions/${uid}`).permissions.processSales = false
   await assert.rejects(completeSale(f.request, f.deps), /permission/)
   assert.equal(f.commits(), 2)
+})
+
+function rentalCheckout() {
+  const f = rentalRenewal()
+  const v = f.docs.get('activity/existing-visit')
+  return {
+    ...f,
+    checkout: {
+      auth: f.request.auth,
+      data: {
+        business: 'dev',
+        visitId: 'existing-visit',
+        expectedRevision: 0,
+        expectedExpiresAt: v.lockerRoomStatus[5],
+        rentalCompleted: true,
+        itemsReturned: true,
+      },
+    },
+  }
+}
+test('confirmed rental checkout atomically closes the visit and final admission; lost-response retry is read only', async () => {
+  const f = rentalCheckout(),
+    before = structuredClone(f.docs.get('activity/existing-visit'))
+  await checkOutRental(f.checkout, f.deps)
+  const v = f.docs.get('activity/existing-visit')
+  assert.equal(v.active, false)
+  assert.equal(v.currIn, false)
+  assert.equal(v.waitlist, false)
+  assert.equal(v.checkedOutBy, owner)
+  assert.ok(v.checkedOutAt)
+  assert.equal(v.rentalCompleted, true)
+  assert.equal(v.itemsReturned, true)
+  assert.deepEqual(v.lockerRoomStatus, before.lockerRoomStatus)
+  assert.equal(f.docs.get('members/' + before.memberID).checkedIn, false)
+  assert.equal(f.docs.has('system/dev/memberVisits/' + before.memberID), false)
+  await checkOutRental(f.checkout, f.deps)
+  assert.equal(f.commits(), 1)
+  await assert.rejects(completeSale(f.request, f.deps), /no longer active/)
+  await assert.rejects(
+    updateRental(
+      {
+        auth: f.request.auth,
+        data: {
+          business: 'dev',
+          visitId: 'existing-visit',
+          expectedRevision: 1,
+          assignedRoom: 'A-1',
+          notes: '',
+          inside: true,
+          waiting: false,
+        },
+      },
+      f.deps,
+    ),
+    /no longer active/,
+  )
+})
+test('checkout retains other rentals and releases admission only after the last; older claimless visits work', async () => {
+  for (const withClaim of [true, false]) {
+    const f = rentalCheckout(),
+      v = f.docs.get('activity/existing-visit')
+    const claimPath = 'system/dev/memberVisits/' + v.memberID
+    f.docs.set('activity/second-visit', structuredClone(v))
+    if (withClaim) f.docs.get(claimPath).visitIds.push('second-visit')
+    else f.docs.delete(claimPath)
+    await checkOutRental(f.checkout, f.deps)
+    assert.equal(f.docs.get('members/' + v.memberID).checkedIn, true)
+    assert.equal(f.docs.get('activity/second-visit').active, true)
+    if (withClaim) assert.deepEqual(f.docs.get(claimPath).visitIds, ['second-visit'])
+    f.checkout.data.visitId = 'second-visit'
+    await checkOutRental(f.checkout, f.deps)
+    assert.equal(f.docs.get('members/' + v.memberID).checkedIn, false)
+    assert.equal(f.docs.has(claimPath), false)
+  }
+})
+test('rental checkout rejects unconfirmed, stale, foreign, inactive and unauthorized requests without writes', async () => {
+  for (const change of [
+    (f) => {
+      f.checkout.data.itemsReturned = false
+    },
+    (f) => {
+      f.checkout.data.rentalCompleted = false
+    },
+    (f) => {
+      f.checkout.data.itemsReturned = 'true'
+    },
+    (f) => {
+      f.checkout.data.extra = true
+    },
+    (f) => {
+      f.checkout.data.visitId = '../foreign'
+    },
+    (f) => {
+      f.checkout.data.business = 'foreign'
+    },
+    (f) => {
+      f.checkout.auth.uid = 'intruder'
+    },
+    (f) => {
+      f.docs.get('activity/existing-visit').access = 'foreign'
+    },
+    (f) => {
+      f.docs.get('activity/existing-visit').goingInactive = true
+    },
+    (f) => {
+      f.docs.get('activity/existing-visit').active = false
+    },
+    (f) => {
+      f.docs.get('activity/existing-visit').editRevision = 1
+    },
+    (f) => {
+      f.docs.get('activity/existing-visit').lockerRoomStatus[5] += 3600
+    },
+    (f) => {
+      f.docs.get('members/' + f.docs.get('activity/existing-visit').memberID).access = 'foreign'
+    },
+    (f) => {
+      f.docs.get(
+        'system/dev/memberVisits/' + f.docs.get('activity/existing-visit').memberID,
+      ).visitIds = ['another']
+    },
+  ]) {
+    const f = rentalCheckout()
+    change(f)
+    const before = structuredClone([...f.docs])
+    await assert.rejects(checkOutRental(f.checkout, f.deps))
+    assert.deepEqual([...f.docs], before)
+    assert.equal(f.commits(), 0)
+  }
+})
+test('cashier checkout respects current saved-business permission, including retry after revocation', async () => {
+  const f = rentalCheckout(),
+    uid = 'cashier'
+  f.docs.set('users/' + uid, { uid, access: 'dev' })
+  f.docs.set('system/dev/staffPermissions/' + uid, { permissions: { processSales: true } })
+  f.checkout.auth = { uid }
+  await checkOutRental(f.checkout, f.deps)
+  f.docs.get('system/dev/staffPermissions/' + uid).permissions.processSales = false
+  await assert.rejects(checkOutRental(f.checkout, f.deps), /permission/)
+  assert.equal(f.commits(), 1)
 })

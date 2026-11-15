@@ -1,4 +1,5 @@
 export const posEndpoints = {
+  checkOutRental: 'https://us-central1-cerms-7af24.cloudfunctions.net/checkOutRental',
   updateRental: 'https://us-central1-cerms-7af24.cloudfunctions.net/updateRental',
   completeSale: 'https://us-central1-cerms-7af24.cloudfunctions.net/completeSale',
   savePosSettings: 'https://us-central1-cerms-7af24.cloudfunctions.net/savePosSettings',
@@ -15,6 +16,18 @@ export function isPosRequest(url: string, body?: string): boolean {
       !/^[a-zA-Z0-9_-]{1,128}$/.test(d.business)
     )
       return false
+    if (url === posEndpoints.checkOutRental)
+      return (
+        Object.keys(d).sort().join() ===
+          'business,expectedExpiresAt,expectedRevision,itemsReturned,rentalCompleted,visitId' &&
+        typeof d.visitId === 'string' &&
+        /^[a-zA-Z0-9_-]{1,260}$/.test(d.visitId) &&
+        Number.isSafeInteger(d.expectedRevision) &&
+        d.expectedRevision >= 0 &&
+        Number.isFinite(d.expectedExpiresAt) &&
+        d.rentalCompleted === true &&
+        d.itemsReturned === true
+      )
     if (url === posEndpoints.updateRental)
       return (
         Object.keys(d).sort().join() ===
@@ -50,10 +63,25 @@ export function isPosRequest(url: string, body?: string): boolean {
             k !== 'member' &&
             k !== 'rentals' &&
             k !== 'pendingMembers' &&
-            k !== 'membershipAssignments',
+            k !== 'membershipAssignments' &&
+            k !== 'noteAcknowledgements',
         )
         .sort()
         .join() === 'business,customerName,lines,note,payments,registerId,requestId,taxRateBps' &&
+      (d.noteAcknowledgements === undefined ||
+        (Array.isArray(d.noteAcknowledgements) &&
+          d.noteAcknowledgements.length <= 50 &&
+          new Set(d.noteAcknowledgements.map((a: { memberId: string }) => a?.memberId)).size ===
+            d.noteAcknowledgements.length &&
+          d.noteAcknowledgements.every(
+            (a: { memberId: string; revision: number }) =>
+              a &&
+              Object.keys(a).sort().join() === 'memberId,revision' &&
+              typeof a.memberId === 'string' &&
+              /^[a-zA-Z0-9_-]{1,128}$/.test(a.memberId) &&
+              Number.isSafeInteger(a.revision) &&
+              a.revision >= 0,
+          ))) &&
       (d.member === undefined ||
         (!!d.member &&
           typeof d.member.id === 'string' &&

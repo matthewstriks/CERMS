@@ -96,6 +96,34 @@ try {
         body: JSON.stringify(withDocumentTimes(json)),
       })
     if (
+      url.hostname === 'us-central1-cerms-7af24.cloudfunctions.net' &&
+      url.pathname === '/memberNotes'
+    ) {
+      const d = request.postDataJSON().data
+      assert.equal(d.action, 'list', 'Existing member regression reads notes only')
+      const m = devDocuments.get(base + 'members/' + d.memberId)?.fields
+      const texts = m?.notes?.arrayValue?.values?.map((n) => n.stringValue) ?? [
+        'Fixture note — never written to Firebase.',
+      ]
+      return respond({
+        result: {
+          name: m?.name?.stringValue ?? 'Fixture member',
+          dna: m?.dna?.booleanValue ?? false,
+          tagged: m?.tag?.booleanValue ?? true,
+          revision: 0,
+          nextCursor: null,
+          notes: texts.map((text, i) => ({
+            id: 'legacy-fixture-' + i,
+            text,
+            kind: 'legacy',
+            actorUid: '',
+            actorName: '',
+            createdAt: null,
+          })),
+        },
+      })
+    }
+    if (
       url.hostname === 'identitytoolkit.googleapis.com' &&
       url.pathname.endsWith(':sendOobCode')
     ) {
@@ -1152,7 +1180,9 @@ try {
         request.path.endsWith(':sendOobCode') ||
         request.path.endsWith(':batchGet') ||
         request.path.endsWith(':runQuery') ||
-        request.path.endsWith(':commit'),
+        request.path.endsWith(':commit') ||
+        (request.host === 'us-central1-cerms-7af24.cloudfunctions.net' &&
+          request.path === '/memberNotes'),
     ),
   )
   console.log(

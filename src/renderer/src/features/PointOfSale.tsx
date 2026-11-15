@@ -1,3 +1,5 @@
+import { createMemberNotes, type MemberNotesState } from '../../../data/firebase-member-notes'
+import MemberNotesReview from './pos/MemberNotesReview'
 import { isPosRequest, posEndpoints } from '../../../shared/pos-policy'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, ShoppingCart, Plus, Trash2 } from 'lucide-react'
@@ -202,6 +204,64 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
   const [choosingRentals, setChoosingRentals] = useState(
     initialDraft.choosingRentals ?? initialDraft.rentalsOnly ?? false,
   )
+  const [noteReviews, setNoteReviews] = useState<(MemberNotesState & { memberId: string })[]>([])
+  const [notesLoading, setNotesLoading] = useState(false)
+  const [noteAcknowledgements, setNoteAcknowledgements] = useState<Record<string, number>>({})
+  const notesLoadVersion = useRef(0)
+  const participantIds = [
+    ...new Set(
+      [
+        ...(member && !member.draft ? [member.id] : []),
+        ...cart.flatMap((l) => [
+          ...(l.rentals ?? []).map((r) => r.memberId ?? member?.id),
+          ...(l.memberships ?? []).map((a) => a.memberId),
+        ]),
+      ].filter((id): id is string => !!id && !pendingMembers.some((m) => m.id === id)),
+    ),
+  ].sort()
+  const participantKey = participantIds.join(',')
+  async function verifyNotes() {
+    if (!reader) return false
+    const version = ++notesLoadVersion.current
+    setNotesLoading(true)
+    try {
+      const states = await Promise.all(
+        participantIds.map(async (memberId) => ({
+          ...(await createMemberNotes(reader, memberId).list()),
+          memberId,
+        })),
+      )
+      if (version !== notesLoadVersion.current) return false
+      const unread = states.filter(
+        (m) => m.tagged && noteAcknowledgements[m.memberId] !== m.revision,
+      )
+      if (unread.length) {
+        setNoteReviews(unread)
+        return false
+      }
+      return true
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : 'Member notes could not be loaded. Retry before continuing.',
+      )
+      return false
+    } finally {
+      if (version === notesLoadVersion.current) setNotesLoading(false)
+    }
+  }
+  useEffect(() => {
+    if (!pending && participantIds.length) void verifyNotes()
+    if (!participantIds.length) {
+      setNoteAcknowledgements({})
+      setNoteReviews([])
+      setNotesLoading(false)
+    }
+    return () => {
+      notesLoadVersion.current++
+    }
+  }, [participantKey, reader])
   const saving = useRef(false),
     searchInput = useRef<HTMLInputElement>(null),
     paymentDialog = useRef<HTMLDialogElement>(null)
@@ -291,7 +351,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     else paymentDialog.current?.close()
   }, [paying])
   const totals = cartTotals(cart, settings?.taxRateBps ?? null),
-    locked = busy || !!pending
+    locked = busy || !!pending || notesLoading || noteReviews.length > 0
   const permittedProducts = useMemo(
     () =>
       products.filter(
@@ -559,6 +619,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
       setMember(undefined)
       setPendingMembers([])
       setExistingMembers([])
+      setNoteAcknowledgements({})
       setRentalsOnly(false)
       setChoosingRentals(false)
       setCart([])
@@ -1084,7 +1145,8 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     ) ||
                     (settings.taxRateBps === null && cart.some((l) => l.product.data.taxable))
                   }
-                  onClick={() => {
+                  onClick={async () => {
+                    if (!(await verifyNotes())) return
                     setPayments(
                       totals.totalCents === 0
                         ? []
@@ -1237,6 +1299,9 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     note: note.trim(),
                     ...(member ? { member } : {}),
                     pendingMembers,
+                    noteAcknowledgements: participantIds
+                      .filter((id) => noteAcknowledgements[id] !== undefined)
+                      .map((memberId) => ({ memberId, revision: noteAcknowledgements[memberId]! })),
                     membershipAssignments: cart.flatMap((l) =>
                       (l.memberships ?? []).map((a) => ({ ...a, productId: l.product.id })),
                     ),
@@ -1321,6 +1386,23 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
               setCustomerName(m.name)
             }
             setPickingMember(null)
+          }}
+        />
+      )}
+      {noteReviews[0] && (
+        <MemberNotesReview
+          key={noteReviews[0].memberId}
+          state={noteReviews[0]}
+          onCancel={() => {
+            setNoteReviews([])
+            setError('Read and confirm member notes before continuing the order.')
+            setPaying(false)
+          }}
+          onConfirm={() => {
+            const current = noteReviews[0]!
+            setNoteAcknowledgements((a) => ({ ...a, [current.memberId]: current.revision }))
+            setNoteReviews((q) => q.slice(1))
+            setError('')
           }}
         />
       )}

@@ -1,0 +1,29 @@
+{
+  "feature": "Confirmed rental completion and returned items, with atomic admission release",
+  "verifiedAt": "2026-11-15T17:09:42.342Z",
+  "database": "cerms",
+  "rulesUnchanged": true,
+  "rulesBaseline": "firebase/releases/theme-2026-11-13.rules",
+  "rulesSha256": "0e17f97d36179fb9a0bb2d0e5ffc69a2ac115f20862ccfe98eb5fdcb63cf219a",
+  "serverSha256": "08995b51cf1e11223cbd4d8d9c79ddac3f113e54e881b188127d6f3592821151",
+  "bothDatabaseConfigurationsUnchanged": true,
+  "bothDatabaseIndexesUnchanged": true,
+  "allRulesReleasesUnchanged": true,
+  "bothBucketsUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "clientChecks": 198,
+  "serverCheckoutChecks": 20,
+  "rulesChecks": 315,
+  "buildPassed": true,
+  "interceptedSingleAndGroupRentalFlowsPassed": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/checkOutRental",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-15T17:09:25.311219397Z",
+      "entryPoint": "checkOutRental"
+    }
+  ]
+}

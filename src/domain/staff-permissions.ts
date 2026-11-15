@@ -2,6 +2,11 @@
 export const ownerUid = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 export const permissionDefinitions = [
   {
+    key: 'removeMemberNotes',
+    label: 'Remove member notes',
+    description: 'Admin permission to remove member notes, including DNA reasons.',
+  },
+  {
     key: 'closeOtherRegisters',
     label: 'Close other staff’s registers',
     description: 'Enter ending counts and close another staff member’s register in this business.',
@@ -45,6 +50,7 @@ export const permissionDefinitions = [
 export type StaffPermission = (typeof permissionDefinitions)[number]['key']
 export type StaffPermissions = Record<StaffPermission, boolean>
 export const defaultStaffPermissions: StaffPermissions = {
+  removeMemberNotes: false,
   closeOtherRegisters: false,
   processSales: false,
   editMembers: false,
@@ -55,6 +61,7 @@ export const defaultStaffPermissions: StaffPermissions = {
   closeRegisters: true,
 }
 export const allStaffPermissions: StaffPermissions = {
+  removeMemberNotes: true,
   closeOtherRegisters: true,
   processSales: true,
   editMembers: true,
@@ -65,6 +72,7 @@ export const allStaffPermissions: StaffPermissions = {
   closeRegisters: true,
 }
 export const noStaffPermissions: StaffPermissions = {
+  removeMemberNotes: false,
   closeOtherRegisters: false,
   processSales: false,
   editMembers: false,
@@ -81,7 +89,9 @@ export function validStaffPermissions(value: unknown): value is StaffPermissions
     Object.keys(data).every((k) => permissionDefinitions.some((p) => p.key === k)) &&
     permissionDefinitions.every(
       ({ key }) =>
-        (['processSales', 'deleteProducts', 'closeOtherRegisters'].includes(key) &&
+        (['processSales', 'deleteProducts', 'closeOtherRegisters', 'removeMemberNotes'].includes(
+          key,
+        ) &&
           data[key] === undefined) ||
         typeof data[key] === 'boolean',
     )

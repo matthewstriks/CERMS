@@ -1,0 +1,41 @@
+{
+  "feature": "Attributed member notes, admin removal, required notes review and DNA reason logging",
+  "verifiedAt": "2026-11-15T17:26:57.051Z",
+  "database": "cerms",
+  "rulesChange": "Optional removeMemberNotes admin permission; direct member edits cannot toggle DNA",
+  "rulesBaseline": "firebase/releases/member-notes-2026-11-15.rules",
+  "rulesSha256": "f6401137ed50bf27afb63a9c2b31b8e20b140ae76a0d04ea4ec3f4b383b6b452",
+  "serverSha256": "aef422280c5d281ca5b10475cdcdf442e5656f38331dbb8c62e0ec84ea2c508e",
+  "bothDatabaseConfigurationsUnchanged": true,
+  "bothDatabaseIndexesUnchanged": true,
+  "legacyAndStorageRulesUnchanged": true,
+  "bothBucketsUnchanged": true,
+  "otherFunctionsUnchanged": true,
+  "clientChecks": 200,
+  "serverNotesAndCheckoutChecks": 37,
+  "rulesChecks": 328,
+  "buildPassed": true,
+  "interceptedNotesAndGroupOrderFlowsPassed": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsModified": false,
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-15T17:26:11.340205068Z",
+      "entryPoint": "completeSale"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-15T17:26:10.163347858Z",
+      "entryPoint": "createStaffAccount"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/memberNotes",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-15T17:26:06.408738292Z",
+      "entryPoint": "memberNotes"
+    }
+  ]
+}

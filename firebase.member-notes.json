@@ -1,0 +1,15 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "cerms-staff",
+      "ignore": ["node_modules", "*.test.mjs"]
+    }
+  ],
+  "firestore": [
+    {
+      "database": "cerms",
+      "rules": "firebase/releases/messaging-2026-11-15.rules"
+    }
+  ]
+}

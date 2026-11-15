@@ -42,6 +42,7 @@ describe('POS money and access', () => {
     }
     expect(effectivePermissions('staff', old)).toEqual({
       ...old,
+      removeMemberNotes: false,
       processSales: false,
       deleteProducts: false,
       closeOtherRegisters: false,
@@ -264,4 +265,28 @@ it('allows only the bounded rental edit endpoint and valid renewal visit identif
   expect(allowed({ ...edit, expectedRevision: -1 })).toBe(false)
   expect(allowed({ ...edit, visitId: '../foreign' })).toBe(false)
   expect(allowed({ ...edit, inside: 'true' })).toBe(false)
+})
+
+it('requires both completion confirmations and bounded checkout details through the request guard', () => {
+  const d = {
+    business: 'dev',
+    visitId: 'visit_1',
+    expectedRevision: 0,
+    expectedExpiresAt: 1800000000,
+    rentalCompleted: true,
+    itemsReturned: true,
+  }
+  const allowed = (data: unknown) =>
+    allowFirebaseRequest(posEndpoints.checkOutRental, 'POST', JSON.stringify({ data }))
+  expect(allowed(d)).toBe(true)
+  for (const bad of [
+    { itemsReturned: false },
+    { rentalCompleted: false },
+    { itemsReturned: 'true' },
+    { expectedRevision: -1 },
+    { expectedExpiresAt: null },
+    { visitId: '../x' },
+    { active: false },
+  ])
+    expect(allowed({ ...d, ...bad })).toBe(false)
 })

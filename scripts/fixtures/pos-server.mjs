@@ -39,13 +39,67 @@ export function posFixture() {
     timestamp: () => ({ timestampValue: '2026-10-01T12:00:00Z' }),
     db: {
       doc: (p) => p,
+      collection: (path) => {
+        const build = (state) => ({
+          ...state,
+          where: (field, op, value) => build({ ...state, field, op, value }),
+          orderBy: (orderField, direction = 'asc') => build({ ...state, orderField, direction }),
+          startAfter: (cursor) =>
+            build({ ...state, cursor: typeof cursor === 'number' ? cursor : cursor.id }),
+          limit: (count) => build({ ...state, count }),
+        })
+        return build({ path })
+      },
       runTransaction: async (fn) => {
         let writing = false
         const writes = []
         const result = await fn({
           get: async (p) => {
             assert.equal(writing, false, 'All reads must precede writes')
-            return { exists: docs.has(p), data: () => structuredClone(docs.get(p)) }
+            if (typeof p === 'object') {
+              let rows = [...docs].filter(
+                ([path, d]) =>
+                  path.startsWith(p.path + '/') &&
+                  !path.slice(p.path.length + 1).includes('/') &&
+                  (!p.field ||
+                    (p.op === 'array-contains'
+                      ? d[p.field]?.includes(p.value)
+                      : d[p.field] === p.value)),
+              )
+              rows.sort(([a, ad], [b, bd]) => {
+                const av = ad[p.orderField],
+                  bv = bd[p.orderField]
+                const compare =
+                  (typeof av === 'number' && typeof bv === 'number' ? av - bv : 0) ||
+                  a.localeCompare(b)
+                return compare * (p.direction === 'desc' ? -1 : 1)
+              })
+              if (typeof p.cursor === 'number')
+                rows = rows.filter(([, d]) =>
+                  p.direction === 'desc' ? d[p.orderField] < p.cursor : d[p.orderField] > p.cursor,
+                )
+              else if (p.cursor)
+                rows = rows.slice(
+                  rows.findIndex(([path]) => path.slice(p.path.length + 1) === p.cursor) + 1,
+                )
+              return {
+                docs: rows
+                  .slice(0, p.count ?? Infinity)
+                  .map(([path, d]) => ({
+                    id: path.slice(p.path.length + 1),
+                    data: () => structuredClone(d),
+                  })),
+              }
+            }
+            return {
+              id: p.slice(p.lastIndexOf('/') + 1),
+              exists: docs.has(p),
+              data: () => structuredClone(docs.get(p)),
+            }
+          },
+          delete: (p) => {
+            writing = true
+            writes.push([p, undefined])
           },
           create: (p, d) => {
             assert.ok(!docs.has(p))
@@ -62,7 +116,10 @@ export function posFixture() {
             writes.push([p, { ...docs.get(p), ...d }])
           },
         })
-        for (const [p, d] of writes) docs.set(p, d)
+        for (const [p, d] of writes) {
+          if (d === undefined) docs.delete(p)
+          else docs.set(p, d)
+        }
         if (writes.length) commits++
         return result
       },

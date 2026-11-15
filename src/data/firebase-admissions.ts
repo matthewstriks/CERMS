@@ -1,38 +1,18 @@
 import { onAuthStateChanged } from 'firebase/auth'
-import {
-  collection,
-  doc,
-  initializeFirestore,
-  memoryLocalCache,
-  memoryEagerGarbageCollector,
-  onSnapshot,
-  query,
-  where,
-} from 'firebase/firestore'
-import type { Firestore, Unsubscribe } from 'firebase/firestore'
-import { firebaseDatabaseId } from '../shared/firebase-policy'
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
+import type { Unsubscribe } from 'firebase/firestore'
+import { getLiveDatabase } from './firebase-live'
 import { getFirebaseServices } from './firebase-membership'
 import { memberFromLegacy } from '../domain/legacy'
 import { admissionFromLegacy } from '../domain/admissions'
 import type { Admission, AdmissionRow, AdmissionsState } from '../domain/admissions'
 
-let liveDb: Firestore | undefined
-/** Separate full-SDK reader; the existing Lite SDK remains responsible for one-shot reads. */
-function database(): Firestore {
-  const { auth } = getFirebaseServices()
-  liveDb ??= initializeFirestore(
-    auth.app,
-    { localCache: memoryLocalCache({ garbageCollector: memoryEagerGarbageCollector() }) },
-    firebaseDatabaseId,
-  )
-  return liveDb
-}
 export function subscribeAdmissions(
   session: { uid: string; club: string },
   receive: (state: AdmissionsState) => void,
 ): Unsubscribe {
   const { auth } = getFirebaseServices()
-  const db = database()
+  const db = getLiveDatabase()
   let stopped = false,
     accessConfirmed = false,
     activityFresh = false

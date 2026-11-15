@@ -63,6 +63,7 @@ export const uploadProductImage = imageHandler(uploadImage)
 export const getProductImage = imageHandler(getImage)
 
 import {
+  checkOutRental as checkOutRentalHandler,
   updateRental as updateRentalHandler,
   completeSale as completeSaleHandler,
   savePosSettings as savePosSettingsHandler,
@@ -108,6 +109,53 @@ export const saveThemePreference = onCall(
       throw new HttpsError(
         'unavailable',
         'Appearance could not be confirmed. Try again when connected.',
+      )
+    }
+  },
+)
+
+export const checkOutRental = onCall(
+  { region: 'us-central1', maxInstances: 3, timeoutSeconds: 60 },
+  async (request) => {
+    try {
+      return await checkOutRentalHandler(request, posDependencies)
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      throw new HttpsError(
+        'unavailable',
+        'Rental checkout was not confirmed. Retry the same checkout.',
+      )
+    }
+  },
+)
+
+import { memberNotes as memberNotesHandler } from './member-notes.mjs'
+export const memberNotes = onCall(
+  { region: 'us-central1', maxInstances: 3, timeoutSeconds: 60 },
+  async (request) => {
+    try {
+      return await memberNotesHandler(request, posDependencies)
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      throw new HttpsError(
+        'unavailable',
+        'Member note request was not confirmed. Retry the same request.',
+      )
+    }
+  },
+)
+
+import { staffMessaging as staffMessagingHandler } from './staff-messaging.mjs'
+export const staffMessaging = onCall(
+  { region: 'us-central1', maxInstances: 3, timeoutSeconds: 60 },
+  async (request) => {
+    try {
+      return await staffMessagingHandler(request, posDependencies)
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      throw new HttpsError(
+        'unavailable',
+        'Messaging request was not confirmed. Retry the same request.',
       )
     }
   },

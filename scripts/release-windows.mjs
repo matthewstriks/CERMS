@@ -1,3 +1,4 @@
+import { parseChangelog, sectionNotes, validateNotes } from './changelog.cjs'
 import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import assert from 'node:assert/strict'
@@ -14,10 +15,26 @@ function run(command, args, env = process.env) {
 if (process.argv.includes('--next-alpha')) {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'))
   assert.match(pkg.version, /-alpha\.\d+$/, 'Alpha publish requires an existing alpha version')
+  const parsed = parseChangelog(await readFile('CHANGELOG.md', 'utf8'))
+  validateNotes(sectionNotes(parsed, 'Unreleased'))
+  const next = pkg.version.replace(
+    /(alpha\.)(\d+)$/,
+    (_all, prefix, number) => prefix + (Number(number) + 1),
+  )
+  assert.ok(
+    !parsed.sections.has(next),
+    'Next version already has notes; use release:win to resume that version or choose a new version.',
+  )
   run(npm, ['version', 'prerelease', '--preid=alpha', '--no-git-tag-version'])
 }
+run(process.execPath, ['scripts/prepare-changelog.mjs'])
 run(npm, ['run', 'check'])
-run(process.execPath, ['--test', 'scripts/release.test.mjs', 'scripts/firebase-release.test.mjs'])
+run(process.execPath, [
+  '--test',
+  'scripts/changelog.test.mjs',
+  'scripts/release.test.mjs',
+  'scripts/firebase-release.test.mjs',
+])
 run(
   npm,
   [

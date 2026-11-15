@@ -3,6 +3,7 @@ export type UpdatePhase =
 export interface UpdateState {
   phase: UpdatePhase
   currentVersion: string
+  releaseNotes?: string
   version?: string
   percent?: number
   message: string

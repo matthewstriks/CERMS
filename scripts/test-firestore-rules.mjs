@@ -1,3 +1,5 @@
+import { messagingEmulatorChecks } from './messaging-emulator-checks.mjs'
+import { messagingRuleChecks } from './messaging-rule-checks.mjs'
 import { posRuleChecks } from './pos-rule-checks.mjs'
 import { productImageRuleChecks } from './product-image-rule-checks.mjs'
 import { staffRuleChecks } from './staff-rule-checks.mjs'
@@ -974,6 +976,22 @@ try {
   await staffRuleChecks({ base, seed, check, fields, str, owner })
   await productImageRuleChecks({ base, seed, check, fields, str, owner })
   await posRuleChecks({ base, seed, check, fields, str, owner })
+  // Notes are served by the authenticated callable, never desktop Firestore writes.
+  await seed('users/' + owner, { ...fields(owner), access: str('club-a') })
+  const notePath = base + '/system/club-a/memberNotes/a/entries/synthetic-note'
+  await seed('system/club-a/memberNotes/a/entries/synthetic-note', { text: str('Synthetic note') })
+  for (const uid of [undefined, 'staff', owner]) {
+    await check('No direct note read', notePath, { uid }, false)
+    await check(
+      'No direct note mutation',
+      notePath,
+      { uid, method: 'PATCH', body: { fields: { text: str('Forged') } } },
+      false,
+    )
+    await check('No direct note deletion', notePath, { uid, method: 'DELETE' }, false)
+  }
+  await messagingRuleChecks({ base, seed, check, fields, str, owner })
+  await messagingEmulatorChecks({ project, port })
   console.log(
     `Firestore rules passed ${checks} allow/deny checks using exact rules on named cerms in isolated ${project}.`,
   )

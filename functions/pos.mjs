@@ -35,6 +35,7 @@ export function validateSale(d, fail) {
     ...('rentals' in d ? ['rentals'] : []),
     ...('pendingMembers' in d ? ['pendingMembers'] : []),
     ...('membershipAssignments' in d ? ['membershipAssignments'] : []),
+    ...('noteAcknowledgements' in d ? ['noteAcknowledgements'] : []),
   ]), fail, 'Invalid sale request.')
   require(id(d.business) &&
     /^[a-f0-9-]{36}$/.test(d.requestId) &&
@@ -84,6 +85,11 @@ export function validateSale(d, fail) {
     if (pending || m.draft !== undefined)
       require(exact(m.draft, Object.keys(emptyMemberDraft())), fail, 'Invalid new member details.')
   }
+  if (d.noteAcknowledgements !== undefined)
+    require(Array.isArray(d.noteAcknowledgements) && d.noteAcknowledgements.length <= 50 &&
+      new Set(d.noteAcknowledgements.map(a => a?.memberId)).size === d.noteAcknowledgements.length &&
+      d.noteAcknowledgements.every(a => exact(a, ['memberId','revision']) && id(a.memberId) && Number.isSafeInteger(a.revision) && a.revision >= 0),
+      fail, 'Confirm the member notes before checkout.')
   if (d.member !== undefined) validateMember(d.member)
   if (d.membershipAssignments !== undefined) {
     require(Array.isArray(d.membershipAssignments) && d.membershipAssignments.length <= 100 &&
@@ -124,7 +130,7 @@ export function validateSale(d, fail) {
   return d
 }
 // Every participant is resolved server-side; all reads precede all fulfillment writes.
-async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
+async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staffName) {
   const productMap = new Map(d.lines.map((l, i) => [l.productId, products[i].data()]))
   const assignments = (d.rentals ?? []).map((r) => ({ ...r, memberId: r.memberId ?? d.member?.id }))
   require(new Set(assignments.filter((r) => r.renewalVisitId).map((r) => r.renewalVisitId)).size ===
@@ -229,10 +235,19 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
         creation_time: timestamp(),
         orderId: d.requestId,
       }
+      if (draft.notes) {
+        require(typeof staffName === 'string' && !!staffName.trim(), fail, 'A saved staff name is required for member notes.')
+        entry.initialNote = draft.notes
+        entry.member.notes = []
+        entry.member.notesRevision = 1
+      }
       entry.isNew = true
     } else if (!entry.member || entry.member.access !== d.business) {
       fail('permission-denied', 'An assigned member is unavailable in this business.')
     }
+    if (!entry.isNew && entry.member.tag === true && !(d.noteAcknowledgements ?? []).some(a =>
+      a.memberId === memberId && a.revision === (entry.member.notesRevision ?? 0)))
+      fail('failed-precondition', 'Member notes need to be read and confirmed again before checkout.')
     const memberPurchases = membershipAssignments.filter(a => a.memberId === memberId)
     if (memberPurchases.length) {
       require(!entry.isNew, fail, 'Use the new-member assignment for a pending membership.')
@@ -348,6 +363,9 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now) {
       for (const [memberId, e] of records) {
         if (e.isNew) {
           tx.create(e.ref, { ...e.member, checkedIn: e.visits.length > 0 })
+          if (e.initialNote) tx.create(db.doc(`system/${d.business}/memberNotes/${memberId}/entries/${memberId}`), {
+            text: e.initialNote, kind: 'note', actorUid: uid, actorName: staffName, createdAt: timestamp(), deleted: false,
+          })
           const claim = { access: 'dev', memberId }
           tx.create(e.identityRef, claim)
           tx.create(e.numberRef, claim)
@@ -531,7 +549,7 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
         'The register does not have enough recorded cash for this payout.',
       )
     const cash = payments.find((p) => p.method === 'cash')
-    const fulfilled = await fulfillment(tx, db, d, products, uid, timestamp, fail, now())
+    const fulfilled = await fulfillment(tx, db, d, products, uid, timestamp, fail, now(), profile.displayName)
     const receipt = {
       schemaVersion: 1,
       business: d.business,
@@ -643,4 +661,89 @@ export async function updateRental(request, { db, fail, timestamp }) {
     })
   })
   return { saved: true }
+}
+
+// Rental completion is independent of payments and never changes a receipt or stock.
+export async function checkOutRental(request, { db, fail, timestamp }) {
+  const d = request.data
+  require(exact(d, [
+    'business',
+    'visitId',
+    'expectedRevision',
+    'expectedExpiresAt',
+    'rentalCompleted',
+    'itemsReturned',
+  ]) &&
+    id(d.business) &&
+    visitId(d.visitId) &&
+    Number.isSafeInteger(d.expectedRevision) &&
+    d.expectedRevision >= 0 &&
+    Number.isFinite(d.expectedExpiresAt) &&
+    d.rentalCompleted === true &&
+    d.itemsReturned === true, fail, 'Confirm that the rental is completed and all required items have been returned.')
+  await db.runTransaction(async (tx) => {
+    await access(tx, db, d.business, request.auth?.uid, fail)
+    const ref = db.doc(`activity/${d.visitId}`)
+    const v = (await tx.get(ref)).data()
+    if (!v || v.access !== d.business || v.lockerRoomStatus?.[0] !== true)
+      fail('failed-precondition', 'This rental is not available in this business.')
+    // A lost-response retry acknowledges the same completion without new writes.
+    if (
+      v.active === false &&
+      v.checkedOutBy === request.auth.uid &&
+      v.checkoutRevision === d.expectedRevision &&
+      v.lockerRoomStatus[5] === d.expectedExpiresAt
+    )
+      return
+    if (v.active !== true || v.goingInactive === true)
+      fail('failed-precondition', 'This rental is no longer active.')
+    if (
+      (v.editRevision ?? 0) !== d.expectedRevision ||
+      v.lockerRoomStatus[5] !== d.expectedExpiresAt
+    )
+      fail(
+        'failed-precondition',
+        'This rental changed. Reopen it and review the latest details before checking out.',
+      )
+    require(id(v.memberID), fail, 'This rental has no valid member.')
+    const memberRef = db.doc(`members/${v.memberID}`)
+    const claimRef = db.doc(`system/${d.business}/memberVisits/${v.memberID}`)
+    const member = (await tx.get(memberRef)).data()
+    const claim = (await tx.get(claimRef)).data()
+    if (!member || member.access !== d.business)
+      fail('failed-precondition', 'The rental member is not available in this business.')
+    if (
+      claim &&
+      (claim.memberId !== v.memberID ||
+        !Array.isArray(claim.visitIds) ||
+        !claim.visitIds.includes(d.visitId))
+    )
+      fail('failed-precondition', 'The member admission claim needs review before checkout.')
+    // A single-field query also covers older visits without a server admission claim.
+    // Read every visit before writing so concurrent completion cannot release admission early.
+    const visits = await tx.get(db.collection('activity').where('memberID', '==', v.memberID))
+    const remaining = visits.docs
+      .filter(
+        (s) => s.id !== d.visitId && s.data().access === d.business && s.data().active === true,
+      )
+      .map((s) => s.id)
+    tx.update(ref, {
+      active: false,
+      currIn: false,
+      waitlist: false,
+      checkedOutAt: timestamp(),
+      checkedOutBy: request.auth.uid,
+      rentalCompleted: true,
+      itemsReturned: true,
+      checkoutRevision: d.expectedRevision,
+      editRevision: d.expectedRevision + 1,
+    })
+    if (remaining.length) {
+      if (claim) tx.update(claimRef, { visitIds: remaining })
+    } else {
+      if (claim) tx.delete(claimRef)
+      tx.update(memberRef, { checkedIn: false })
+    }
+  })
+  return { completed: true }
 }

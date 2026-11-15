@@ -70,6 +70,8 @@ export async function memberManagementRuleChecks({ base, seed, check, call, fiel
     waiver_status: false,
     checkedIn: true,
     notes: [],
+    dna: true,
+    notesRevision: 1,
     creation_time: 'changed',
     extraLegacyField: 'changed',
     updatedBy: 'staff',
