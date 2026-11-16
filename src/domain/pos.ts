@@ -73,6 +73,7 @@ export interface Payment {
   reference: string
 }
 export interface CartLine {
+  waived?: boolean
   memberships?: CartMembership[]
   assignedRoom?: string
   rentals?: CartRental[]
@@ -114,7 +115,13 @@ export interface SaleRequest {
   taxRateBps: number
   customerName: string
   note: string
-  lines: { productId: string; version: number; quantity: number; unitPriceCents: number }[]
+  lines: {
+    productId: string
+    version: number
+    quantity: number
+    unitPriceCents: number
+    waived?: boolean
+  }[]
   payments: Payment[]
 }
 export interface PosSettings {
@@ -129,6 +136,7 @@ export interface RegisterTotals {
   taxCents: number
   netByMethod: Record<PaymentMethod, number>
   expectedCashCents: number
+  cashDropCents: number
   cashReceivedCents: number
   changeGivenCents: number
   cashPaidOutCents: number
@@ -171,14 +179,14 @@ export interface SaleReceipt extends Omit<
 }
 export function cartTotals(lines: CartLine[], rate: number | null) {
   const subtotalCents = lines.reduce(
-    (s, l) => s + l.unitPriceCents * l.quantity * (l.product.data.payout ? -1 : 1),
+    (s, l) => s + (l.waived ? 0 : l.unitPriceCents) * l.quantity * (l.product.data.payout ? -1 : 1),
     0,
   )
   const taxCents = lines.reduce(
     (s, l) =>
       s +
       (l.product.data.taxable
-        ? Math.round((l.unitPriceCents * l.quantity * (rate ?? 0)) / 10000) *
+        ? Math.round(((l.waived ? 0 : l.unitPriceCents) * l.quantity * (rate ?? 0)) / 10000) *
           (l.product.data.payout ? -1 : 1)
         : 0),
     0,
@@ -191,6 +199,7 @@ export const emptyRegisterTotals = (opening: number): RegisterTotals => ({
   taxCents: 0,
   netByMethod: { cash: 0, card: 0, giftCard: 0, check: 0, other: 0 },
   expectedCashCents: opening,
+  cashDropCents: 0,
   cashReceivedCents: 0,
   changeGivenCents: 0,
   cashPaidOutCents: 0,
@@ -212,7 +221,7 @@ export function receiptText(r: SaleReceipt): string {
     '--------------------------------',
     ...r.lines.flatMap((l) => [
       l.name,
-      `${l.quantity} × ${money(l.unitPriceCents)}   ${money(l.subtotalCents)}`,
+      `${l.quantity} × ${money(l.unitPriceCents)}   ${money(l.subtotalCents)}${l.waived ? '   WAIVED' : ''}`,
       ...(r.memberships
         ?.filter((a) => a.productId === l.productId)
         .map(

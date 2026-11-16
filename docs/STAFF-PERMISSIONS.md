@@ -9,6 +9,7 @@ Read-only inspection confirmed `matthew@striks.com` belongs to existing protecte
 Users & permissions lists the selected business's `cerms/users` profiles in pages of 50. Staff can inspect their own effective permissions. The owner can inspect and edit these independent flags:
 
 - Use point of sale: record sales/payouts on one’s own open register.
+- Waive products: set selected eligible order lines to $0 before checkout.
 - Edit member records.
 - Delete member records.
 - Create and edit products/categories.

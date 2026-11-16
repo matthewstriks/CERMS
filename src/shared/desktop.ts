@@ -9,6 +9,30 @@ export interface AppInfo {
 export interface AboutInfo extends AppInfo {
   author: string
 }
+export interface BugReportFile {
+  name: string
+  contentType: string
+  base64: string
+  size: number
+}
+export interface BugReportContext {
+  email: string
+  uid: string
+  business: string
+  version: string
+  platform: string
+  electron: string
+  logs: string[]
+}
+export interface BugReportPayload {
+  requestId: string
+  subject: string
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  message: string
+  context: BugReportContext
+  screenshots: BugReportFile[]
+  files: BugReportFile[]
+}
 export interface DesktopApi {
   getUpdateState(): Promise<UpdateState>
   onUpdateState(callback: (state: UpdateState) => void): () => void
@@ -28,4 +52,15 @@ export interface DesktopApi {
   setWindowMode(mode: 'login' | 'workspace'): Promise<void>
   getAppInfo(): Promise<AppInfo>
   openMemberFile(url: string): Promise<void>
+  openBugReport(auth: {
+    token: string
+    email: string
+    uid: string
+    business: string
+  }): Promise<void>
+  getBugReportContext(): Promise<BugReportContext>
+  captureMainWindow(): Promise<BugReportFile>
+  chooseBugFiles(): Promise<BugReportFile[]>
+  submitBugReport(payload: BugReportPayload): Promise<{ reportId: string }>
+  closeBugReport(): Promise<void>
 }

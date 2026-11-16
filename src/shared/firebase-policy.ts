@@ -13,6 +13,7 @@ import { isCatalogCommit, isDeleteProductCommit } from './catalog-policy'
 import { isRegisterCommit } from './register-policy'
 import { isMemberManagementCommit } from './member-management-policy'
 import { isMemberViewCommit } from './member-log-policy'
+import { bugReportEndpoint, isBugReportRequest } from './bug-report-policy'
 /** Fixed to the existing CERMS project. This is configuration, not a credential. */
 export const firebaseProjectId = 'cerms-7af24'
 export const firebaseDatabaseId = 'cerms'
@@ -50,6 +51,8 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
       return method === 'OPTIONS' || (method === 'POST' && isProductImageRequest(url.href, body))
     if (url.href === staffAccountEndpoint)
       return method === 'OPTIONS' || (method === 'POST' && isCreateStaffRequest(body))
+    if (url.href === bugReportEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isBugReportRequest(body))
     if (method === 'OPTIONS')
       return [
         'firestore.googleapis.com',

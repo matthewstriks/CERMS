@@ -118,7 +118,9 @@ export function summarize(data) {
   const notes = new Set()
   let cashReceived = 0,
     changeGiven = 0,
-    cashPaidOut = 0
+    cashPaidOut = 0,
+    waivedTotal = 0,
+    waivedUnits = 0
   for (const sale of sales) {
     assert.equal(sale.business, 'dev', 'Foreign-business receipt rejected')
     assert.equal(sale.status, 'completed', 'Only completed server receipts can be reported')
@@ -195,11 +197,22 @@ export function summarize(data) {
         subtotal: 0,
         tax: 0,
         total: 0,
+        waivedUnits: 0,
+        waivedValue: 0,
       }
       product[line.payout ? 'payouts' : 'sold'] += line.quantity
       product.subtotal += cents(line.subtotalCents)
       product.tax += cents(line.taxCents)
       product.total += cents(line.totalCents)
+      const waivedValue = line.waived
+        ? Math.abs(line.quantity * line.unitPriceCents * (line.payout ? -1 : 1))
+        : 0
+      if (line.waived) {
+        waivedUnits += line.quantity
+        waivedTotal += waivedValue
+        product.waivedUnits += line.quantity
+        product.waivedValue += waivedValue
+      }
       productSales.set(line.productId, product)
       const cat = categorySales.get(category) ?? { name: category, units: 0, total: 0 }
       cat.units += qty
@@ -222,6 +235,8 @@ export function summarize(data) {
         line.subtotalCents / 100,
         line.taxCents / 100,
         line.totalCents / 100,
+        line.waived === true ? 'Yes' : 'No',
+        waivedValue / 100,
       ])
     }
     const recipient = (id) =>
@@ -261,6 +276,8 @@ export function summarize(data) {
     cashReceived,
     changeGiven,
     cashPaidOut,
+    waivedTotal,
+    waivedUnits,
     products: [...productSales.values()],
     categories: [...categorySales.values()],
     cashiers: [...cashiers.values()],

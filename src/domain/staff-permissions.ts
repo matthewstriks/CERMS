@@ -22,6 +22,11 @@ export const permissionDefinitions = [
     description: 'Record sales and payouts on your own open register; view receipts.',
   },
   {
+    key: 'waiveProducts',
+    label: 'Waive products',
+    description: 'Set eligible products in an order to $0 before checkout.',
+  },
+  {
     key: 'editMembers',
     label: 'Edit member records',
     description: 'Change identity, contact and membership details.',
@@ -53,6 +58,7 @@ export const defaultStaffPermissions: StaffPermissions = {
   removeMemberNotes: false,
   closeOtherRegisters: false,
   processSales: false,
+  waiveProducts: false,
   editMembers: false,
   deleteMembers: false,
   manageProducts: false,
@@ -64,6 +70,7 @@ export const allStaffPermissions: StaffPermissions = {
   removeMemberNotes: true,
   closeOtherRegisters: true,
   processSales: true,
+  waiveProducts: true,
   editMembers: true,
   deleteMembers: true,
   manageProducts: true,
@@ -75,6 +82,7 @@ export const noStaffPermissions: StaffPermissions = {
   removeMemberNotes: false,
   closeOtherRegisters: false,
   processSales: false,
+  waiveProducts: false,
   editMembers: false,
   deleteMembers: false,
   manageProducts: false,
@@ -89,9 +97,13 @@ export function validStaffPermissions(value: unknown): value is StaffPermissions
     Object.keys(data).every((k) => permissionDefinitions.some((p) => p.key === k)) &&
     permissionDefinitions.every(
       ({ key }) =>
-        (['processSales', 'deleteProducts', 'closeOtherRegisters', 'removeMemberNotes'].includes(
-          key,
-        ) &&
+        ([
+          'processSales',
+          'waiveProducts',
+          'deleteProducts',
+          'closeOtherRegisters',
+          'removeMemberNotes',
+        ].includes(key) &&
           data[key] === undefined) ||
         typeof data[key] === 'boolean',
     )

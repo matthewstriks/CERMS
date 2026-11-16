@@ -46,14 +46,22 @@ export function validateSale(d, fail) {
   require(new Set(d.lines.map((l) => l.productId)).size ===
     d.lines.length, fail, 'Combine duplicate products.')
   for (const l of d.lines)
-    require(exact(l, ['productId', 'version', 'quantity', 'unitPriceCents']) &&
+    require(exact(l, [
+      'productId',
+      'version',
+      'quantity',
+      'unitPriceCents',
+      ...('waived' in l ? ['waived'] : []),
+    ]) &&
       id(l.productId) &&
       Number.isSafeInteger(l.version) &&
       l.version > 0 &&
       Number.isSafeInteger(l.quantity) &&
       l.quantity > 0 &&
       l.quantity <= 1000 &&
-      cents(l.unitPriceCents), fail, 'Check product quantities and prices.')
+      cents(l.unitPriceCents) &&
+      (l.waived === undefined ||
+        typeof l.waived === 'boolean'), fail, 'Check product quantities and prices.')
   require(Number.isInteger(d.taxRateBps) &&
     d.taxRateBps >= 0 &&
     d.taxRateBps <= 10000, fail, 'Confirm the sales tax rate.')
@@ -86,18 +94,31 @@ export function validateSale(d, fail) {
       require(exact(m.draft, Object.keys(emptyMemberDraft())), fail, 'Invalid new member details.')
   }
   if (d.noteAcknowledgements !== undefined)
-    require(Array.isArray(d.noteAcknowledgements) && d.noteAcknowledgements.length <= 50 &&
-      new Set(d.noteAcknowledgements.map(a => a?.memberId)).size === d.noteAcknowledgements.length &&
-      d.noteAcknowledgements.every(a => exact(a, ['memberId','revision']) && id(a.memberId) && Number.isSafeInteger(a.revision) && a.revision >= 0),
-      fail, 'Confirm the member notes before checkout.')
+    require(Array.isArray(d.noteAcknowledgements) &&
+      d.noteAcknowledgements.length <= 50 &&
+      new Set(d.noteAcknowledgements.map((a) => a?.memberId)).size ===
+        d.noteAcknowledgements.length &&
+      d.noteAcknowledgements.every(
+        (a) =>
+          exact(a, ['memberId', 'revision']) &&
+          id(a.memberId) &&
+          Number.isSafeInteger(a.revision) &&
+          a.revision >= 0,
+      ), fail, 'Confirm the member notes before checkout.')
   if (d.member !== undefined) validateMember(d.member)
   if (d.membershipAssignments !== undefined) {
-    require(Array.isArray(d.membershipAssignments) && d.membershipAssignments.length <= 100 &&
-      new Set(d.membershipAssignments.map(a => a?.id)).size === d.membershipAssignments.length,
-      fail, 'Use at most 100 uniquely assigned membership units.')
+    require(Array.isArray(d.membershipAssignments) &&
+      d.membershipAssignments.length <= 100 &&
+      new Set(d.membershipAssignments.map((a) => a?.id)).size ===
+        d.membershipAssignments.length, fail, 'Use at most 100 uniquely assigned membership units.')
     for (const a of d.membershipAssignments)
-      require(exact(a, ['id','productId','memberId','mode']) && /^[a-f0-9-]{36}$/.test(a.id) &&
-        id(a.productId) && id(a.memberId) && ['restart','extend'].includes(a.mode), fail, 'Assign each membership and choose its renewal mode.')
+      require(exact(a, ['id', 'productId', 'memberId', 'mode']) &&
+        /^[a-f0-9-]{36}$/.test(a.id) &&
+        id(a.productId) &&
+        id(a.memberId) &&
+        ['restart', 'extend'].includes(
+          a.mode,
+        ), fail, 'Assign each membership and choose its renewal mode.')
   }
   if (d.pendingMembers !== undefined) {
     require(Array.isArray(d.pendingMembers) &&
@@ -148,7 +169,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
     ...(d.member ? [d.member.id] : []),
     ...pendingIds,
     ...assignments.map((r) => r.memberId),
-    ...membershipAssignments.map(a => a.memberId),
+    ...membershipAssignments.map((a) => a.memberId),
   ])
   require(memberIds.size <= 50 &&
     [...memberIds].every(id), fail, 'Every rental needs a member in this business.')
@@ -157,7 +178,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
     const assignedRentals = assignments.filter((r) => r.productId === l.productId)
     const assignedMemberships = [
       ...pending.filter((m) => m.draft.membershipProductId === l.productId),
-      ...membershipAssignments.filter(a => a.productId === l.productId),
+      ...membershipAssignments.filter((a) => a.productId === l.productId),
     ]
     require(p.rental
       ? assignedRentals.length === l.quantity
@@ -168,7 +189,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
           0, fail, 'Each membership unit needs its own new member details.')
   }
   require(assignments.every((r) => productMap.get(r.productId)?.rental) &&
-    membershipAssignments.every(a => productMap.get(a.productId)?.membership) &&
+    membershipAssignments.every((a) => productMap.get(a.productId)?.membership) &&
     pending.every(
       (m) => productMap.get(m.draft.membershipProductId)?.membership,
     ), fail, 'A membership or rental assignment is missing its product.')
@@ -236,7 +257,8 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
         orderId: d.requestId,
       }
       if (draft.notes) {
-        require(typeof staffName === 'string' && !!staffName.trim(), fail, 'A saved staff name is required for member notes.')
+        require(typeof staffName === 'string' &&
+          !!staffName.trim(), fail, 'A saved staff name is required for member notes.')
         entry.initialNote = draft.notes
         entry.member.notes = []
         entry.member.notesRevision = 1
@@ -245,28 +267,55 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
     } else if (!entry.member || entry.member.access !== d.business) {
       fail('permission-denied', 'An assigned member is unavailable in this business.')
     }
-    if (!entry.isNew && entry.member.tag === true && !(d.noteAcknowledgements ?? []).some(a =>
-      a.memberId === memberId && a.revision === (entry.member.notesRevision ?? 0)))
-      fail('failed-precondition', 'Member notes need to be read and confirmed again before checkout.')
-    const memberPurchases = membershipAssignments.filter(a => a.memberId === memberId)
+    if (
+      !entry.isNew &&
+      entry.member.tag === true &&
+      !(d.noteAcknowledgements ?? []).some(
+        (a) => a.memberId === memberId && a.revision === (entry.member.notesRevision ?? 0),
+      )
+    )
+      fail(
+        'failed-precondition',
+        'Member notes need to be read and confirmed again before checkout.',
+      )
+    const memberPurchases = membershipAssignments.filter((a) => a.memberId === memberId)
     if (memberPurchases.length) {
       require(!entry.isNew, fail, 'Use the new-member assignment for a pending membership.')
-      if (entry.member.dna === true) fail('failed-precondition', 'A do-not-admit member cannot renew through checkout.')
+      if (entry.member.dna === true)
+        fail('failed-precondition', 'A do-not-admit member cannot renew through checkout.')
       const first = memberPurchases[0]
-      require(memberPurchases.every(a => a.productId === first.productId && a.mode === first.mode),
-        fail, 'Use the same membership product and renewal mode for each unit assigned to one member.')
+      require(memberPurchases.every(
+        (a) => a.productId === first.productId && a.mode === first.mode,
+      ), fail, 'Use the same membership product and renewal mode for each unit assigned to one member.')
       const p = productMap.get(first.productId)
       const duration = p.membershipLengthRaw * durationUnits[p.membershipLengthType]
       require(!p.payout, fail, 'A payout product cannot renew a membership.')
       let expiry
-      try { expiry = membershipRenewalExpiry(entry.member.id_expiration, duration * memberPurchases.length, first.mode, now) }
-      catch (e) { fail('invalid-argument', e.message) }
+      try {
+        expiry = membershipRenewalExpiry(
+          entry.member.id_expiration,
+          duration * memberPurchases.length,
+          first.mode,
+          now,
+        )
+      } catch (e) {
+        fail('invalid-argument', e.message)
+      }
       entry.membershipUpdate = { membership_type: p.name, id_expiration: expiry }
-      for (const a of memberPurchases) membershipReceipts.push({
-        id: a.id, productId: a.productId, memberId, action: 'renewal', mode: a.mode,
-        previousExpiresAt: entry.member.id_expiration != null && Number.isFinite(Number(entry.member.id_expiration)) ? Number(entry.member.id_expiration) : null,
-        expiresAt: expiry,
-      })
+      for (const a of memberPurchases)
+        membershipReceipts.push({
+          id: a.id,
+          productId: a.productId,
+          memberId,
+          action: 'renewal',
+          mode: a.mode,
+          previousExpiresAt:
+            entry.member.id_expiration != null &&
+            Number.isFinite(Number(entry.member.id_expiration))
+              ? Number(entry.member.id_expiration)
+              : null,
+          expiresAt: expiry,
+        })
       entry.member = { ...entry.member, ...entry.membershipUpdate }
     }
     const rentals = assignments.filter((r) => r.memberId === memberId && !r.renewalVisitId)
@@ -306,7 +355,10 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
         !Number.isFinite(Number(entry.member.id_expiration)) ||
         Number(entry.member.id_expiration) < 0
       )
-        fail('failed-precondition', 'A membership with a recorded expiration and no Do not admit restriction is required to check in.')
+        fail(
+          'failed-precondition',
+          'A membership with a recorded expiration and no Do not admit restriction is required to check in.',
+        )
       if (entry.member.checkedIn === true || claim.exists)
         fail('failed-precondition', 'An assigned member already has an active visit.')
       entry.visits = rentals.map((r) => {
@@ -352,7 +404,10 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
   return {
     member: snapshots.find((m) => m.id === d.member?.id) ?? null,
     members: snapshots,
-    memberships: [...pending.map((m) => ({ productId: m.draft.membershipProductId, memberId: m.id })), ...membershipReceipts],
+    memberships: [
+      ...pending.map((m) => ({ productId: m.draft.membershipProductId, memberId: m.id })),
+      ...membershipReceipts,
+    ],
     rentals: assignments,
     apply() {
       for (const r of renewals)
@@ -365,15 +420,23 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
       for (const [memberId, e] of records) {
         if (e.isNew) {
           tx.create(e.ref, { ...e.member, checkedIn: e.visits.length > 0 })
-          if (e.initialNote) tx.create(db.doc(`system/${d.business}/memberNotes/${memberId}/entries/${memberId}`), {
-            text: e.initialNote, kind: 'note', actorUid: uid, actorName: staffName, createdAt: timestamp(), deleted: false,
-          })
+          if (e.initialNote)
+            tx.create(db.doc(`system/${d.business}/memberNotes/${memberId}/entries/${memberId}`), {
+              text: e.initialNote,
+              kind: 'note',
+              actorUid: uid,
+              actorName: staffName,
+              createdAt: timestamp(),
+              deleted: false,
+            })
           const claim = { access: 'dev', memberId }
           tx.create(e.identityRef, claim)
           tx.create(e.numberRef, claim)
-        } else if (e.visits.length || e.membershipUpdate) tx.update(e.ref, {
-          ...(e.membershipUpdate ?? {}), ...(e.visits.length ? { checkedIn: true } : {}),
-        })
+        } else if (e.visits.length || e.membershipUpdate)
+          tx.update(e.ref, {
+            ...(e.membershipUpdate ?? {}),
+            ...(e.visits.length ? { checkedIn: true } : {}),
+          })
         if (e.visits.length)
           tx.create(e.visitClaimRef, {
             memberId,
@@ -400,7 +463,11 @@ async function access(tx, db, business, uid, fail, admin = false) {
     (admin ? uid !== owner : uid !== owner && permission.data()?.permissions?.processSales !== true)
   )
     fail('permission-denied', 'Point of sale permission is required in this business.')
-  return { profile: profile.data(), system: system.data() }
+  return {
+    profile: profile.data(),
+    system: system.data(),
+    canWaive: uid === owner || permission.data()?.permissions?.waiveProducts === true,
+  }
 }
 export function posSettings(system, stored) {
   const legacy =
@@ -446,7 +513,7 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
   const path = `system/${d.business}`,
     saleRef = db.doc(`${path}/sales/${d.requestId}`)
   return db.runTransaction(async (tx) => {
-    const { profile, system } = await access(tx, db, d.business, uid, fail)
+    const { profile, system, canWaive } = await access(tx, db, d.business, uid, fail)
     const prior = await tx.get(saleRef)
     if (prior.exists) {
       if (prior.data().fingerprint !== fingerprint || prior.data().cashierUid !== uid)
@@ -490,6 +557,10 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
           'failed-precondition',
           'A product changed or is unavailable. Refresh the catalog and review the sale.',
         )
+      if (l.waived === true) {
+        require(canWaive, fail, 'Waive products permission is required.')
+        require(!p.payout, fail, 'Payouts cannot be waived.')
+      }
       if (p.taxable && settings.taxRateBps === null)
         fail(
           'failed-precondition',
@@ -504,7 +575,7 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
       )
         fail('failed-precondition', `${p.name}: not enough inventory.`)
       require(cents(l.quantity * l.unitPriceCents), fail, 'A line exceeds the supported amount.')
-      const lineSubtotal = l.quantity * l.unitPriceCents * (p.payout ? -1 : 1),
+      const lineSubtotal = l.quantity * (l.waived ? 0 : l.unitPriceCents) * (p.payout ? -1 : 1),
         lineTax = p.taxable
           ? Math.round((Math.abs(lineSubtotal) * d.taxRateBps) / 10000) * Math.sign(lineSubtotal)
           : 0
@@ -512,6 +583,7 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
       taxCents += lineTax
       lines.push({
         ...l,
+        ...(l.waived ? { waived: true } : {}),
         name: p.name,
         barcode: p.barcode,
         categoryId: p.cat,
@@ -544,14 +616,25 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
     const previous = totalsDoc.data() ?? {},
       netByMethod = Object.fromEntries(methods.map((m) => [m, previous.netByMethod?.[m] ?? 0]))
     for (const p of payments) netByMethod[p.method] += p.amountCents * (outgoing ? -1 : 1)
-    const expectedCashCents = register.data().openingTotalCents + netByMethod.cash
+    const cashDropCents = previous.cashDropCents ?? 0
+    const expectedCashCents = register.data().openingTotalCents + netByMethod.cash - cashDropCents
     if (expectedCashCents < 0)
       fail(
         'failed-precondition',
         'The register does not have enough recorded cash for this payout.',
       )
     const cash = payments.find((p) => p.method === 'cash')
-    const fulfilled = await fulfillment(tx, db, d, products, uid, timestamp, fail, now(), profile.displayName)
+    const fulfilled = await fulfillment(
+      tx,
+      db,
+      d,
+      products,
+      uid,
+      timestamp,
+      fail,
+      now(),
+      profile.displayName,
+    )
     const receipt = {
       schemaVersion: 1,
       business: d.business,
@@ -588,6 +671,7 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
       taxCents: (previous.taxCents ?? 0) + taxCents,
       netByMethod,
       expectedCashCents,
+      cashDropCents,
       cashReceivedCents:
         (previous.cashReceivedCents ?? 0) + (cash && !outgoing ? cash.receivedCents : 0),
       changeGivenCents: (previous.changeGivenCents ?? 0) + (cash?.changeCents ?? 0),
@@ -605,7 +689,79 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
           updatedAt: timestamp(),
         })
     }
+
     return { saleId: d.requestId }
+  })
+}
+
+export async function cashDrop(request, { db, fail, timestamp }) {
+  const d = request.data
+  require(exact(d, ['amountCents', 'business', 'note', 'registerId', 'requestId']) &&
+    id(d.business) &&
+    /^[a-f0-9-]{36}$/.test(d.requestId) &&
+    /^[a-f0-9-]{36}$/.test(d.registerId) &&
+    Number.isSafeInteger(d.amountCents) &&
+    d.amountCents > 0 &&
+    d.amountCents <= 999999999 &&
+    typeof d.note === 'string' &&
+    d.note.length <= 500, fail, 'Enter a valid cash drop.')
+  const uid = request.auth?.uid
+  const fingerprint = createHash('sha256').update(JSON.stringify(d)).digest('hex')
+  const path = `system/${d.business}`,
+    dropRef = db.doc(`${path}/registers/${d.registerId}/cashDrops/${d.requestId}`),
+    totalsRef = db.doc(`${path}/registerTotals/${d.registerId}`)
+  return db.runTransaction(async (tx) => {
+    const { profile } = await access(tx, db, d.business, uid, fail)
+    const [drop, register, claim, totalsDoc] = await Promise.all([
+      tx.get(dropRef),
+      tx.get(db.doc(`${path}/registers/${d.registerId}`)),
+      tx.get(db.doc(`${path}/registerOwners/${uid}`)),
+      tx.get(totalsRef),
+    ])
+    if (drop.exists) {
+      if (drop.data().fingerprint !== fingerprint || drop.data().actorUid !== uid)
+        fail('already-exists', 'This cash drop request already saved different details.')
+      return { dropId: d.requestId }
+    }
+    if (
+      !register.exists ||
+      register.data().status !== 'open' ||
+      register.data().ownerUid !== uid ||
+      claim.data()?.registerId !== d.registerId
+    )
+      fail('failed-precondition', 'Open your own register before recording a cash drop.')
+    const previous = totalsDoc.data() ?? {},
+      cashDropCents = (previous.cashDropCents ?? 0) + d.amountCents,
+      expectedCashCents =
+        register.data().openingTotalCents + (previous.netByMethod?.cash ?? 0) - cashDropCents
+    if (expectedCashCents < 0)
+      fail('failed-precondition', 'The register does not have enough recorded cash for this drop.')
+    tx.create(dropRef, {
+      schemaVersion: 1,
+      requestId: d.requestId,
+      registerId: d.registerId,
+      amountCents: d.amountCents,
+      note: d.note,
+      actorUid: uid,
+      actorName: profile.displayName || uid,
+      fingerprint,
+      createdAt: timestamp(),
+    })
+    tx.set(totalsRef, {
+      schemaVersion: 1,
+      registerId: d.registerId,
+      saleCount: previous.saleCount ?? 0,
+      totalCents: previous.totalCents ?? 0,
+      taxCents: previous.taxCents ?? 0,
+      netByMethod: previous.netByMethod ?? { cash: 0, card: 0, giftCard: 0, check: 0, other: 0 },
+      expectedCashCents,
+      cashDropCents,
+      cashReceivedCents: previous.cashReceivedCents ?? 0,
+      changeGivenCents: previous.changeGivenCents ?? 0,
+      cashPaidOutCents: previous.cashPaidOutCents ?? 0,
+      updatedAt: timestamp(),
+    })
+    return { dropId: d.requestId }
   })
 }
 
@@ -682,7 +838,8 @@ export async function checkOutRental(request, { db, fail, timestamp }) {
     d.expectedRevision >= 0 &&
     Number.isFinite(d.expectedExpiresAt) &&
     d.rentalCompleted === true &&
-    d.itemsReturned === true, fail, 'Confirm that the rental is completed and all required items have been returned.')
+    d.itemsReturned ===
+      true, fail, 'Confirm that the rental is completed and all required items have been returned.')
   await db.runTransaction(async (tx) => {
     await access(tx, db, d.business, request.auth?.uid, fail)
     const ref = db.doc(`activity/${d.visitId}`)

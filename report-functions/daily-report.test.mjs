@@ -43,6 +43,25 @@ test('reconciles split payments, actual quantities, category aliases and immutab
   assert.equal(rows[0][11], 50) // previous-day shift activity is retained
 })
 
+test('reports waived products separately from collected sales', () => {
+  const d = fixtureData()
+  d.sales[0].lines[0].waived = true
+  d.sales[0].lines[0].subtotalCents = 0
+  d.sales[0].lines[0].taxCents = 0
+  d.sales[0].lines[0].totalCents = 0
+  d.sales[0].subtotalCents = 0
+  d.sales[0].taxCents = 0
+  d.sales[0].totalCents = 0
+  d.sales[0].payments = []
+  const summary = summarize(d)
+  assert.equal(summary.total, 0)
+  assert.equal(summary.waivedUnits, 2)
+  assert.equal(summary.waivedTotal, 2000)
+  assert.equal(summary.products[0].waivedValue, 2000)
+  assert.equal(summary.orderItems[0][12], 'Yes')
+  assert.equal(summary.orderItems[0][13], 20)
+})
+
 test('payouts stay signed; missing/deleted categories and zero-activity days are explicit', () => {
   const d = fixtureData(),
     payout = structuredClone(d.sales[0])

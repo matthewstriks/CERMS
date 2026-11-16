@@ -44,6 +44,7 @@ describe('POS money and access', () => {
       ...old,
       removeMemberNotes: false,
       processSales: false,
+      waiveProducts: false,
       deleteProducts: false,
       closeOtherRegisters: false,
     })
@@ -63,6 +64,21 @@ describe('POS money and access', () => {
       },
     })
     expect(allowFirebaseRequest(posEndpoints.completeSale, 'POST', body)).toBe(true)
+    expect(
+      allowFirebaseRequest(
+        posEndpoints.cashDrop,
+        'POST',
+        JSON.stringify({
+          data: {
+            business: 'club-a',
+            requestId: '10000000-0000-4000-8000-000000000001',
+            registerId: '10000000-0000-4000-8000-000000000002',
+            amountCents: 2500,
+            note: 'Safe drop',
+          },
+        }),
+      ),
+    ).toBe(true)
     expect(allowFirebaseRequest(posEndpoints.completeSale + '?extra=1', 'POST', body)).toBe(false)
     expect(
       allowFirebaseRequest(

@@ -78,7 +78,8 @@ function readDraft(key: string): {
           l.quantity > 0 &&
           l.quantity <= 1000 &&
           Number.isSafeInteger(l.unitPriceCents) &&
-          l.unitPriceCents >= 0,
+          l.unitPriceCents >= 0 &&
+          (l.waived === undefined || typeof l.waived === 'boolean'),
       ) ||
       typeof d.customerName !== 'string' ||
       typeof d.note !== 'string' ||
@@ -319,6 +320,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     searchInput = useRef<HTMLInputElement>(null),
     paymentDialog = useRef<HTMLDialogElement>(null)
   const canSell = !!reader && hasStaffPermission(reader.uid, 'processSales', reader.permissions)
+  const canWaive = !!reader && hasStaffPermission(reader.uid, 'waiveProducts', reader.permissions)
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -498,6 +500,12 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
         ...l,
         rentals: l.rentals?.map((r) => (r.id === rentalId ? { ...r, ...patch } : r)),
       })),
+    )
+  }
+  function toggleWaived(productId: string) {
+    if (!canWaive || locked) return
+    setCart((rows) =>
+      rows.map((l) => (l.product.id === productId ? { ...l, waived: !l.waived } : l)),
     )
   }
   function removeRental(rentalId: string) {
@@ -943,7 +951,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                       <div>
                         <strong>{l.product.data.name}</strong>
                         <small>
-                          {money(l.unitPriceCents / 100)} each
+                          {l.waived ? 'Waived · ' : `${money(l.unitPriceCents / 100)} each`}
                           {l.product.data.payout ? ' · Payout' : ''}
                         </small>
                         {l.product.data.membership &&
@@ -1087,7 +1095,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                               type="text"
                               inputMode="decimal"
                               value={l.priceInput ?? String(l.unitPriceCents / 100)}
-                              disabled={locked}
+                              disabled={locked || l.waived}
                               onChange={(e) => {
                                 const priceInput = e.target.value
                                 let unitPriceCents = l.unitPriceCents
@@ -1105,9 +1113,22 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                             />
                           </label>
                         )}
+                        {canWaive && !l.product.data.payout && (
+                          <button
+                            type="button"
+                            disabled={locked}
+                            aria-pressed={l.waived === true}
+                            aria-label={`${l.waived ? 'Remove waiver from' : 'Waive'} ${l.product.data.name}`}
+                            onClick={() => toggleWaived(l.product.id)}
+                          >
+                            {l.waived ? 'Unwaive' : 'Waive'}
+                          </button>
+                        )}
                         <strong>
                           {money(
-                            (l.unitPriceCents * l.quantity * (l.product.data.payout ? -1 : 1)) /
+                            ((l.waived ? 0 : l.unitPriceCents) *
+                              l.quantity *
+                              (l.product.data.payout ? -1 : 1)) /
                               100,
                           )}
                         </strong>
@@ -1391,6 +1412,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                       version: l.product.version,
                       quantity: l.quantity,
                       unitPriceCents: l.unitPriceCents,
+                      ...(l.waived ? { waived: true } : {}),
                     })),
                     payments: settlement.payments,
                   }

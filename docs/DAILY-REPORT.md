@@ -29,18 +29,21 @@ Do not send additional test messages automatically.
 
 ## Email and workbook
 
-The email includes transaction count, net sales/tax, payment breakdown, cash
-received/change/payouts and closed-register counted cash/over-short. Still-open
-registers are identified as provisional.
+The email includes transaction count, net sales/tax, waived product value,
+payment breakdown, cash received/change/payouts and closed-register counted
+cash/over-short. Still-open registers are identified as provisional.
 
 Workbook tabs include:
 
 - Summary: reporting period, totals, scope and data notes.
 - Orders: receipt/register IDs, cashier, customer/member snapshots, products,
-  subtotal/tax/net total, every tender method, cash received/change and note.
+  subtotal/tax/net total, waived product value, every tender method, cash
+  received/change and note.
 - Order Items and Payments: quantities, prices, product/category identities,
-  membership/rental/payout type, split tender, directions and external references.
-- Product Sales, Category Totals and Cashiers: quantity and monetary summaries.
+  membership/rental/payout type, waiver state/value, split tender, directions and
+  external references.
+- Product Sales, Category Totals and Cashiers: quantity and monetary summaries,
+  including waived units and value by product.
 - Legacy Category Groups: Hygiene, Health, Snacks, Flip Flops, Incense and Towels;
   the Snacks group retains the Beverages/Candy/Chips/Snacks alias behavior.
 - Registers plus a uniquely named sheet for each closed-register cashier:

@@ -15,6 +15,7 @@ export function registerCloseoutText({
   record: RegisterRecord
   totals: RegisterTotals
 }): string {
+  const cashDropCents = totals.cashDropCents ?? 0
   if (
     record.status !== 'closed' ||
     record.closedAt === null ||
@@ -31,6 +32,7 @@ export function registerCloseoutText({
     totals.cashReceivedCents,
     totals.changeGivenCents,
     totals.cashPaidOutCents,
+    cashDropCents,
     ...Object.keys(paymentMethods).map(
       (key) => totals.netByMethod?.[key as keyof typeof paymentMethods],
     ),
@@ -39,7 +41,8 @@ export function registerCloseoutText({
     !Number.isSafeInteger(totals.saleCount) ||
     totals.saleCount < 0 ||
     !amounts.every(Number.isSafeInteger) ||
-    totals.expectedCashCents !== record.openingTotalCents + totals.netByMethod.cash ||
+    totals.expectedCashCents !==
+      record.openingTotalCents + totals.netByMethod.cash - cashDropCents ||
     totals.totalCents !== Object.values(totals.netByMethod).reduce((sum, value) => sum + value, 0)
   )
     throw new Error('Saved payment totals could not be verified. Retry loading the report.')
@@ -74,6 +77,7 @@ export function registerCloseoutText({
     `Cash received: ${money(totals.cashReceivedCents)}`,
     `Change given: ${money(totals.changeGivenCents)}`,
     `Cash paid out: ${money(totals.cashPaidOutCents)}`,
+    `Cash dropped: ${money(cashDropCents)}`,
     `Net cash payments: ${money(totals.netByMethod.cash)}`,
     `Expected cash: ${money(totals.expectedCashCents)}`,
     `Counted cash: ${money(record.closingTotalCents)}`,

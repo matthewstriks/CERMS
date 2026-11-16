@@ -5,6 +5,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { createAccount } from './staff-account.mjs'
+import { submitBugReport as submitBugReportHandler } from './bug-report.mjs'
 const app = initializeApp({ projectId: 'cerms-7af24' })
 const db = getFirestore(app, 'cerms')
 export const createStaffAccount = onCall(
@@ -62,11 +63,34 @@ function imageHandler(handler) {
 export const uploadProductImage = imageHandler(uploadImage)
 export const getProductImage = imageHandler(getImage)
 
+export const submitBugReport = onCall(
+  { region: 'us-central1', maxInstances: 3, timeoutSeconds: 120, memory: '512MiB' },
+  async (request) => {
+    try {
+      return await submitBugReportHandler(request, {
+        db,
+        bucket: getStorage(app).bucket('cerms-7af24-cerms5-bug-reports'),
+        timestamp: () => FieldValue.serverTimestamp(),
+        fail: (code, message) => {
+          throw new HttpsError(code, message)
+        },
+      })
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      throw new HttpsError(
+        'unavailable',
+        'Bug report could not be sent. Retry without changing the report details.',
+      )
+    }
+  },
+)
+
 import {
   checkOutRental as checkOutRentalHandler,
   updateRental as updateRentalHandler,
   completeSale as completeSaleHandler,
   savePosSettings as savePosSettingsHandler,
+  cashDrop as cashDropHandler,
 } from './pos.mjs'
 const posDependencies = {
   db,
@@ -90,6 +114,7 @@ function posHandler(handler) {
 }
 export const completeSale = posHandler(completeSaleHandler)
 export const savePosSettings = posHandler(savePosSettingsHandler)
+export const cashDrop = posHandler(cashDropHandler)
 
 export const updateRental = posHandler(updateRentalHandler)
 

@@ -26,6 +26,7 @@ export default defineConfig({
         input: {
           index: resolve('src/renderer/index.html'),
           about: resolve('src/renderer/about.html'),
+          bugReport: resolve('src/renderer/bug-report.html'),
         },
       },
     },

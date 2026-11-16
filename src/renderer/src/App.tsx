@@ -2,7 +2,7 @@ import { requestNotificationSound } from './lib/notification-audio'
 import { hasStaffPermission } from '../../domain/staff-permissions'
 import BrandLogo from './components/BrandLogo'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronRight, LogOut, Moon, Sun } from 'lucide-react'
+import { Bug, ChevronRight, LogOut, Moon, Sun } from 'lucide-react'
 import { modules } from './lib/modules'
 import type { ModuleId } from './lib/modules'
 import { Badge } from './components/ui'
@@ -12,6 +12,7 @@ import { canSwitchSystems } from '../../shared/firebase-policy'
 import { canManageMembers } from '../../shared/member-management-policy'
 import { canCreateDevMember } from '../../shared/dev-member-policy'
 import { useMembershipSession } from './lib/membership-session'
+import { getFirebaseServices } from '../../data/firebase-membership'
 const Activity = lazy(() => import('./features/Activity'))
 const Members = lazy(() => import('./features/Members'))
 const Products = lazy(() => import('./features/Products'))
@@ -29,6 +30,7 @@ function readRoute(): ModuleId {
 export default function App() {
   const membership = useMembershipSession()
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [bugReportError, setBugReportError] = useState('')
   const messagingUid = membership.reader?.uid
   const messagingBusiness = membership.reader?.club
   useEffect(() => {
@@ -209,6 +211,31 @@ export default function App() {
           <div className="topbar-right">
             <span>CERMS {info.data?.version ?? '…'}</span>
             <button
+              aria-label="Report a bug"
+              title="Report a bug"
+              onClick={async () => {
+                if (!membership.reader) return
+                try {
+                  const user = getFirebaseServices().auth.currentUser
+                  if (!user?.email) throw new Error('Your signed-in email is unavailable.')
+                  setBugReportError('')
+                  await window.desktop.openBugReport({
+                    token: await user.getIdToken(),
+                    email: user.email,
+                    uid: membership.reader.uid,
+                    business: membership.reader.club,
+                  })
+                } catch (error) {
+                  setBugReportError(
+                    error instanceof Error ? error.message : 'Unable to open bug reporting.',
+                  )
+                }
+              }}
+              disabled={membership.switching}
+            >
+              <Bug size={18} />
+            </button>
+            <button
               className="theme-toggle"
               aria-label={
                 membership.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
@@ -223,6 +250,11 @@ export default function App() {
           </div>
         </header>
         <main id="main-content">
+          {bugReportError && (
+            <p className="inline-error" role="alert">
+              {bugReportError}
+            </p>
+          )}
           {membership.themeError && (
             <p className="inline-error" role="alert">
               {membership.themeError}

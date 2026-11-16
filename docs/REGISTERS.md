@@ -2,7 +2,7 @@
 
 The user authorized live register deployment on September 30, 2026. Register-only rules were deployed to named `cerms` in `cerms-7af24`, and the required index is **READY**. See [deployment evidence](REGISTERS-DEPLOYMENT.json) for readiness and verification. The exact released rules are archived in `firebase/releases/registers-2026-09-30.rules`; `firebase/cerms.rules` still includes separate, undeployed membership changes. The legacy `(default)` database, its register records, Auth, Storage, user profiles and existing checkout remain unchanged.
 
-The user authorized each signed-in staff member to open one register per business and close only their own, with open registers visible to staff in that business. The user explicitly deferred cash movements until POS is implemented. This version stores opening and closing denomination counts, calculated totals, staff identity, server timestamps and an optional closing note. The UI shows the cash change, **not** expected cash or an over/short amount. There are no sale, refund, payout, drop, manual cash movement, card, gift-card, QuickBooks or shift-report operations.
+The user authorized each signed-in staff member to open one register per business and close only their own, with open registers visible to staff in that business. Cashiers with POS access can record a cash drop from their own open register during a shift. This version stores opening and closing denomination counts, calculated totals, staff identity, server timestamps and an optional closing note. The UI shows the cash change, expected cash, and over/short amount.
 
 ## Workflow
 
@@ -17,6 +17,7 @@ Open register and Close my register accept whole-number quantities for $100, $50
 - Open is an atomic two-document commit: create the UUID register and create/update the user's pointer. Rules require reciprocal references, a new register, and the previous register to be closed. Concurrent opens cannot both commit.
 - Close is one update with an exact field mask: status, closingCounts, closingTotalCents and closeNote, plus the server closedAt timestamp. Only the stored owner may close an open register. Ownership, opening counts/total/time and staff name remain unchanged. Closed records cannot be edited, reopened or deleted.
 - Staff access is determined by Auth UID and the saved own-profile business, with an existing business document. All register records are readable within that business. Rules and the desktop request guard validate count schemas, bounds, totals, timestamps and exact write shapes. No general Firestore write API is enabled.
+- `system/{business}/registers/{registerId}/cashDrops/{requestId}`: immutable server-owned cash-drop audit records containing the amount in cents, actor, note, request fingerprint and server timestamp. A drop is accepted only for the signed-in cashier's own open register, and the same request UUID is idempotent.
 - The client rechecks the session before reads/writes, uses stable request UUIDs, and reads back uncertain saves. An identical retry succeeds without another write; conflicting opening or closing values are rejected.
 
 The prepared index is `registers(status ASC, openedAt DESC)`, collection scope. It serves open and closed register queries under a specific business, bounded to 50 per page. The existing member index remains in the configuration. No legacy imports or live test writes are required.
@@ -33,6 +34,10 @@ The exact register-only release passed 42 focused synthetic emulator checks befo
 ## POS integration
 
 The subsequent POS release connects immutable server-owned payment totals to each register. Expected cash includes net cash tender (received less change, minus payouts); card and other tenders are tracked separately. Closing over/short compares denomination counts to expected cash. See `POINT-OF-SALE.md` and `POS-DEPLOYMENT.json`. Historical no-POS statements above describe the earlier register-only release.
+
+## Cash drops
+
+The **Cash drop** action is available on an open cashier register to staff with POS access. Enter a positive dollar amount and an optional note to record cash removed from the drawer mid-shift. The server verifies the register owner, current open status and available recorded cash, then atomically writes the audit record and updates the register ledger. Dropped cash is subtracted from expected cash and is therefore not counted as a shortage when the register closes. Cash drops cannot be edited or deleted, and retries with the same request are safe.
 
 ## Manager closeout
 

@@ -119,6 +119,12 @@ export function createPos(reader: Pick<MembershipReader, 'uid' | 'club'>) {
     }) => call('updateRental', { business: reader.club, ...data }),
     saveSettings: (settings: PosSettings) =>
       call('savePosSettings', { business: reader.club, ...settings }),
+    cashDrop: (data: {
+      requestId: string
+      registerId: string
+      amountCents: number
+      note: string
+    }) => call<{ dropId: string }>('cashDrop', { business: reader.club, ...data }),
     async complete(request: SaleRequest) {
       await call<{ saleId: string }>('completeSale', request)
       return this.receipt(request.requestId)
@@ -145,7 +151,9 @@ export function createPos(reader: Pick<MembershipReader, 'uid' | 'club'>) {
     async totals(registerId: string, opening: number): Promise<RegisterTotals> {
       await session()
       const d = await getDoc(doc(db, path, 'registerTotals', registerId))
-      return d.exists() ? (d.data() as RegisterTotals) : emptyRegisterTotals(opening)
+      return d.exists()
+        ? ({ ...d.data(), cashDropCents: d.data().cashDropCents ?? 0 } as RegisterTotals)
+        : emptyRegisterTotals(opening)
     },
   }
 }

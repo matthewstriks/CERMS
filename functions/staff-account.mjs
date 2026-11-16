@@ -5,6 +5,7 @@ export const keys = [
   'closeOtherRegisters',
   'deleteProducts',
   'processSales',
+  'waiveProducts',
   'editMembers',
   'deleteMembers',
   'manageProducts',
@@ -42,9 +43,13 @@ export function validateAccount(data, fail) {
     Object.keys(permissions).some((k) => !keys.includes(k)) ||
     !keys.every(
       (k) =>
-        (['processSales', 'deleteProducts', 'closeOtherRegisters', 'removeMemberNotes'].includes(
-          k,
-        ) &&
+        ([
+          'processSales',
+          'waiveProducts',
+          'deleteProducts',
+          'closeOtherRegisters',
+          'removeMemberNotes',
+        ].includes(k) &&
           permissions[k] === undefined) ||
         typeof permissions[k] === 'boolean',
     )

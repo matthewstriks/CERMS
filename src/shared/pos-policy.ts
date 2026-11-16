@@ -3,6 +3,7 @@ export const posEndpoints = {
   updateRental: 'https://us-central1-cerms-7af24.cloudfunctions.net/updateRental',
   completeSale: 'https://us-central1-cerms-7af24.cloudfunctions.net/completeSale',
   savePosSettings: 'https://us-central1-cerms-7af24.cloudfunctions.net/savePosSettings',
+  cashDrop: 'https://us-central1-cerms-7af24.cloudfunctions.net/cashDrop',
 } as const
 export function isPosRequest(url: string, body?: string): boolean {
   try {
@@ -54,6 +55,19 @@ export function isPosRequest(url: string, body?: string): boolean {
         ['receiptName', 'receiptAddress', 'receiptFooter'].every(
           (k) => typeof d[k] === 'string' && d[k].length <= 500,
         )
+      )
+    if (url === posEndpoints.cashDrop)
+      return (
+        Object.keys(d).sort().join() === 'amountCents,business,note,registerId,requestId' &&
+        typeof d.requestId === 'string' &&
+        /^[a-f0-9-]{36}$/.test(d.requestId) &&
+        typeof d.registerId === 'string' &&
+        /^[a-f0-9-]{36}$/.test(d.registerId) &&
+        Number.isSafeInteger(d.amountCents) &&
+        d.amountCents > 0 &&
+        d.amountCents <= 999999999 &&
+        typeof d.note === 'string' &&
+        d.note.length <= 500
       )
     return (
       url === posEndpoints.completeSale &&
@@ -148,6 +162,36 @@ export function isPosRequest(url: string, body?: string): boolean {
       Array.isArray(d.lines) &&
       d.lines.length > 0 &&
       d.lines.length <= 100 &&
+      d.lines.every(
+        (l: {
+          productId: string
+          version: number
+          quantity: number
+          unitPriceCents: number
+          waived?: boolean
+        }) =>
+          l &&
+          Object.keys(l).sort().join() ===
+            [
+              'productId',
+              'quantity',
+              'unitPriceCents',
+              'version',
+              ...(l.waived !== undefined ? ['waived'] : []),
+            ]
+              .sort()
+              .join() &&
+          typeof l.productId === 'string' &&
+          /^[a-zA-Z0-9_-]{1,128}$/.test(l.productId) &&
+          Number.isSafeInteger(l.version) &&
+          l.version > 0 &&
+          Number.isSafeInteger(l.quantity) &&
+          l.quantity > 0 &&
+          l.quantity <= 1000 &&
+          Number.isSafeInteger(l.unitPriceCents) &&
+          l.unitPriceCents >= 0 &&
+          (l.waived === undefined || typeof l.waived === 'boolean'),
+      ) &&
       Array.isArray(d.payments) &&
       d.payments.length <= 12
     )

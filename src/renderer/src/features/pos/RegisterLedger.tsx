@@ -55,6 +55,8 @@ export default function RegisterLedger({
           <dd>{money(totals.changeGivenCents / 100)}</dd>
           <dt>Cash paid out</dt>
           <dd>{money(totals.cashPaidOutCents / 100)}</dd>
+          <dt>Cash dropped</dt>
+          <dd>{money(totals.cashDropCents / 100)}</dd>
           <dt>
             <strong>Expected cash</strong>
           </dt>

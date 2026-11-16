@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { autoUpdater } from 'electron-updater'
 import { createUpdateController } from './updates'
 import { createServiceStatusMonitor } from './service-status'
@@ -22,7 +23,13 @@ import { pathToFileURL } from 'node:url'
 import { isTrustedRenderer, rendererAsset } from './security'
 import { applicationMenu } from './application-menu'
 import packageInfo from '../../package.json'
-import type { AboutInfo, AppInfo } from '../shared/desktop'
+import type {
+  AboutInfo,
+  AppInfo,
+  BugReportContext,
+  BugReportFile,
+  BugReportPayload,
+} from '../shared/desktop'
 import { allowFirebaseRequest, isMemberFileUrl } from '../shared/firebase-policy'
 
 // Keep the new app's local profile separate from CERMS 4, including in development.
@@ -37,6 +44,10 @@ const appIcon = app.isPackaged
   : join(app.getAppPath(), 'resources/branding/icon.png')
 let mainWindow: BrowserWindow | null = null
 let aboutWindow: BrowserWindow | null = null
+let bugReportWindow: BrowserWindow | null = null
+let bugReportAuth: { token: string; email: string; uid: string; business: string } | null = null
+const bugReportEndpoint = 'https://us-central1-cerms-7af24.cloudfunctions.net/submitBugReport'
+const bugReportId = /^[a-zA-Z0-9_-]{1,128}$/
 
 function aboutInfo(): AboutInfo {
   return {
@@ -45,6 +56,67 @@ function aboutInfo(): AboutInfo {
     platform: process.platform,
     packaged: app.isPackaged,
     author: packageInfo.author,
+  }
+}
+
+async function openBugReport(auth: {
+  token: string
+  email: string
+  uid: string
+  business: string
+}): Promise<void> {
+  if (
+    typeof auth.token !== 'string' ||
+    !auth.token ||
+    typeof auth.email !== 'string' ||
+    auth.email.length > 320 ||
+    !bugReportId.test(auth.uid) ||
+    !bugReportId.test(auth.business)
+  )
+    throw new Error('Bug reports require an authenticated staff session.')
+  bugReportAuth = auth
+  if (bugReportWindow && !bugReportWindow.isDestroyed()) {
+    if (bugReportWindow.isMinimized()) bugReportWindow.restore()
+    bugReportWindow.show()
+    bugReportWindow.focus()
+    return
+  }
+  const window = new BrowserWindow({
+    icon: appIcon,
+    width: 760,
+    height: 760,
+    minWidth: 620,
+    minHeight: 620,
+    show: false,
+    title: 'Report a bug · CERMS',
+    backgroundColor: '#f5f6f8',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  })
+  bugReportWindow = window
+  window.setMenu(null)
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+  window.webContents.on('will-attach-webview', (event) => event.preventDefault())
+  window.once('ready-to-show', () => window.show())
+  window.once('closed', () => {
+    if (bugReportWindow === window) {
+      bugReportWindow = null
+      bugReportAuth = null
+    }
+  })
+  try {
+    if (devUrl) await window.loadURL(new URL('bug-report.html', devUrl).href)
+    else await window.loadURL('cerms://app/bug-report.html')
+  } catch (error) {
+    window.destroy()
+    throw error
   }
 }
 
@@ -135,6 +207,7 @@ async function createWindow(): Promise<void> {
     const orderItem = Menu.getApplicationMenu()?.getMenuItemById('new-order')
     if (orderItem) orderItem.enabled = false
     aboutWindow?.close()
+    bugReportWindow?.close()
   })
   if (devUrl) await window.loadURL(devUrl)
   else await window.loadURL('cerms://app/index.html')
@@ -373,6 +446,94 @@ app
         throw new Error('This attachment cannot be opened by CERMS.')
       }
       await shell.openExternal(url)
+    })
+    ipcMain.handle('bug-report:open', async (event, auth: unknown) => {
+      if (!trustedWindow(event, mainWindow) || !auth || typeof auth !== 'object')
+        throw new Error('Untrusted request')
+      await openBugReport(auth as { token: string; email: string; uid: string; business: string })
+    })
+    ipcMain.handle('bug-report:context', async (event): Promise<BugReportContext> => {
+      if (!trustedWindow(event, bugReportWindow) || !bugReportAuth || !mainWindow)
+        throw new Error('Bug report session is unavailable.')
+      let logs: string[] = []
+      try {
+        const result: unknown = await mainWindow.webContents.executeJavaScript(
+          'typeof window.__cermsDiagnostics === "function" ? window.__cermsDiagnostics() : []',
+          true,
+        )
+        if (Array.isArray(result))
+          logs = result.filter((item): item is string => typeof item === 'string').slice(-100)
+      } catch {
+        logs = ['Unable to read renderer diagnostics.']
+      }
+      return {
+        email: bugReportAuth.email,
+        uid: bugReportAuth.uid,
+        business: bugReportAuth.business,
+        version: app.getVersion(),
+        platform: process.platform,
+        electron: process.versions.electron,
+        logs,
+      }
+    })
+    ipcMain.handle('bug-report:capture-main', async (event): Promise<BugReportFile> => {
+      if (!trustedWindow(event, bugReportWindow) || !mainWindow)
+        throw new Error('The main CERMS window is unavailable.')
+      const image = await mainWindow.webContents.capturePage()
+      const base64 = image.toJPEG(80).toString('base64')
+      return {
+        name: `cerms-main-${Date.now()}.jpg`,
+        contentType: 'image/jpeg',
+        base64,
+        size: Buffer.byteLength(base64, 'base64'),
+      }
+    })
+    ipcMain.handle('bug-report:choose-files', async (event): Promise<BugReportFile[]> => {
+      if (!trustedWindow(event, bugReportWindow)) throw new Error('Untrusted request')
+      const result = await dialog.showOpenDialog(bugReportWindow!, {
+        title: 'Attach bug-report files',
+        properties: ['openFile', 'multiSelections'],
+      })
+      if (result.canceled) return []
+      const files: BugReportFile[] = []
+      let total = 0
+      for (const path of result.filePaths.slice(0, 10)) {
+        const data = await readFile(path)
+        if (data.byteLength > 8 * 1024 * 1024 || total + data.byteLength > 20 * 1024 * 1024)
+          throw new Error('Attachments must be no larger than 8 MB each and 20 MB total.')
+        total += data.byteLength
+        files.push({
+          name: path.split(/[\\/]/).pop() || 'attachment',
+          contentType: 'application/octet-stream',
+          base64: data.toString('base64'),
+          size: data.byteLength,
+        })
+      }
+      return files
+    })
+    ipcMain.handle('bug-report:submit', async (event, payload: unknown) => {
+      if (!trustedWindow(event, bugReportWindow) || !bugReportAuth)
+        throw new Error('Bug report session is unavailable.')
+      if (!payload || typeof payload !== 'object') throw new Error('Invalid bug report.')
+      const response = await net.fetch(bugReportEndpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${bugReportAuth.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ data: payload as BugReportPayload }),
+      })
+      const result = (await response.json()) as {
+        result?: { reportId?: string }
+        error?: { message?: string }
+      }
+      if (!response.ok || !result.result?.reportId)
+        throw new Error(result.error?.message || 'Bug report could not be sent. Please retry.')
+      return result.result
+    })
+    ipcMain.handle('bug-report:close', (event) => {
+      if (!trustedWindow(event, bugReportWindow)) throw new Error('Untrusted request')
+      bugReportWindow?.close()
     })
     await createWindow()
     const startupUpdate = setTimeout(() => {

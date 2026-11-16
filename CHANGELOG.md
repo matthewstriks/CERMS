@@ -6,7 +6,15 @@ these notes under the new version automatically.
 
 ## Unreleased
 
-<!-- Add changes for the next version here. -->
+### Added
+
+- Bug reporting from the desktop with a separate popup, priority and
+  description fields, CERMS 5 screenshots, file attachments, renderer
+  diagnostics, secure support links, and email follow-up through Firebase.
+- Cash drops for staff with POS access, including idempotent server processing,
+  register-ledger history, and cash-drop deductions in closeout reconciliation.
+- Permission-controlled product waivers that set selected order lines to $0 and
+  identify waived units and value in Dev daily reports.
 
 ## 5.0.0-alpha.5
 

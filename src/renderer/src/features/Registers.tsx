@@ -10,6 +10,7 @@ import RegisterCountDialog from './registers/RegisterCountDialog'
 import RegisterCloseoutDialog from './registers/RegisterCloseoutDialog'
 import { displayReference, matchesDisplayReference } from '../../../domain/display-reference'
 import './registers/Registers.css'
+import CashDropDialog from './registers/CashDropDialog'
 
 export default function Registers() {
   const { reader } = useMembershipSession()
@@ -24,6 +25,7 @@ export default function Registers() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [closeoutId, setCloseoutId] = useState<string | null>(null)
+  const [cashDrop, setCashDrop] = useState(false)
   const [search, setSearch] = useState('')
   const [editor, setEditor] = useState<{
     mode: 'open' | 'close' | 'view'
@@ -94,6 +96,17 @@ export default function Registers() {
         </div>
         <button disabled={busy || !!editor} onClick={() => setRevision((value) => value + 1)}>
           Refresh registers
+        </button>
+        <button
+          onClick={() => setCashDrop(true)}
+          disabled={
+            busy ||
+            !own ||
+            !!editor ||
+            !hasStaffPermission(reader.uid, 'processSales', reader.permissions)
+          }
+        >
+          Cash drop
         </button>
         <button
           className="primary"
@@ -300,6 +313,18 @@ export default function Registers() {
             )
             setEditor(null)
             if (editor.mode === 'close' && editor.record) setCloseoutId(editor.record.id)
+            setRevision((value) => value + 1)
+          }}
+        />
+      )}
+      {cashDrop && own && (
+        <CashDropDialog
+          reader={reader}
+          registerId={own.id}
+          onClose={() => setCashDrop(false)}
+          onSaved={() => {
+            setCashDrop(false)
+            setNotice('Cash drop recorded. It is excluded from expected closing cash.')
             setRevision((value) => value + 1)
           }}
         />

@@ -35,5 +35,11 @@ const api: DesktopApi = {
   setWindowMode: (mode) => ipcRenderer.invoke('app:window-mode', mode),
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   openMemberFile: (url) => ipcRenderer.invoke('member:open-file', url),
+  openBugReport: (auth) => ipcRenderer.invoke('bug-report:open', auth),
+  getBugReportContext: () => ipcRenderer.invoke('bug-report:context'),
+  captureMainWindow: () => ipcRenderer.invoke('bug-report:capture-main'),
+  chooseBugFiles: () => ipcRenderer.invoke('bug-report:choose-files'),
+  submitBugReport: (payload) => ipcRenderer.invoke('bug-report:submit', payload),
+  closeBugReport: () => ipcRenderer.invoke('bug-report:close'),
 }
 contextBridge.exposeInMainWorld('desktop', Object.freeze(api))

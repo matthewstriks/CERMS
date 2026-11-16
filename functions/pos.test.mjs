@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { completeSale, savePosSettings, updateRental, checkOutRental } from './pos.mjs'
+import { completeSale, cashDrop, savePosSettings, updateRental, checkOutRental } from './pos.mjs'
 import { posFixture, owner, business, registerId } from '../scripts/fixtures/pos-server.mjs'
 test('split payment saves receipt, change, register ledger and inventory atomically; retry after close never doubles totals', async () => {
   const f = posFixture()
@@ -59,6 +59,101 @@ test('assigned cashier can sell; payout subtracts cash and cannot overdraw drawe
   f.request.data.payments[0].amountCents = f.request.data.payments[0].receivedCents = 10000
   await assert.rejects(completeSale(f.request, f.deps), /enough recorded cash/)
   assert.equal(f.commits(), 1)
+})
+test('waiving a product requires permission and records a zero-cost line', async () => {
+  const denied = posFixture()
+  denied.request.data.lines[0].waived = true
+  denied.request.data.payments = []
+  denied.request.auth.uid = 'cashier'
+  denied.docs.set('users/cashier', { uid: 'cashier', access: business })
+  denied.docs.set(`system/${business}/staffPermissions/cashier`, {
+    permissions: { processSales: true },
+  })
+  denied.docs.set(`system/${business}/registerOwners/cashier`, { registerId })
+  denied.docs.get(`system/${business}/registers/${registerId}`).ownerUid = 'cashier'
+  await assert.rejects(completeSale(denied.request, denied.deps), /Waive products permission/)
+  assert.equal(denied.commits(), 0)
+
+  const allowed = posFixture()
+  allowed.request.data.lines[0].waived = true
+  allowed.request.data.payments = []
+  allowed.request.auth.uid = 'cashier'
+  allowed.docs.set('users/cashier', { uid: 'cashier', access: business })
+  allowed.docs.set(`system/${business}/staffPermissions/cashier`, {
+    permissions: { processSales: true, waiveProducts: true },
+  })
+  allowed.docs.set(`system/${business}/registerOwners/cashier`, { registerId })
+  allowed.docs.get(`system/${business}/registers/${registerId}`).ownerUid = 'cashier'
+  await completeSale(allowed.request, allowed.deps)
+  const line = allowed.docs.get(`system/${business}/sales/${allowed.request.data.requestId}`)
+    .lines[0]
+  assert.equal(line.waived, true)
+  assert.equal(line.subtotalCents, 0)
+  assert.equal(line.taxCents, 0)
+  assert.equal(
+    allowed.docs.get(`system/${business}/sales/${allowed.request.data.requestId}`).totalCents,
+    0,
+  )
+})
+test('cashier cash drop reduces expected cash atomically and is idempotent', async () => {
+  const f = posFixture()
+  const request = {
+    auth: { uid: owner },
+    data: {
+      business,
+      requestId: '30000000-0000-0000-0000-000000000001',
+      registerId,
+      amountCents: 2500,
+      note: 'Safe drop',
+    },
+  }
+  await cashDrop(request, f.deps)
+  const totals = f.docs.get(`system/${business}/registerTotals/${registerId}`)
+  assert.equal(totals.expectedCashCents, 7500)
+  assert.equal(totals.cashDropCents, 2500)
+  assert.equal(
+    f.docs.get(`system/${business}/registers/${registerId}/cashDrops/${request.data.requestId}`)
+      .actorUid,
+    owner,
+  )
+  await cashDrop(request, f.deps)
+  assert.equal(f.commits(), 1)
+  request.data.amountCents = 2600
+  await assert.rejects(cashDrop(request, f.deps), /different details/)
+})
+test('cash drop cannot remove more than recorded cash or use another register', async () => {
+  const f = posFixture()
+  await assert.rejects(
+    cashDrop(
+      {
+        auth: { uid: owner },
+        data: {
+          business,
+          requestId: '30000000-0000-0000-0000-000000000002',
+          registerId,
+          amountCents: 10001,
+          note: '',
+        },
+      },
+      f.deps,
+    ),
+  )
+  f.request.auth.uid = 'intruder'
+  await assert.rejects(
+    cashDrop(
+      {
+        auth: { uid: 'intruder' },
+        data: {
+          business,
+          requestId: '30000000-0000-0000-0000-000000000003',
+          registerId,
+          amountCents: 100,
+          note: '',
+        },
+      },
+      f.deps,
+    ),
+  )
 })
 test('tax and receipt settings are owner-only and configurable, with no default zero for missing taxable setup', async () => {
   const f = posFixture()
