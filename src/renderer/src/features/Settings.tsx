@@ -1,3 +1,4 @@
+import NotificationSoundSettings from '../components/NotificationSoundSettings'
 import { UpdateSettings } from '../components/AppUpdates'
 import { ownerUid } from '../../../domain/staff-permissions'
 import { useState } from 'react'
@@ -63,6 +64,7 @@ export default function Settings() {
         {aboutError && <p role="alert">{aboutError}</p>}
         <UpdateSettings />
       </section>
+      <NotificationSoundSettings />
       <section className="panel settings-card full-width">
         <SectionTitle title="Administration" />
         <p>

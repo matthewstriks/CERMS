@@ -117,7 +117,11 @@ export default function ReceiptPrintDialog({
           {error}
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p role="status" data-notification-sound>
+          {notice}
+        </p>
+      )}
       <div className="dialog-actions">
         <button type="button" disabled={busy} onClick={onClose}>
           Done

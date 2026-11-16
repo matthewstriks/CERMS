@@ -205,12 +205,16 @@ test('failed checkout never creates a member or rental (payment, assignment, cat
   await assert.rejects(completeSale(f.request, f.deps), /already exists/)
   assert.equal(f.commits(), 1)
 })
-test('existing member order supports rentals only after checkout; blocks expired/DNA/foreign/already admitted members', async () => {
+test('existing member order supports rentals only after checkout; permits expired members and blocks DNA/foreign/already admitted members', async () => {
   for (const change of [
     null,
     { dna: true },
     { access: 'other' },
     { id_expiration: 1 },
+    { id_expiration: null },
+    { id_expiration: 'invalid' },
+    { id_expiration: '' },
+    { id_expiration: false },
     { checkedIn: true },
   ]) {
     const f = posFixture(),
@@ -232,12 +236,17 @@ test('existing member order supports rentals only after checkout; blocks expired
       checkedIn: false,
       ...change,
     })
-    if (change) {
+    if (change && change.id_expiration !== 1) {
       await assert.rejects(completeSale(f.request, f.deps))
       assert.equal(f.commits(), 0)
     } else {
       await completeSale(f.request, f.deps)
       assert.equal(f.docs.get('members/' + memberId).checkedIn, true)
+      if (change?.id_expiration === 1) {
+        assert.equal(f.docs.get('members/' + memberId).id_expiration, 1)
+        await completeSale(f.request, f.deps)
+        assert.equal(f.commits(), 1, 'Expired admission retries do not double fulfillment')
+      }
       f.request.data.requestId = '60000000-0000-4000-8000-000000000001'
       f.request.data.lines[0].version = 2
       await assert.rejects(completeSale(f.request, f.deps), /active visit/)
@@ -339,6 +348,16 @@ test('one order creates multiple memberships and repeated rentals for pending/ex
   await assert.rejects(completeSale(f.request, f.deps), /different details/)
   assert.equal(f.commits(), 1)
 })
+test('group checkout permits an expired rental recipient without buying membership time', async () => {
+  const f = groupCheckout()
+  f.docs.get('members/friend').id_expiration = 1
+  const prior = structuredClone(f.docs.get('members/friend'))
+  await completeSale(f.request, f.deps)
+  assert.deepEqual(f.docs.get('members/friend'), { ...prior, checkedIn: true })
+  assert.ok(f.docs.has('system/dev/memberVisits/friend'))
+  await completeSale(f.request, f.deps)
+  assert.equal(f.commits(), 1)
+})
 test('any invalid group recipient, duplicate pending identity, quantity mismatch or assignment invalidates the entire checkout', async () => {
   for (const mutate of [
     (f) => f.request.data.rentals.pop(),
@@ -349,7 +368,7 @@ test('any invalid group recipient, duplicate pending identity, quantity mismatch
     (f) => (f.docs.get('members/friend').access = 'foreign'),
     (f) => (f.docs.get('members/friend').dna = true),
     (f) => (f.docs.get('members/friend').checkedIn = true),
-    (f) => (f.docs.get('members/friend').id_expiration = 1),
+    (f) => (f.docs.get('members/friend').id_expiration = null),
     (f) =>
       (f.request.data.pendingMembers[1].draft.governmentId =
         f.request.data.pendingMembers[0].draft.governmentId),

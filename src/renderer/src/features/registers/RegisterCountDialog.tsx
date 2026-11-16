@@ -17,7 +17,9 @@ export default function RegisterCountDialog({
   client,
   onClose,
   onSaved,
+  introduction,
 }: {
+  introduction?: string
   mode: 'open' | 'close' | 'view'
   record?: RegisterRecord
   client: RegisterClient
@@ -49,6 +51,7 @@ export default function RegisterCountDialog({
   return (
     <dialog
       ref={dialog}
+      data-notification-sound={introduction ? 'register-required' : undefined}
       className="member-dialog register-dialog"
       aria-label={title}
       onCancel={(event) => {
@@ -57,6 +60,7 @@ export default function RegisterCountDialog({
       }}
     >
       <h2>{title}</h2>
+      {introduction && <p>{introduction}</p>}
       {record && (
         <p>
           {displayReference('register', record.id)} · {record.ownerName || record.ownerUid} · Opened{' '}

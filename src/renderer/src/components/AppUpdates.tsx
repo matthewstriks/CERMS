@@ -1,3 +1,4 @@
+import { requestNotificationSound } from '../lib/notification-audio'
 import ReleaseNotesDialog from './ReleaseNotesDialog'
 import { useEffect, useState } from 'react'
 import { Download, RefreshCw, X } from 'lucide-react'
@@ -40,7 +41,11 @@ export default function AppUpdates() {
     return null
   return (
     <>
-      <aside className="app-update-notice" aria-label="Application updates">
+      <aside
+        className="app-update-notice"
+        aria-label="Application updates"
+        data-notification-sound={`update:${state.phase}:${state.version ?? ''}`}
+      >
         <div role="status">
           <strong>{state.phase === 'ready' ? 'Update ready' : 'Application updates'}</strong>
           <p>
@@ -58,6 +63,7 @@ export default function AppUpdates() {
               className="primary"
               disabled={installing}
               onClick={async () => {
+                requestNotificationSound()
                 setInstalling(true)
                 setError('')
                 try {

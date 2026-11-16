@@ -85,3 +85,9 @@ to be checked with its installed driver. Screenshot:
 Firebase deployments or alpha publications were performed for this feature.
 
 Deployed under standing approval. Current rules archive: `firebase/releases/register-managers-2026-09-30.rules`. Evidence: [manager deployment](REGISTER-MANAGERS-DEPLOYMENT.json); legacy configuration and services verified unchanged.
+
+## Opening a register when an order starts
+
+POS checks the signed-in user's own register afresh when an order begins: the first retail/barcode item, a membership selection, or a member-linked order arriving from member creation/check-in. If none is open, it presents the existing denomination-count opening dialog in place. Opening refreshes POS and keeps the complete order draft; canceling keeps the draft and checkout stays disabled until a register is open. The register strip also offers Open register to revisit the prompt. Staff without `openRegisters` see an explanation to ask an administrator for permission; no rights are granted automatically. Empty POS/history views do not prompt, and unresolved sale retries retain their original request/register. Member notes review and membership dialogs resume after the register prompt.
+
+This desktop-only change uses the existing scoped register client and permissions; no backend deployment or production test writes. `node scripts/pos-smoke.mjs --register-prompt` intercepts every HTTPS request and covers first-item detection after a synthetic register close, cancel/draft preservation, opening denomination counts and checkout readiness, member check-in, and pending new memberships.

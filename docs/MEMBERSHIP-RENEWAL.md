@@ -92,3 +92,13 @@ so merely returning to POS does not reopen it. Active members retain the normal
 Create order behavior; Check in eligibility is unchanged. The intercepted renewal
 flow verifies both entry paths, recipient selection, cancellation and assignment.
 No backend deployment or live data changes are required.
+
+## Optional renewal during expired-member check-in
+
+Expired memberships can now Check in from Members. The same renewal picker opens with the expired member selected, and **Continue without renewal** explicitly skips adding membership time. Selecting an expired member or rental recipient through the POS member picker also offers renewal. Skipping keeps the member linked and permits the normal rental checkout; it does not change the recorded expiration or mark the membership active. A deliberate paid membership selection still renews only in the atomic successful checkout.
+
+`completeSale` no longer rejects a rental recipient solely for a past membership expiration. It still requires a recorded valid expiration, same-business access, no DNA restriction and no existing admission/claim, together with all existing checkout/register/permission/note checks. Direct member/activity writes remain blocked. Cancellation and failed payment never admit or renew a member; identical retries cannot duplicate rentals or admission.
+
+Validation: `node --test functions/pos.test.mjs`, `npm test`, desktop build, and the intercepted `node scripts/pos-smoke.mjs --expired-checkin` and `--membership-renewal` flows. Deployment is limited to `functions:cerms-staff:completeSale`; compatibility evidence is recorded in `docs/EXPIRED-CHECKIN-DEPLOYMENT.json`. No rules/index changes, migrations or production test writes are required.
+
+Deployment completed November 16, 2026: only `completeSale` changed and is ACTIVE. Before/after metadata verified the legacy/default database, both database configurations/indexes, all rules releases, every other function/schedule and all existing bucket settings/IAM unchanged. Build, 211 client checks, 21 synthetic server checkout checks and intercepted expired-check-in/renewal flows passed. No production test transactions or existing-account changes.

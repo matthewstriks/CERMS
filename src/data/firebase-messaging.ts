@@ -116,6 +116,74 @@ export function createMessaging(reader: Pick<MembershipReader, 'uid' | 'club'>) 
         }),
     )
   }
+  function listenAllChats(receive: (state: MessagingLive<StaffChat>) => void) {
+    // Keep every stream within the deployed 50-conversation list limit.
+    // Rebind later pages whenever an ordering boundary moves.
+    const pages: {
+      anchor: string
+      docs: QueryDocumentSnapshot[]
+      live: boolean
+      stop: () => void
+    }[] = []
+    let stopped = false
+    const trim = (from: number) => {
+      pages.splice(from).forEach((p) => p.stop())
+    }
+    const emit = () => {
+      if (stopped) return
+      const complete = pages.length && pages.every((p) => p.live) && pages.at(-1)!.docs.length < 50
+      const rows = new Map<string, StaffChat>()
+      if (complete)
+        for (const page of pages)
+          for (const d of page.docs) if (!rows.has(d.id)) rows.set(d.id, chat(d))
+      receive({ rows: [...rows.values()], status: complete ? 'live' : 'reconnecting', more: false })
+    }
+    const watch = (index: number, cursor?: QueryDocumentSnapshot, anchor = '') => {
+      const page = { anchor, docs: [] as QueryDocumentSnapshot[], live: false, stop: () => {} }
+      pages[index] = page
+      page.stop = onSnapshot(
+        query(
+          collection(db, path),
+          where('participantUids', 'array-contains', reader.uid),
+          orderBy('updatedAt', 'desc'),
+          ...(cursor ? [startAfter(cursor)] : []),
+          limit(50),
+        ),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (stopped || pages[index] !== page) return
+          page.live = !snapshot.metadata.fromCache
+          if (page.live) {
+            page.docs = snapshot.docs
+            const last = page.docs.at(-1)
+            if (page.docs.length === 50 && last) {
+              const boundary = JSON.stringify([last.id, last.data().updatedAt])
+              if (pages[index + 1]?.anchor !== boundary) {
+                trim(index + 1)
+                watch(index + 1, last, boundary)
+              }
+            } else trim(index + 1)
+          }
+          emit()
+        },
+        () => {
+          if (stopped) return
+          stopped = true
+          trim(0)
+          receive({
+            rows: [],
+            status: 'error',
+            error: 'Message notifications could not be loaded. Sign in again to reconnect.',
+          })
+        },
+      )
+    }
+    watch(0)
+    return () => {
+      stopped = true
+      trim(0)
+    }
+  }
   return {
     async directory(): Promise<StaffContact[]> {
       const contacts: StaffContact[] = []
@@ -162,7 +230,7 @@ export function createMessaging(reader: Pick<MembershipReader, 'uid' | 'club'>) 
         query,
         before,
       }),
-    subscribeChats(receive: (state: MessagingLive<StaffChat>) => void) {
+    subscribeChats(receive: (state: MessagingLive<StaffChat>) => void, all = false) {
       paged = false
       chatCursor = undefined
       let stopped = false,
@@ -194,21 +262,25 @@ export function createMessaging(reader: Pick<MembershipReader, 'uid' | 'club'>) 
             return
           }
           if (!stopChats)
-            stopChats = listen<StaffChat>(
-              query(
-                collection(db, path),
-                where('participantUids', 'array-contains', reader.uid),
-                orderBy('updatedAt', 'desc'),
-                limit(50),
-              ),
-              (s) => {
-                if (!paged) chatCursor = s.docs.at(-1)
-                return s.docs.map(chat)
-              },
-              (state) => {
-                if (!stopped) receive(state)
-              },
-            )
+            stopChats = all
+              ? listenAllChats((state) => {
+                  if (!stopped) receive(state)
+                })
+              : listen<StaffChat>(
+                  query(
+                    collection(db, path),
+                    where('participantUids', 'array-contains', reader.uid),
+                    orderBy('updatedAt', 'desc'),
+                    limit(50),
+                  ),
+                  (s) => {
+                    if (!paged) chatCursor = s.docs.at(-1)
+                    return s.docs.map(chat)
+                  },
+                  (state) => {
+                    if (!stopped) receive(state)
+                  },
+                )
         },
         fail,
       )
@@ -217,6 +289,97 @@ export function createMessaging(reader: Pick<MembershipReader, 'uid' | 'club'>) 
         stopAuth()
         stopProfile()
         stopChats?.()
+      }
+    },
+    subscribeUnreadCount(receive: (count: number) => void, onIncoming?: () => void) {
+      // Watch every conversation, including those beyond the paginated inbox.
+      // Read watermarks include outgoing messages, so count incoming documents
+      // rather than subtracting sequence numbers.
+      const watches = new Map<
+        string,
+        {
+          sequence: number
+          count: number | null
+          stop: () => void
+        }
+      >()
+      let live = false,
+        bootstrapped = false
+      const knownSequences = new Map<string, number>()
+      const emit = () =>
+        receive(
+          live && [...watches.values()].every((w) => w.count !== null)
+            ? [...watches.values()].reduce((sum, w) => sum + (w.count ?? 0), 0)
+            : 0,
+        )
+      const clear = () => {
+        watches.forEach((w) => w.stop())
+        watches.clear()
+      }
+      const stop = createMessaging(reader).subscribeChats((state) => {
+        live = state.status === 'live'
+        if (!live) {
+          clear()
+          emit()
+          return
+        }
+        for (const c of state.rows) {
+          const known = knownSequences.get(c.id) ?? (bootstrapped ? 0 : c.lastSequence)
+          knownSequences.set(c.id, known)
+          if (
+            bootstrapped &&
+            c.lastSequence > known &&
+            c.lastMessage?.senderUid !== reader.uid &&
+            c.lastMessage
+          ) {
+            knownSequences.set(c.id, c.lastSequence)
+            onIncoming?.()
+          }
+        }
+        bootstrapped = true
+        const ids = new Set(state.rows.map((c) => c.id))
+        for (const [id, w] of watches) {
+          if (!ids.has(id)) {
+            w.stop()
+            watches.delete(id)
+          }
+        }
+        for (const c of state.rows) {
+          const sequence = c.readBy[reader.uid]?.sequence ?? 0
+          const previous = watches.get(c.id)
+          if (previous?.sequence === sequence) continue
+          previous?.stop()
+          watches.delete(c.id)
+          if (sequence >= c.lastSequence) continue
+          const watch = { sequence, count: null as number | null, stop: () => {} }
+          watches.set(c.id, watch)
+          watch.stop = listen<StaffMessage>(
+            query(collection(db, path, c.id, 'messages'), where('sequence', '>', sequence)),
+            (s) => s.docs.map(message),
+            (messages) => {
+              if (watches.get(c.id) !== watch) return
+              if (messages.status === 'live') {
+                const known = knownSequences.get(c.id) ?? c.lastSequence
+                if (messages.rows.some((m) => m.senderUid !== reader.uid && m.sequence > known))
+                  onIncoming?.()
+                knownSequences.set(
+                  c.id,
+                  messages.rows.reduce((highest, m) => Math.max(highest, m.sequence), known),
+                )
+              }
+              watch.count =
+                messages.status === 'live'
+                  ? messages.rows.filter((m) => m.senderUid !== reader.uid).length
+                  : null
+              emit()
+            },
+          )
+        }
+        emit()
+      }, true)
+      return () => {
+        stop()
+        clear()
       }
     },
     async olderChats() {

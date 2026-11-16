@@ -282,7 +282,11 @@ export default function Staff() {
         </button>
       </div>
       <p>Staff accounts for {reader.club}. Your owner account has full access in every business.</p>
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p role="status" data-notification-sound>
+          {notice}
+        </p>
+      )}
       {error && (
         <p role="alert" className="inline-error">
           {error}

@@ -7,7 +7,7 @@ import { membershipProduct, catalogFields } from './fixtures/catalog.mjs'
 // Every HTTPS request is intercepted. These tests never send credentials or records to Firebase.
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
 delete env.ELECTRON_RUN_AS_NODE
-const app = await electron.launch({ args: ['.'], env, timeout: 20000 })
+const app = await electron.launch({ args: ['.', '--mute-audio'], env, timeout: 20000 })
 const requests = [],
   queries = [],
   errors = []

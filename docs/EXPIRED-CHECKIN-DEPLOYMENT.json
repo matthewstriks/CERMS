@@ -1,0 +1,21 @@
+{
+  "verifiedAt": "2026-11-16T17:34:47.418Z",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-16T17:34:24.432158293Z"
+  },
+  "database": "cerms",
+  "onlyFunctionChanged": "completeSale",
+  "allRulesReleasesUnchanged": true,
+  "bothDatabaseConfigurationsAndIndexesUnchanged": true,
+  "allOtherFunctionsAndSchedulesUnchanged": true,
+  "allExistingBucketSettingsAndIamUnchanged": true,
+  "clientChecks": 211,
+  "serverCheckoutChecks": 21,
+  "buildPassed": true,
+  "interceptedExpiredCheckinAndRenewalFlowsPassed": true,
+  "liveTestWrites": false,
+  "sourceSha256": "c2d515d9b45f91feaf687f1c91b708ab2fa9f8a4c38f543a91b0ff905e0027f8",
+  "checkoutDomainSha256": "8183a8d95a33589e6a2b3dd4403ffee483ed17c24a55a057f25cb8dc69388ce4"
+}

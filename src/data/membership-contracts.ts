@@ -1,3 +1,4 @@
+import type { NotificationSoundPreference } from '../shared/notification-sound-policy'
 import type { StaffPermissions } from '../domain/staff-permissions'
 import type { Member } from '../domain/legacy'
 
@@ -36,6 +37,7 @@ export interface MembershipHistory {
 export interface MembershipReader {
   readonly uid: string
   readonly club: string
+  readonly notificationSoundPreference?: NotificationSoundPreference
   readonly themePreference?: 'light' | 'dark'
   readonly staffName: string
   readonly permissions?: StaffPermissions

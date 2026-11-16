@@ -213,6 +213,21 @@ nav {
   background: var(--success-bg, #eaf3ee);
   font-weight: 650;
 }
+.nav-unread-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #c73535;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .active-dot {
   margin-left: auto;
   width: 5px;
@@ -1389,4 +1404,62 @@ button.danger {
 }
 .member-dialog {
   background: var(--surface, white);
+}
+
+.rental-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 180px;
+  max-width: 250px;
+}
+.rental-row-actions button {
+  padding: 7px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.rental-row-actions .rental-renew-action {
+  color: var(--warning-ink, #805c15);
+  background: var(--warning-bg, #fff8e9);
+  border-color: var(--warning-line, #d4ad57);
+}
+
+.notification-sound-settings h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+.notification-sound-settings p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.notification-sound-settings fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.sound-enable {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+}
+.sound-volume {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  font-size: 13px;
+}
+.sound-volume input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--green);
+}
+.sound-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
 }

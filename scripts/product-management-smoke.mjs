@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
 delete env.ELECTRON_RUN_AS_NODE
-const app = await electron.launch({ args: ['.'], env, timeout: 20000 })
+const app = await electron.launch({ args: ['.', '--mute-audio'], env, timeout: 20000 })
 const base = 'projects/cerms-7af24/databases/cerms/documents',
   uid = 'c7D7AH07kgXmjn8tSiOgzHscLZ12',
   club = 'fixture-club',

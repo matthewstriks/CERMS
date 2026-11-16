@@ -1,3 +1,7 @@
+import { requestNotificationSound } from '../lib/notification-audio'
+import RegisterCountDialog from './registers/RegisterCountDialog'
+import RegisterRequiredDialog from './registers/RegisterRequiredDialog'
+import './registers/Registers.css'
 import { createMemberNotes, type MemberNotesState } from '../../../data/firebase-member-notes'
 import MemberNotesReview from './pos/MemberNotesReview'
 import { isPosRequest, posEndpoints } from '../../../shared/pos-policy'
@@ -195,7 +199,56 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
   const [membershipPurchase, setMembershipPurchase] = useState<{
     productId?: string
     renewalPrompt?: boolean
+    memberId?: string
   } | null>(initialDraft.promptMembership === true ? { renewalPrompt: true } : null)
+  const [registerPrompt, setRegisterPrompt] = useState(false)
+  const [checkingRegister, setCheckingRegister] = useState(false)
+  const orderStarted = !!(
+    cart.length ||
+    member ||
+    pendingMembers.length ||
+    membershipPurchase ||
+    addingMembership
+  )
+  useEffect(() => {
+    if (
+      !clients ||
+      historyOnly ||
+      pending ||
+      !orderStarted ||
+      !reader ||
+      !hasStaffPermission(reader.uid, 'processSales', reader.permissions)
+    ) {
+      setCheckingRegister(false)
+      setRegisterPrompt(false)
+      return
+    }
+    let active = true
+    setCheckingRegister(true)
+    void clients.registers
+      .own()
+      .then((current) => {
+        if (!active) return
+        setRegister(current)
+        setRegisterPrompt(!current)
+      })
+      .catch((failure) => {
+        if (active) {
+          setRegister(null)
+          setError(
+            failure instanceof Error
+              ? failure.message
+              : 'Unable to check your register. Refresh POS to retry.',
+          )
+        }
+      })
+      .finally(() => {
+        if (active) setCheckingRegister(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [clients, historyOnly, orderStarted, !!pending])
   const [catalogLoaded, setCatalogLoaded] = useState(false)
   const [pickingMember, setPickingMember] = useState<{ rentalId?: string } | null>(null)
   const orderMembers = [...existingMembers, ...pendingMembers]
@@ -351,7 +404,13 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     else paymentDialog.current?.close()
   }, [paying])
   const totals = cartTotals(cart, settings?.taxRateBps ?? null),
-    locked = busy || !!pending || notesLoading || noteReviews.length > 0
+    locked =
+      busy ||
+      !!pending ||
+      checkingRegister ||
+      registerPrompt ||
+      notesLoading ||
+      noteReviews.length > 0
   const permittedProducts = useMemo(
     () =>
       products.filter(
@@ -674,7 +733,11 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           {error}
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p role="status" data-notification-sound>
+          {notice}
+        </p>
+      )}
       {pending && (
         <section className="panel pos-pending">
           <strong>Confirm the previous sale before continuing</strong>
@@ -720,7 +783,13 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                   </>
                 ) : (
                   <>
-                    Open your register before checkout. <a href="#registers">Go to Registers</a>
+                    Open your register before checkout.{' '}
+                    <button
+                      disabled={busy || checkingRegister || !!pending}
+                      onClick={() => setRegisterPrompt(true)}
+                    >
+                      Open register
+                    </button>
                   </>
                 )}
               </span>
@@ -810,6 +879,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                   <button
                     disabled={locked || (!cart.length && !member)}
                     onClick={() => {
+                      requestNotificationSound()
                       if (window.confirm('Clear this unsaved cart?')) {
                         setCart([])
                         setCustomerName('')
@@ -1338,10 +1408,18 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
       {membershipPurchase && catalogLoaded && !locked && (
         <MembershipPurchaseDialog
           reader={reader}
-          products={permittedProducts.filter((p) => p.data.membership && !p.data.payout)}
+          products={products.filter(
+            (p) =>
+              p.data.active &&
+              p.data.membership &&
+              !p.data.payout &&
+              (!p.data.restricted || p.data.restrictedUsers.includes(reader.uid)),
+          )}
           initialProductId={membershipPurchase.productId}
           renewalPrompt={membershipPurchase.renewalPrompt}
-          initialMember={existingMembers.find((m) => m.id === member?.id)}
+          initialMember={existingMembers.find(
+            (m) => m.id === (membershipPurchase.memberId ?? member?.id),
+          )}
           members={existingMembers}
           assignments={cart.flatMap((l) =>
             (l.memberships ?? []).map((a) => ({ productId: l.product.id, memberId: a.memberId })),
@@ -1355,7 +1433,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           onAssign={assignMembership}
         />
       )}
-      {addingMembership && (
+      {addingMembership && !registerPrompt && !checkingRegister && (
         <CreateMemberDialog
           uid={reader.uid}
           club={reader.club}
@@ -1374,11 +1452,11 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           }}
         />
       )}
-      {pickingMember && (
+      {pickingMember && !registerPrompt && !checkingRegister && (
         <OrderMemberPicker
           reader={reader}
           onClose={() => setPickingMember(null)}
-          onSelect={(m) => {
+          onSelect={(m, expired) => {
             setExistingMembers((rows) => (rows.some((p) => p.id === m.id) ? rows : [...rows, m]))
             if (pickingMember.rentalId) updateRental(pickingMember.rentalId, { memberId: m.id })
             else {
@@ -1386,10 +1464,11 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
               setCustomerName(m.name)
             }
             setPickingMember(null)
+            if (expired) setMembershipPurchase({ renewalPrompt: true, memberId: m.id })
           }}
         />
       )}
-      {noteReviews[0] && (
+      {noteReviews[0] && !registerPrompt && !checkingRegister && (
         <MemberNotesReview
           key={noteReviews[0].memberId}
           state={noteReviews[0]}
@@ -1406,6 +1485,22 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           }}
         />
       )}
+      {registerPrompt &&
+        (hasStaffPermission(reader.uid, 'openRegisters', reader.permissions) ? (
+          <RegisterCountDialog
+            mode="open"
+            client={clients.registers}
+            introduction="You don’t have an active register. Open your register to continue this order. Your order details will be kept."
+            onClose={() => setRegisterPrompt(false)}
+            onSaved={() => {
+              setRegisterPrompt(false)
+              setNotice('Register opened. Continue your order.')
+              void refresh()
+            }}
+          />
+        ) : (
+          <RegisterRequiredDialog onClose={() => setRegisterPrompt(false)} />
+        ))}
       {receipt && <ReceiptDialog receipt={receipt} onClose={() => setReceipt(null)} />}
     </>
   )

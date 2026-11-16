@@ -1,3 +1,4 @@
+import { requestNotificationSound } from './notification-audio'
 import type { CartLine, OrderMember } from '../../../domain/pos'
 import type { MembershipReader } from '../../../data/membership-contracts'
 export interface OrderStart {
@@ -11,11 +12,10 @@ export function startMemberOrder(reader: MembershipReader, order: OrderStart) {
   const draft = JSON.parse(localStorage.getItem(key) || 'null')
   if (draft?.pending)
     throw new Error('Resolve the pending POS order before starting another order.')
-  if (
-    draft?.cart?.length &&
-    !window.confirm('Replace the current unsaved order with this member’s order?')
-  )
-    return false
+  if (draft?.cart?.length) {
+    requestNotificationSound()
+    if (!window.confirm('Replace the current unsaved order with this member’s order?')) return false
+  }
   localStorage.setItem(
     key,
     JSON.stringify({

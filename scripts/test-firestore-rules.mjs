@@ -332,6 +332,58 @@ try {
     patch(owner, { ...fields(owner), themePreference: str('light'), access: str('club-b') }),
     false,
   )
+  const soundFields = (enabled = true, volume = 50) => ({
+    mapValue: {
+      fields: { enabled: { booleanValue: enabled }, volume: { integerValue: String(volume) } },
+    },
+  })
+  await seed('users/' + owner, { ...fields(owner), notificationSoundPreference: soundFields() })
+  await check(
+    'Owner switch retains valid sound preference',
+    ownerPath,
+    patch(owner, {
+      ...fields(owner),
+      notificationSoundPreference: soundFields(),
+      access: str('club-b'),
+    }),
+    true,
+  )
+  await check(
+    'Owner cannot directly mutate sound preference',
+    ownerPath,
+    patch(owner, {
+      ...fields(owner),
+      notificationSoundPreference: soundFields(false),
+      access: str('club-b'),
+    }),
+    false,
+  )
+  await check(
+    'Staff cannot directly add sound preference',
+    userPath,
+    patch('staff', { ...fields('staff'), notificationSoundPreference: soundFields() }),
+    false,
+  )
+  for (const preference of [
+    soundFields(true, -1),
+    soundFields(true, 101),
+    { mapValue: { fields: { enabled: str('yes'), volume: { integerValue: '50' } } } },
+    { mapValue: { fields: { enabled: { booleanValue: true } } } },
+    { mapValue: { fields: { ...soundFields().mapValue.fields, extra: str('no') } } },
+  ]) {
+    await seed('users/' + owner, { ...fields(owner), notificationSoundPreference: preference })
+    await check(
+      'Malformed sound preference cannot pass system-switch validation',
+      ownerPath,
+      patch(owner, {
+        ...fields(owner),
+        notificationSoundPreference: preference,
+        access: str('club-b'),
+      }),
+      false,
+    )
+  }
+
   await seed('users/' + owner, { ...fields(owner), themePreference: str('invalid') })
   await check(
     'Invalid theme cannot pass profile validation',

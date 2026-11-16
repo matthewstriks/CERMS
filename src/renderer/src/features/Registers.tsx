@@ -127,7 +127,11 @@ export default function Registers() {
           older records.
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p role="status" data-notification-sound>
+          {notice}
+        </p>
+      )}
       {error && (
         <p role="alert" className="inline-error">
           {error}

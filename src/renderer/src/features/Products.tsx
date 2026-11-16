@@ -125,7 +125,11 @@ export default function Products() {
           {error}
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p role="status" data-notification-sound>
+          {notice}
+        </p>
+      )}
       {busy && <p role="status">Loading catalog…</p>}
       {loaded && tab === 'products' && (
         <>

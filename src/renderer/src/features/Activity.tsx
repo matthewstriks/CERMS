@@ -4,12 +4,14 @@ import { createCatalog } from '../../../data/firebase-catalog'
 import type { CatalogProduct, CatalogRecord } from '../../../domain/catalog'
 import { startMemberOrder } from '../lib/order-start'
 import { useEffect, useRef, useState } from 'react'
-import { Clock3, Search, X } from 'lucide-react'
+import { Clock3, Search, X, Eye, Pencil, LogOut, RotateCw } from 'lucide-react'
 import { Badge } from '../components/ui'
 import { useMembershipSession } from '../lib/membership-session'
 import RentalAlerts from '../components/RentalAlerts'
 import { rentalTime, rentalUrgency } from '../../../domain/admissions'
 import type { AdmissionRow, AdmissionsState } from '../../../domain/admissions'
+
+type RentalAction = 'view' | 'edit' | 'checkout' | 'renew'
 
 const dateTime = (value: number | null) =>
   value === null ? 'Not recorded' : new Date(value).toLocaleString()
@@ -18,7 +20,7 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
   const [state, setState] = useState<AdmissionsState>({ rows: [], status: 'connecting' })
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<{ id: string; action: RentalAction } | null>(null)
   const [revision, setRevision] = useState(0)
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
@@ -73,8 +75,10 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
           value.toLocaleLowerCase().includes(text),
         )),
   )
-  const detail = state.rows.find((visit) => visit.id === selected)
+  const detail = state.rows.find((visit) => visit.id === selected?.id)
   const live = state.status === 'live'
+  const canManageRentals =
+    !!reader && hasStaffPermission(reader.uid, 'processSales', reader.permissions)
   return (
     <>
       <div className="admissions-status" role="status">
@@ -148,7 +152,7 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
                 <th>Arrival</th>
                 <th>Time remaining</th>
                 <th>Status</th>
-                <th>Details</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -192,12 +196,46 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
                     {visit.waiting && <Badge tone="amber">Waitlist</Badge>}
                   </td>
                   <td>
-                    <button
-                      onClick={() => setSelected(visit.id)}
-                      aria-label={`View visit for ${visit.memberName}`}
+                    <div
+                      className="rental-row-actions"
+                      role="group"
+                      aria-label={`Actions for ${visit.memberName} · ${visit.rental} · ${visit.location}`}
                     >
-                      View
-                    </button>
+                      <button
+                        onClick={() => setSelected({ id: visit.id, action: 'view' })}
+                        aria-label={`View visit for ${visit.memberName}`}
+                      >
+                        <Eye size={14} aria-hidden="true" /> View
+                      </button>
+                      {canManageRentals && visit.rentalEnabled && visit.active && (
+                        <>
+                          <button
+                            disabled={!live}
+                            onClick={() => setSelected({ id: visit.id, action: 'edit' })}
+                            aria-label={`Edit rental for ${visit.memberName} · ${visit.rental} · ${visit.location}`}
+                          >
+                            <Pencil size={14} aria-hidden="true" /> Edit
+                          </button>
+                          <button
+                            disabled={!live || visit.expiresAt === null}
+                            onClick={() => setSelected({ id: visit.id, action: 'checkout' })}
+                            aria-label={`Check out rental for ${visit.memberName} · ${visit.rental} · ${visit.location}`}
+                          >
+                            <LogOut size={14} aria-hidden="true" /> Check out
+                          </button>
+                          {expired(visit) && (
+                            <button
+                              className="rental-renew-action"
+                              disabled={!live}
+                              onClick={() => setSelected({ id: visit.id, action: 'renew' })}
+                              aria-label={`Renew rental for ${visit.memberName} · ${visit.rental} · ${visit.location}`}
+                            >
+                              <RotateCw size={14} aria-hidden="true" /> Renew
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -215,7 +253,14 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
         successful checkout.
       </p>
       {detail && (
-        <VisitDetails key={detail.id} visit={detail} now={now} onClose={() => setSelected(null)} />
+        <VisitDetails
+          key={`${detail.id}:${selected?.action}`}
+          visit={detail}
+          now={now}
+          live={live}
+          initialAction={selected?.action ?? 'view'}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   )
@@ -223,17 +268,23 @@ export default function Activity({ showRentalAlerts = false }: { showRentalAlert
 function VisitDetails({
   visit,
   now,
+  live,
+  initialAction,
   onClose,
 }: {
   visit: AdmissionRow
   now: number
+  live: boolean
+  initialAction: RentalAction
   onClose(): void
 }) {
   const { reader } = useMembershipSession()
   const canEdit =
     !!reader &&
     hasStaffPermission(reader.uid, 'processSales', reader.permissions) &&
-    visit.rentalEnabled
+    visit.rentalEnabled &&
+    visit.active &&
+    live
   const [room, setRoom] = useState(visit.location)
   const [notes, setNotes] = useState(visit.notes)
   const [inside, setInside] = useState(visit.inside)
@@ -242,17 +293,23 @@ function VisitDetails({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
-  const [checkingOut, setCheckingOut] = useState(false)
+  const [checkingOut, setCheckingOut] = useState(
+    initialAction === 'checkout' && visit.expiresAt !== null,
+  )
   const [checkoutTarget, setCheckoutTarget] = useState<{
     revision: number
     expiresAt: number
-  } | null>(null)
+  } | null>(
+    initialAction === 'checkout' && visit.expiresAt !== null
+      ? { revision: visit.editRevision, expiresAt: visit.expiresAt / 1000 }
+      : null,
+  )
   const [rentalCompleted, setRentalCompleted] = useState(false)
   const [itemsReturned, setItemsReturned] = useState(false)
   const [products, setProducts] = useState<CatalogRecord<CatalogProduct>[]>([])
   const [productId, setProductId] = useState('')
   useEffect(() => {
-    if (!reader || !canEdit) return
+    if (!reader || !canEdit || !['view', 'renew'].includes(initialAction)) return
     let active = true
     const catalog = createCatalog(reader)
     void (async () => {
@@ -280,14 +337,14 @@ function VisitDetails({
     return () => {
       active = false
     }
-  }, [reader, canEdit, visit.rental])
+  }, [reader, canEdit, visit.rental, initialAction])
   const dirty =
     room !== visit.location ||
     notes !== visit.notes ||
     inside !== visit.inside ||
     waiting !== visit.waiting
   async function save() {
-    if (!reader || busy) return
+    if (!reader || !canEdit || busy) return
     setBusy(true)
     setError('')
     setSaved('')
@@ -309,7 +366,7 @@ function VisitDetails({
     }
   }
   async function checkOut() {
-    if (!reader || busy || !rentalCompleted || !itemsReturned || !checkoutTarget) return
+    if (!reader || !canEdit || busy || !rentalCompleted || !itemsReturned || !checkoutTarget) return
     setBusy(true)
     setError('')
     try {
@@ -328,7 +385,7 @@ function VisitDetails({
     }
   }
   function renew() {
-    if (!reader) return
+    if (!reader || !canEdit) return
     const product = products.find((p) => p.id === productId)
     if (!product) return
     try {
@@ -359,12 +416,15 @@ function VisitDetails({
   useEffect(() => {
     const node = dialog.current
     node?.showModal()
+    if (initialAction !== 'view')
+      node?.querySelector<HTMLInputElement | HTMLSelectElement>('input, select')?.focus()
     return () => node?.close()
-  }, [])
+  }, [initialAction])
   return (
     <dialog
       ref={dialog}
       className="member-dialog rental-dialog"
+      data-notification-sound={checkingOut ? `rental-checkout:${visit.id}` : undefined}
       aria-labelledby="visit-title"
       onCancel={(event) => {
         if (busy) event.preventDefault()
@@ -399,144 +459,163 @@ function VisitDetails({
           </div>
         ))}
       </dl>
+      {!live && (
+        <p role="status">
+          Rental updates are reconnecting. Wait for live updates before making changes.
+        </p>
+      )}
       {canEdit ? (
         <>
-          <fieldset disabled={busy || checkingOut}>
-            <legend>Edit active rental</legend>
-            <label>
-              Assigned Room/Number
-              <input
-                value={room}
-                maxLength={120}
-                onChange={(e) => {
-                  setRoom(e.target.value)
-                  setSaved('')
-                }}
-              />
-            </label>
-            <label>
-              Visit notes
-              <textarea
-                aria-label="Visit notes"
-                value={notes}
-                maxLength={1000}
-                onChange={(e) => {
-                  setNotes(e.target.value)
-                  setSaved('')
-                }}
-              />
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={inside}
-                onChange={(e) => {
-                  setInside(e.target.checked)
-                  setSaved('')
-                }}
-              />{' '}
-              Inside (off = outside)
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={waiting}
-                onChange={(e) => {
-                  setWaiting(e.target.checked)
-                  setSaved('')
-                }}
-              />{' '}
-              On waitlist
-            </label>
-            <button className="primary" disabled={!room.trim()} onClick={() => void save()}>
-              Save rental changes
-            </button>
-          </fieldset>
-          <fieldset disabled={busy || checkingOut}>
-            <legend>Renew rental</legend>
-            <label>
-              Rental product
-              <select
-                aria-label="Rental product"
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-              >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.data.name} · {p.data.rentalLengthRaw} {p.data.rentalLengthType} · $
-                    {(p.data.priceCents / 100).toFixed(2)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>
-              Time is added only after successful checkout. Active rentals keep their remaining
-              time; overdue rentals restart from checkout time.
-            </p>
-            {dirty && <p>Save your changes or reopen the visit before renewing.</p>}
-            <button disabled={!productId || dirty} onClick={renew}>
-              Renew in order
-            </button>
-          </fieldset>
-          <fieldset disabled={busy}>
-            <legend>Check out rental</legend>
-            {checkingOut ? (
-              <>
-                <p>
-                  Complete {visit.rental} · {visit.location} for {visit.memberName}? This ends this
-                  rental. The member stays checked in while other rentals are active.
-                </p>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={rentalCompleted}
-                    onChange={(e) => setRentalCompleted(e.target.checked)}
-                  />{' '}
-                  The rental is completed
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={itemsReturned}
-                    onChange={(e) => setItemsReturned(e.target.checked)}
-                  />{' '}
-                  All required items have been returned
-                </label>
-                <button
-                  onClick={() => {
-                    setCheckingOut(false)
-                    setRentalCompleted(false)
-                    setItemsReturned(false)
-                  }}
-                >
-                  Cancel checkout
-                </button>
-                <button
-                  className="primary"
-                  disabled={!rentalCompleted || !itemsReturned}
-                  onClick={() => void checkOut()}
-                >
-                  {busy ? 'Checking out…' : 'Confirm rental checkout'}
-                </button>
-              </>
-            ) : (
-              <>
-                {dirty && <p>Save your changes or reopen the visit before checking out.</p>}
-                <button
-                  disabled={dirty || visit.expiresAt === null}
-                  onClick={() => {
-                    setCheckoutTarget({ revision, expiresAt: visit.expiresAt! / 1000 })
-                    setCheckingOut(true)
-                    setError('')
+          {(initialAction === 'view' || initialAction === 'edit') && (
+            <fieldset disabled={busy || checkingOut}>
+              <legend>Edit active rental</legend>
+              <label>
+                Assigned Room/Number
+                <input
+                  value={room}
+                  maxLength={120}
+                  onChange={(e) => {
+                    setRoom(e.target.value)
                     setSaved('')
                   }}
+                />
+              </label>
+              <label>
+                Visit notes
+                <textarea
+                  aria-label="Visit notes"
+                  value={notes}
+                  maxLength={1000}
+                  onChange={(e) => {
+                    setNotes(e.target.value)
+                    setSaved('')
+                  }}
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={inside}
+                  onChange={(e) => {
+                    setInside(e.target.checked)
+                    setSaved('')
+                  }}
+                />{' '}
+                Inside (off = outside)
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={waiting}
+                  onChange={(e) => {
+                    setWaiting(e.target.checked)
+                    setSaved('')
+                  }}
+                />{' '}
+                On waitlist
+              </label>
+              <button className="primary" disabled={!room.trim()} onClick={() => void save()}>
+                Save rental changes
+              </button>
+            </fieldset>
+          )}
+          {(initialAction === 'view' || initialAction === 'renew') && (
+            <fieldset disabled={busy || checkingOut}>
+              <legend>Renew rental</legend>
+              <label>
+                Rental product
+                <select
+                  aria-label="Rental product"
+                  value={productId}
+                  onChange={(e) => setProductId(e.target.value)}
                 >
-                  Check out rental
-                </button>
-              </>
-            )}
-          </fieldset>
-          {saved && <p role="status">{saved}</p>}
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.data.name} · {p.data.rentalLengthRaw} {p.data.rentalLengthType} · $
+                      {(p.data.priceCents / 100).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p>
+                Time is added only after successful checkout. Active rentals keep their remaining
+                time; overdue rentals restart from checkout time.
+              </p>
+              {dirty && <p>Save your changes or reopen the visit before renewing.</p>}
+              <button disabled={!productId || dirty} onClick={renew}>
+                Renew in order
+              </button>
+            </fieldset>
+          )}
+          {(initialAction === 'view' || initialAction === 'checkout') && (
+            <fieldset disabled={busy}>
+              <legend>Check out rental</legend>
+              {checkingOut ? (
+                <>
+                  <p>
+                    Complete {visit.rental} · {visit.location} for {visit.memberName}? This ends
+                    this rental. The member stays checked in while other rentals are active.
+                  </p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={rentalCompleted}
+                      onChange={(e) => setRentalCompleted(e.target.checked)}
+                    />{' '}
+                    The rental is completed
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={itemsReturned}
+                      onChange={(e) => setItemsReturned(e.target.checked)}
+                    />{' '}
+                    All required items have been returned
+                  </label>
+                  <button
+                    onClick={() => {
+                      if (initialAction === 'checkout') {
+                        onClose()
+                        return
+                      }
+                      setCheckingOut(false)
+                      setRentalCompleted(false)
+                      setItemsReturned(false)
+                    }}
+                  >
+                    Cancel checkout
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={!rentalCompleted || !itemsReturned}
+                    onClick={() => void checkOut()}
+                  >
+                    {busy ? 'Checking out…' : 'Confirm rental checkout'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  {dirty && <p>Save your changes or reopen the visit before checking out.</p>}
+                  <button
+                    disabled={dirty || visit.expiresAt === null}
+                    onClick={() => {
+                      setCheckoutTarget({ revision, expiresAt: visit.expiresAt! / 1000 })
+                      setCheckingOut(true)
+                      setError('')
+                      setSaved('')
+                    }}
+                  >
+                    Check out rental
+                  </button>
+                </>
+              )}
+            </fieldset>
+          )}
+          {saved && (
+            <p role="status" data-notification-sound>
+              {saved}
+            </p>
+          )}
           {error && (
             <p className="inline-error" role="alert">
               {error}

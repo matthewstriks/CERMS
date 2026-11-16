@@ -103,13 +103,8 @@ export const modules = [
     label: 'Reports & analytics',
     icon: ChartNoAxesCombined,
     group: 'Insights',
-    description: 'Understand sales, attendance, and shift performance.',
-    features: [
-      'Date-range membership, attendance, and sales analysis',
-      'Excel reports and daily summaries',
-      'Scheduled daily report delivery',
-      'QuickBooks accounting integration',
-    ],
+    description: 'Sales trends, membership health, rental demand, and register reconciliation.',
+    features: [],
   },
   {
     id: 'messages',

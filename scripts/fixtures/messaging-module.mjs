@@ -21,6 +21,33 @@ export function createMessaging(reader) {
   }
   let chatOffset = 50
   return {
+    subscribeUnreadCount(receive, onIncoming) {
+      let bootstrapped = false
+      const known = new Map()
+      const emit = () => {
+        for (const c of state().chats) {
+          const previous = known.get(c.id) ?? (bootstrapped ? 0 : c.lastSequence)
+          if (bootstrapped && c.lastSequence > previous && c.lastMessage?.senderUid !== reader.uid)
+            onIncoming?.()
+          known.set(c.id, c.lastSequence)
+        }
+        bootstrapped = true
+        receive(
+          state().chats.reduce(
+            (total, c) =>
+              total +
+              (state().messages[c.id] ?? []).filter(
+                (m) =>
+                  m.sequence > (c.readBy[reader.uid]?.sequence ?? 0) && m.senderUid !== reader.uid,
+              ).length,
+            0,
+          ),
+        )
+      }
+      window.addEventListener('messaging-fixture', emit)
+      queueMicrotask(emit)
+      return () => window.removeEventListener('messaging-fixture', emit)
+    },
     async directory() {
       const all = []
       let cursor = null

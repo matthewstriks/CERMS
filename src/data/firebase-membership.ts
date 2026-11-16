@@ -1,3 +1,7 @@
+import {
+  validNotificationSoundPreference,
+  defaultNotificationSoundPreference,
+} from '../shared/notification-sound-policy'
 import publicClientConfig from '../../config/firebase-client.json'
 import { readStaffPermissions } from './firebase-staff-permissions'
 import { noStaffPermissions } from '../domain/staff-permissions'
@@ -141,6 +145,11 @@ export async function loadMembershipSession(): Promise<MembershipReader> {
     uid,
     club: access,
     permissions,
+    notificationSoundPreference: validNotificationSoundPreference(
+      fields.notificationSoundPreference,
+    )
+      ? { ...fields.notificationSoundPreference }
+      : { ...defaultNotificationSoundPreference },
     themePreference: fields.themePreference === 'dark' ? 'dark' : 'light',
     staffName: typeof fields.displayName === 'string' ? fields.displayName : 'CERMS staff',
     close() {

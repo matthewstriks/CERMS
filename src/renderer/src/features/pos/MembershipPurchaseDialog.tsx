@@ -143,6 +143,9 @@ export default function MembershipPurchaseDialog({
       <dialog
         ref={dialog}
         className="member-dialog membership-purchase-dialog"
+        data-notification-sound={
+          renewalPrompt ? `expired-membership:${initialMember?.id ?? ''}` : undefined
+        }
         aria-label="Add membership to order"
         onCancel={(event) => {
           event.preventDefault()
@@ -155,7 +158,7 @@ export default function MembershipPurchaseDialog({
             <h2>{renewalPrompt ? 'Renew expired membership' : 'Add membership to order'}</h2>
             <p>
               {renewalPrompt
-                ? `${initialMember?.name ?? 'This member'}’s membership has expired. Choose a plan to add to their order.`
+                ? `${initialMember?.name ?? 'This member'}’s membership has expired. Add a renewal to their order, or continue without renewing.`
                 : 'Choose a plan, then assign its time to a member.'}
             </p>
           </div>
@@ -354,7 +357,7 @@ export default function MembershipPurchaseDialog({
         )}
         <div className="dialog-actions">
           <button type="button" onClick={onClose}>
-            Cancel
+            {renewalPrompt ? 'Continue without renewal' : 'Cancel'}
           </button>
           <button
             type="button"

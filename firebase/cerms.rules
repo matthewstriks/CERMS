@@ -68,9 +68,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
     function validUser(data, uid) {
-      return data.keys().hasOnly(['uid', 'displayName', 'email', 'access', 'rank', 'version', 'themePreference'])
+      return data.keys().hasOnly(['uid', 'displayName', 'email', 'access', 'rank', 'version', 'themePreference', 'notificationSoundPreference'])
         && data.keys().hasAll(['uid', 'displayName', 'access', 'rank'])
         && (!('themePreference' in data) || data.themePreference in ['light', 'dark'])
+        && (!('notificationSoundPreference' in data) || (
+          data.notificationSoundPreference is map
+          && data.notificationSoundPreference.keys().hasOnly(['enabled','volume'])
+          && data.notificationSoundPreference.keys().hasAll(['enabled','volume'])
+          && data.notificationSoundPreference.enabled is bool
+          && data.notificationSoundPreference.volume is int
+          && data.notificationSoundPreference.volume >= 0 && data.notificationSoundPreference.volume <= 100))
         && data.uid == uid && data.uid is string && data.uid.size() <= 128
         && data.displayName is string && data.displayName.size() <= 256
         && validSystemId(data.access)

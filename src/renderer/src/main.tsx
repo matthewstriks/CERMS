@@ -1,3 +1,4 @@
+import { NotificationSoundProvider } from './lib/notification-sounds'
 import AppUpdates from './components/AppUpdates'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -10,8 +11,10 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <MembershipSessionProvider>
-        <AuthGate />
-        <AppUpdates />
+        <NotificationSoundProvider>
+          <AuthGate />
+          <AppUpdates />
+        </NotificationSoundProvider>
       </MembershipSessionProvider>
     </ErrorBoundary>
   </StrictMode>,

@@ -18,6 +18,7 @@ export default function MemberNotesReview({
   }, [])
   return (
     <dialog
+      data-notification-sound="required-member-notes"
       ref={dialog}
       className="member-dialog member-notes-review"
       aria-label="Read member notes"

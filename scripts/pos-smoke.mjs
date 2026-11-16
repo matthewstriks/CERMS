@@ -1,3 +1,4 @@
+import { seedReports, reportQuery } from './fixtures/reports.mjs'
 import { memberNotes } from '../functions/member-notes.mjs'
 import { saveThemePreference } from '../functions/theme.mjs'
 import { _electron as electron, expect } from 'playwright/test'
@@ -9,6 +10,10 @@ import { completeSale, savePosSettings, updateRental, checkOutRental } from '../
 import { posFixture, owner as uid, registerId } from './fixtures/pos-server.mjs'
 import { membershipProduct } from './fixtures/catalog.mjs'
 import { emptyCounts } from './fixtures/registers.mjs'
+const reportsSmoke = process.argv.includes('--reports')
+let denyReportSales = false
+const expiredCheckinSmoke = process.argv.includes('--expired-checkin')
+const registerPromptSmoke = process.argv.includes('--register-prompt')
 const notesSmoke = process.argv.includes('--notes')
 const themeSmoke = process.argv.includes('--theme')
 let failThemeNext = false
@@ -16,7 +21,12 @@ const catalogSmoke = process.argv.includes('--catalog')
 const groupSmoke = process.argv.includes('--group')
 const renewalSmoke = process.argv.includes('--membership-renewal')
 const membershipSmoke =
-  process.argv.includes('--members') || groupSmoke || renewalSmoke || notesSmoke
+  process.argv.includes('--members') ||
+  groupSmoke ||
+  renewalSmoke ||
+  notesSmoke ||
+  registerPromptSmoke ||
+  expiredCheckinSmoke
 const club = membershipSmoke ? 'dev' : 'club-a'
 const fixture = posFixture(),
   docs = fixture.docs,
@@ -50,7 +60,7 @@ if (membershipSmoke) {
     inventory: null,
   })
 }
-if (groupSmoke || renewalSmoke || notesSmoke) {
+if (groupSmoke || renewalSmoke || notesSmoke || registerPromptSmoke || expiredCheckinSmoke) {
   for (const [id, name, number] of [
     ['buyer', 'Alex Buyer', 101],
     ['friend', 'Casey Friend', 102],
@@ -104,6 +114,7 @@ Object.assign(docs.get(`system/${club}/registers/${registerId}`), {
   closedAt: null,
   closeNote: '',
 })
+if (reportsSmoke) await seedReports({ fixture, uid, club, registerId })
 const imageReads = new Map()
 let catalogImage
 if (catalogSmoke) {
@@ -170,7 +181,7 @@ async function expandCategories(page) {
 }
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
 delete env.ELECTRON_RUN_AS_NODE
-const app = await electron.launch({ args: ['.'], env, timeout: 20000 }),
+const app = await electron.launch({ args: ['.', '--mute-audio'], env, timeout: 20000 }),
   errors = []
 let originalDraft
 let saleCalls = 0,
@@ -184,6 +195,15 @@ try {
     .context()
     .route('cerms://app/assets/firebase-admissions-*.js', (r) =>
       r.fulfill({ contentType: 'text/javascript', body: admissions }),
+    )
+  const messaging = await readFile(
+    new URL('./fixtures/messaging-module.mjs', import.meta.url),
+    'utf8',
+  )
+  await app
+    .context()
+    .route('cerms://app/assets/firebase-messaging-*.js', (r) =>
+      r.fulfill({ contentType: 'text/javascript', body: messaging }),
     )
   await app.context().route('https://**/*', async (route) => {
     const request = route.request(),
@@ -309,6 +329,32 @@ try {
         )
       if (url.pathname.endsWith(':runQuery')) {
         const collection = body.structuredQuery.from[0].collectionId
+        if (reportsSmoke) {
+          if (denyReportSales && collection === 'sales')
+            return route.fulfill({
+              status: 403,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                error: {
+                  code: 403,
+                  status: 'PERMISSION_DENIED',
+                  message: 'Synthetic report access unavailable',
+                },
+              }),
+            })
+          if (['sales', 'registers', 'members', 'activity'].includes(collection))
+            assert.ok(body.structuredQuery.limit <= 50, `Bounded ${collection} queries`)
+          const suffix = url.pathname
+            .slice(('/v1/' + base).length)
+            .replace(/:runQuery$/, '')
+            .replace(/^\//, '')
+          return respond(
+            reportQuery(docs, body, base, suffix ? suffix + '/' : '').map((p) => ({
+              document: document(p),
+            })),
+          )
+        }
+
         return respond(
           [...docs.keys()]
             .filter((p) =>
@@ -320,10 +366,13 @@ try {
         )
       }
       if (url.pathname.endsWith(':commit')) {
+        assert.ok(!reportsSmoke, 'Reports must never write Firestore documents')
         for (const w of body.writes) {
           const p = w.update.name.slice(base.length + 1)
           assert.ok(
-            p.startsWith(`system/${club}/registers/`) || p.startsWith(`system/${club}/memberLogs/`),
+            p.startsWith(`system/${club}/registers/`) ||
+              p.startsWith(`system/${club}/registerOwners/`) ||
+              p.startsWith(`system/${club}/memberLogs/`),
           )
           if (!docs.has(p)) docs.set(p, {})
           for (const [k, v] of Object.entries(w.update.fields)) {
@@ -404,7 +453,225 @@ try {
     item.click()
   })
   await expect(page.getByText('Your register is open')).toBeVisible()
-  if (notesSmoke) {
+  if (reportsSmoke) {
+    await page.getByRole('link', { name: 'Reports & analytics', exact: true }).click()
+    const reportView = page.getByRole('group', { name: 'Report views', exact: true })
+    await expect(reportView).toBeVisible()
+    const metric = (label) =>
+      page.locator('.report-metric').filter({ has: page.locator('span', { hasText: label }) })
+    await expect(metric('Net sales before tax').locator('strong')).toHaveText('$1,038.00')
+    await expect(metric('Completed transactions').locator('strong')).toHaveText('53')
+    await expect(
+      page.getByRole('img', { name: 'Daily net sales before tax', exact: true }),
+    ).toBeVisible()
+    await reportView.getByRole('button', { name: 'Sales & payments', exact: true }).click()
+    const receipts = page.getByRole('table', { name: 'Receipt detail', exact: true })
+    await expect(receipts.getByRole('row')).toHaveCount(16)
+    await page
+      .getByRole('group', { name: 'Receipt detail pages', exact: true })
+      .getByRole('button', { name: 'Next', exact: true })
+      .click()
+    await expect(receipts.getByRole('row')).toHaveCount(16)
+    await receipts
+      .getByRole('button', { name: /View receipt/ })
+      .first()
+      .click()
+    await expect(page.getByRole('dialog', { name: 'Sale receipt', exact: true })).toBeVisible()
+    await page
+      .getByRole('dialog', { name: 'Sale receipt', exact: true })
+      .getByRole('button', { name: 'Done', exact: true })
+      .click()
+    await page.getByLabel('Report to export', { exact: true }).selectOption('receipts')
+    const exportPath = '/private/tmp/cerms-report-smoke.csv'
+    await app.evaluate(({ session }, path) => {
+      globalThis.reportCsvState = 'waiting'
+      session.defaultSession.once('will-download', (_event, item) => {
+        item.setSavePath(path)
+        item.once('done', (_event, state) => {
+          globalThis.reportCsvState = state
+        })
+      })
+    }, exportPath)
+    await page.getByRole('button', { name: 'Export CSV', exact: true }).click()
+    await expect.poll(() => app.evaluate(() => globalThis.reportCsvState)).toBe('completed')
+    const csv = await readFile(exportPath, 'utf8')
+    assert.equal(
+      csv.trim().split('\r\n').length,
+      54,
+      'Every selected receipt is exported, beyond the first 50',
+    )
+    assert.ok(csv.includes("'=Saved Staff"), 'Spreadsheet formulas escaped')
+    assert.ok(!csv.includes('PRIVATE-GOVERNMENT-ID'))
+    await reportView.getByRole('button', { name: 'Memberships', exact: true }).click()
+    await expect(metric('Active memberships now').locator('strong')).toHaveText('1')
+    await expect(
+      page.getByRole('table', { name: 'Memberships expiring in 30 days', exact: true }),
+    ).toContainText('Upcoming Member')
+    await expect(page.locator('.report-view')).not.toContainText('Foreign Member')
+    await reportView.getByRole('button', { name: 'Rental activity', exact: true }).click()
+    await expect(metric('Rental starts').locator('strong')).toHaveText('2')
+    await expect(metric('Unique visiting members').locator('strong')).toHaveText('1')
+    await reportView.getByRole('button', { name: 'Register closeouts', exact: true }).click()
+    await expect(metric('Registers closed').locator('strong')).toHaveText('1')
+    await expect(metric('Net cash over / short').locator('strong')).toHaveText('$1.00')
+    await mkdir('artifacts', { recursive: true })
+    await page.screenshot({ path: 'artifacts/reports-registers.png', fullPage: true })
+    await reportView.getByRole('button', { name: 'Overview', exact: true }).click()
+    await page.screenshot({ path: 'artifacts/reports-overview-light.png', fullPage: true })
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'dark'
+    })
+    await page.screenshot({ path: 'artifacts/reports-overview-dark.png', fullPage: true })
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]
+      window.unmaximize()
+      window.setSize(1100, 800)
+    })
+    await expect.poll(() => page.evaluate(() => innerWidth)).toBeLessThanOrEqual(1100)
+    await reportView.getByRole('button', { name: 'Register closeouts', exact: true }).click()
+    assert.ok(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+      'Narrow report tables scroll within their panel',
+    )
+    await page.screenshot({ path: 'artifacts/reports-registers-narrow-dark.png', fullPage: true })
+    await reportView.getByRole('button', { name: 'Memberships', exact: true }).click()
+    await page.screenshot({ path: 'artifacts/reports-memberships-narrow-dark.png', fullPage: true })
+    await reportView.getByRole('button', { name: 'Overview', exact: true }).click()
+    // Financial failures remain explicit; current membership data is still usable.
+    denyReportSales = true
+    await page.getByRole('button', { name: 'Refresh reports', exact: true }).click()
+    await expect(
+      page.getByRole('heading', { name: 'Sales report unavailable', exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.getByLabel('Report to export').locator('option[value="receipts"]'),
+    ).toHaveCount(0)
+    await reportView.getByRole('button', { name: 'Memberships', exact: true }).click()
+    await expect(metric('Active memberships now').locator('strong')).toHaveText('1')
+    denyReportSales = false
+    await page.getByLabel('Report start date', { exact: true }).fill('2000-01-01')
+    await page.getByLabel('Report end date', { exact: true }).fill('2000-01-02')
+    await page.getByRole('button', { name: 'Apply dates', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Refresh reports', exact: true })).toBeEnabled()
+    await reportView.getByRole('button', { name: 'Overview', exact: true }).click()
+    await expect(metric('Completed transactions').locator('strong')).toHaveText('0')
+    await expect(metric('Net sales before tax').locator('strong')).toHaveText('$0.00')
+    assert.equal(saleCalls, 0)
+    assert.deepEqual(errors, [])
+    console.log(
+      'Reports passed: complete scoped pagination, comparison and payout totals, all five views, receipts, complete safe CSV, current snapshots, empty ranges, per-source failures and light/dark layouts. All HTTPS intercepted; no production writes or print jobs.',
+    )
+  } else if (expiredCheckinSmoke) {
+    const expired = Math.floor(Date.now() / 1000) - 86400
+    docs.get('members/buyer').id_expiration = expired
+    const before = structuredClone(docs.get('members/buyer'))
+    // Selecting an expired member directly in POS also offers optional renewal.
+    await page.getByRole('button', { name: 'Find existing member', exact: true }).click()
+    await page
+      .getByRole('dialog', { name: 'Choose existing member' })
+      .getByRole('button', { name: /Alex Buyer/ })
+      .click()
+    const renewal = page.getByRole('dialog', { name: 'Add membership to order', exact: true })
+    await expect(renewal.getByRole('heading', { name: 'Renew expired membership' })).toBeVisible()
+    await expect(renewal.getByLabel('Membership product')).toHaveValue('plan')
+    await renewal.getByRole('button', { name: 'Continue without renewal', exact: true }).click()
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: 'Clear', exact: true }).click()
+    await page.getByRole('link', { name: 'Members', exact: true }).click()
+    const row = page.getByRole('row').filter({ hasText: 'Alex Buyer' })
+    await expect(row).toContainText('Expired')
+    await expect(row.getByRole('button', { name: 'Check in', exact: true })).toBeEnabled()
+    await row.getByRole('button', { name: 'Check in', exact: true }).click()
+    await expect(renewal.getByRole('heading', { name: 'Renew expired membership' })).toBeVisible()
+    await expect(renewal.getByLabel('Membership product')).toHaveValue('plan')
+    await renewal.getByRole('button', { name: 'Continue without renewal', exact: true }).click()
+    await expandCategories(page)
+    await page.locator('.pos-product').filter({ hasText: 'Room rental' }).click()
+    await page.getByLabel('Assigned Room/Number for Room rental', { exact: true }).fill('EX-1')
+    await page.getByRole('button', { name: 'Continue to order', exact: true }).click()
+    await expect(page.locator('.pos-cart')).not.toContainText('Monthly plan')
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    const payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByRole('button', { name: 'Back to cart' }).click()
+    assert.deepEqual(docs.get('members/buyer'), before)
+    assert.equal(fixture.commits(), 0)
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    await payment.getByLabel('Payment amount 1').dblclick()
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    await payment.getByRole('button', { name: 'Retry same sale', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: 'Sale receipt', exact: true })).toBeVisible()
+    assert.deepEqual(docs.get('members/buyer'), { ...before, checkedIn: true })
+    assert.equal(fixture.commits(), 1)
+    assert.equal([...docs.keys()].filter((p) => p.startsWith('activity/')).length, 1)
+    assert.ok(docs.has(`system/${club}/memberVisits/buyer`))
+    assert.deepEqual(errors, [])
+    console.log(
+      'Expired check-in passed: table and POS entry, optional renewal prompt/skip, rental checkout without renewal, canceled payment preserves member, atomic admission, lost-response retry and unchanged membership expiry. All HTTPS intercepted.',
+    )
+  } else if (registerPromptSmoke) {
+    const prompt = page.getByRole('dialog', { name: 'Open register', exact: true })
+    await expect(prompt).toHaveCount(0)
+    const closeSyntheticRegister = () => {
+      const id = docs.get(`system/${club}/registerOwners/${uid}`).registerId
+      Object.assign(docs.get(`system/${club}/registers/${id}`), {
+        status: 'closed',
+        closingCounts: emptyCounts(),
+        closingTotalCents: 0,
+        closedAt: { timestampValue: time },
+      })
+    }
+    closeSyntheticRegister()
+    await expandCategories(page)
+    await page.locator('.pos-product').filter({ hasText: 'Test retail' }).click()
+    await expect(prompt).toBeVisible()
+    await prompt.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.locator('.pos-cart')).toContainText('Test retail')
+    await expect(page.getByRole('button', { name: 'Take payment', exact: true })).toBeDisabled()
+    await page.getByRole('button', { name: 'Open register', exact: true }).click()
+    await expect(prompt).toBeVisible()
+    await prompt.getByLabel('$20 bills', { exact: true }).fill('3')
+    await prompt.getByRole('button', { name: 'Open register', exact: true }).click()
+    await expect(prompt).toHaveCount(0)
+    await expect(page.getByText('Your register is open')).toBeVisible()
+    const openedId = docs.get(`system/${club}/registerOwners/${uid}`).registerId
+    assert.equal(docs.get(`system/${club}/registers/${openedId}`).openingTotalCents, 6000)
+    await expect(page.getByRole('button', { name: 'Take payment', exact: true })).toBeEnabled()
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: 'Clear', exact: true }).click()
+    closeSyntheticRegister()
+    // Existing-member check-in must prompt before selecting a rental.
+    await page.getByRole('link', { name: 'Members', exact: true }).click()
+    let row = page.getByRole('row').filter({ hasText: 'Alex Buyer' })
+    await row.getByRole('button', { name: 'Check in', exact: true }).click()
+    await expect(prompt).toBeVisible()
+    await prompt.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByLabel('Order linked to', { exact: true })).toContainText('Alex Buyer')
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: 'Clear', exact: true }).click()
+    // New-member details survive the prompt and remain unfulfilled.
+    await page.getByRole('link', { name: 'Members', exact: true }).click()
+    await page.getByRole('button', { name: 'Create membership', exact: true }).click()
+    const form = page.getByRole('dialog')
+    await form.getByLabel('First name', { exact: true }).fill('Synthetic')
+    await form.getByLabel('Last name', { exact: true }).fill('Register Guest')
+    await form.getByLabel('Date of birth', { exact: true }).fill('1990-01-02')
+    await form.getByLabel('ID state or type', { exact: true }).selectOption('TX')
+    await form.getByLabel('ID number', { exact: true }).fill('FAKE-REGISTER-PROMPT')
+    await form.getByLabel('Type of membership', { exact: true }).selectOption('plan')
+    await form.getByRole('button', { name: 'Continue to checkout' }).click()
+    await expect(prompt).toBeVisible()
+    await prompt.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.locator('.pos-cart')).toContainText('Monthly plan')
+    await expect(page.getByLabel('Order linked to', { exact: true })).toContainText(
+      'Synthetic Register Guest',
+    )
+    assert.equal([...docs.keys()].filter((p) => p.startsWith('members/')).length, 2)
+    assert.equal(saleCalls, 0)
+    assert.deepEqual(errors, [])
+    console.log(
+      'Order register prompt passed: empty POS stays quiet, fresh own-register check, retail/member check-in/new membership prompts, cancel preserves drafts, denomination opening and checkout readiness. All HTTPS intercepted.',
+    )
+  } else if (notesSmoke) {
     await page.getByRole('link', { name: 'Members', exact: true }).click()
     await page.getByRole('button', { name: 'View Alex Buyer', exact: true }).click()
     const details = page.getByRole('dialog', { name: 'Alex Buyer', exact: true })
@@ -689,7 +956,7 @@ try {
     )
     await expect(automatic.getByRole('combobox', { name: 'Membership recipient' })).toBeDisabled()
     await expect(automatic.getByLabel('Membership product')).toHaveValue('plan')
-    await automatic.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await automatic.getByRole('button', { name: 'Continue without renewal', exact: true }).click()
     assert.equal(docs.get('members/buyer').id_expiration, expired)
     assert.equal(fixture.commits(), 2)
     await page.getByRole('link', { name: 'Registers', exact: true }).click()
@@ -903,6 +1170,36 @@ try {
       await expect(page.getByRole('row').filter({ hasText: savedMember.name })).toContainText(
         'Room rental · A-12',
       )
+      const rentalRow = page.getByRole('row').filter({ hasText: savedMember.name })
+      const publishRental = (row, status = 'live') =>
+        page.evaluate(
+          ({ row, status }) =>
+            window.dispatchEvent(
+              new CustomEvent('admissions-fixture', { detail: { rows: [row], status } }),
+            ),
+          { row, status },
+        )
+      await publishRental({ ...admission, expiresAt: Date.now() + 3600000 })
+      await expect(rentalRow.getByRole('button', { name: /^Edit rental for/ })).toBeEnabled()
+      await expect(rentalRow.getByRole('button', { name: /^Check out rental for/ })).toBeEnabled()
+      await expect(rentalRow.getByRole('button', { name: /^Renew rental for/ })).toHaveCount(0)
+      await publishRental(admission, 'reconnecting')
+      await expect(rentalRow.getByRole('button', { name: /^Edit rental for/ })).toBeDisabled()
+      await expect(rentalRow.getByRole('button', { name: /^Check out rental for/ })).toBeDisabled()
+      await publishRental({ ...admission, rentalEnabled: false })
+      await expect(rentalRow.getByRole('button', { name: /^Edit rental for/ })).toHaveCount(0)
+      await expect(rentalRow.getByRole('button', { name: /^Check out rental for/ })).toHaveCount(0)
+      await publishRental({ ...admission, expiresAt: Date.now() - 5000 })
+      await expect(rentalRow.getByRole('button', { name: /^Renew rental for/ })).toBeVisible()
+      await mkdir('artifacts', { recursive: true })
+      await page.screenshot({ path: `artifacts/rental-row-actions-${hash}.png` })
+      await rentalRow.getByRole('button', { name: /^Renew rental for/ }).click()
+      const renewal = page.getByRole('dialog', { name: savedMember.name, exact: true })
+      await expect(renewal.getByRole('button', { name: 'Renew in order' })).toBeEnabled()
+      await expect(renewal.getByLabel('Assigned Room/Number', { exact: true })).toHaveCount(0)
+      await expect(renewal.getByRole('button', { name: 'Confirm rental checkout' })).toHaveCount(0)
+      await renewal.getByRole('button', { name: 'Close', exact: true }).click()
+      await publishRental(admission)
     }
     // Exercise the shared visit editor on both entry points, then paid renewal.
     const beforeExpiry = visit.lockerRoomStatus[5]
@@ -918,8 +1215,14 @@ try {
           ),
         admission,
       )
-      await page.getByRole('button', { name: `View visit for ${savedMember.name}` }).click()
+      await page
+        .getByRole('row')
+        .filter({ hasText: savedMember.name })
+        .getByRole('button', { name: /^Edit rental for/ })
+        .click()
       const details = page.getByRole('dialog', { name: savedMember.name, exact: true })
+      await expect(details.getByLabel('Assigned Room/Number', { exact: true })).toBeFocused()
+      await expect(details.getByRole('button', { name: 'Renew in order' })).toHaveCount(0)
       await details.getByLabel('Assigned Room/Number', { exact: true }).fill('C-22')
       await details.getByLabel('Visit notes', { exact: true }).fill('Renewal fixture note')
       await details.getByLabel('Inside (off = outside)').uncheck()
@@ -953,6 +1256,21 @@ try {
           ({ uid, club }) => localStorage.removeItem(`cerms.pos.${uid}.${club}`),
           { uid, club },
         )
+        await details.getByRole('button', { name: 'Close', exact: true }).click()
+        await page.evaluate(
+          (row) =>
+            window.dispatchEvent(
+              new CustomEvent('admissions-fixture', {
+                detail: { rows: [{ ...row, expiresAt: Date.now() - 5000 }], status: 'live' },
+              }),
+            ),
+          admission,
+        )
+        await page
+          .getByRole('row')
+          .filter({ hasText: savedMember.name })
+          .getByRole('button', { name: /^Renew rental for/ })
+          .click()
         await details.getByRole('button', { name: 'Renew in order' }).click()
       }
     }
@@ -1008,16 +1326,22 @@ try {
           ),
         admission,
       )
-      await page.getByRole('button', { name: `View visit for ${savedMember.name}` }).click()
+      const checkoutShortcut = page
+        .getByRole('row')
+        .filter({ hasText: savedMember.name })
+        .getByRole('button', { name: /^Check out rental for/ })
+      await checkoutShortcut.click()
       const details = page.getByRole('dialog', { name: savedMember.name, exact: true })
-      await details.getByRole('button', { name: 'Check out rental', exact: true }).click()
+      await expect(details.getByLabel('Assigned Room/Number', { exact: true })).toHaveCount(0)
+      await expect(details.getByRole('button', { name: 'Renew in order' })).toHaveCount(0)
       const confirm = details.getByRole('button', { name: 'Confirm rental checkout', exact: true })
       await expect(confirm).toBeDisabled()
       await details.getByLabel('The rental is completed', { exact: true }).check()
       await expect(confirm).toBeDisabled()
       await details.getByRole('button', { name: 'Cancel checkout' }).click()
+      await expect(details).not.toBeVisible()
       assert.equal(docs.get('activity/' + admission.id).active, true)
-      await details.getByRole('button', { name: 'Check out rental', exact: true }).click()
+      await checkoutShortcut.click()
       await expect(details.getByLabel('The rental is completed', { exact: true })).not.toBeChecked()
       await details.getByLabel('The rental is completed', { exact: true }).check()
       await details.getByLabel('All required items have been returned', { exact: true }).check()

@@ -1,0 +1,27 @@
+{
+  "verifiedAt": "2026-11-16T18:25:13.896Z",
+  "database": "cerms",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/saveNotificationSoundPreference",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-16T18:23:36.468947557Z"
+  },
+  "rulesBaseline": "firebase/releases/notification-sounds-2026-11-16.rules",
+  "rulesSha256": "7961ea2cd868af444035caee2ae76c71693dfa7a7efe09b105dc56187a1323e5",
+  "serviceSha256": "59ba81eb69f4c1a7815b04b1d05b9caf4b19f5d591f5ca3f17e3114825808a76",
+  "indexSha256": "250c56396c0fcf2dabfee343c157ef431e388c78c5586899e16b0ba2c1f58877",
+  "onlyOptionalSoundPreferenceRulesChanged": true,
+  "allOtherRulesReleasesUnchanged": true,
+  "allExistingFunctionsAndSchedulesUnchanged": true,
+  "bothDatabaseConfigurationsAndIndexesUnchanged": true,
+  "allExistingBucketSettingsAndIamUnchanged": true,
+  "liveTestWrites": false,
+  "existingAuthAccountsChanged": false,
+  "clientChecks": 232,
+  "serviceChecks": 2,
+  "localRulesChecks": 370,
+  "buildPassed": true,
+  "interceptedAudioSettingsFlowPassed": true,
+  "interceptedMessagingRegressionPassed": true,
+  "physicalSpeakerOutputTested": false
+}

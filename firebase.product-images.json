@@ -3,16 +3,13 @@
     {
       "source": "functions",
       "codebase": "cerms-staff",
-      "ignore": [
-        "node_modules",
-        "*.test.mjs"
-      ]
+      "ignore": ["node_modules", "*.test.mjs"]
     }
   ],
   "firestore": [
     {
       "database": "cerms",
-      "rules": "firebase/releases/messaging-2026-11-15.rules"
+      "rules": "firebase/releases/notification-sounds-2026-11-16.rules"
     }
   ]
 }

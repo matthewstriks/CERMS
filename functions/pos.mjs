@@ -301,10 +301,12 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
       const claim = await tx.get(entry.visitClaimRef)
       if (
         entry.member.dna === true ||
+        !['number', 'string'].includes(typeof entry.member.id_expiration) ||
+        String(entry.member.id_expiration).trim() === '' ||
         !Number.isFinite(Number(entry.member.id_expiration)) ||
-        Number(entry.member.id_expiration) * 1000 <= now
+        Number(entry.member.id_expiration) < 0
       )
-        fail('failed-precondition', 'Only active, admitted memberships can check in.')
+        fail('failed-precondition', 'A membership with a recorded expiration and no Do not admit restriction is required to check in.')
       if (entry.member.checkedIn === true || claim.exists)
         fail('failed-precondition', 'An assigned member already has an active visit.')
       entry.visits = rentals.map((r) => {

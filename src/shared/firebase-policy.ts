@@ -1,3 +1,4 @@
+import { notificationSoundEndpoint, isNotificationSoundRequest } from './notification-sound-policy'
 import { isMessagingRequest, staffMessagingEndpoint } from './messaging-policy'
 import { isMemberNotesRequest, memberNotesEndpoint } from './member-notes-policy'
 import { themeEndpoint, isThemeRequest } from './theme-policy'
@@ -37,6 +38,8 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
     if (url.protocol !== 'https:' || url.username || url.password || url.port) return false
     if (url.href === staffMessagingEndpoint)
       return method === 'OPTIONS' || (method === 'POST' && isMessagingRequest(body))
+    if (url.href === notificationSoundEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isNotificationSoundRequest(body))
     if (url.href === themeEndpoint)
       return method === 'OPTIONS' || (method === 'POST' && isThemeRequest(body))
     if (url.href === memberNotesEndpoint)

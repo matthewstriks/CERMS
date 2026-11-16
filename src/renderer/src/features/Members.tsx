@@ -48,7 +48,7 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
         member: { id: member.id, name: member.name },
         cart: [],
         rentalsOnly,
-        promptMembership: !rentalsOnly && membershipStatus(member, Date.now()) === 'Expired',
+        promptMembership: membershipStatus(member, Date.now()) === 'Expired',
       })
     } catch (e) {
       setNotice(e instanceof Error ? e.message : 'Unable to open order.')
@@ -237,7 +237,7 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
                               <>
                                 <button onClick={() => order(member)}>Create order</button>
                                 <button
-                                  disabled={state !== 'Active'}
+                                  disabled={state !== 'Active' && state !== 'Expired'}
                                   onClick={() => order(member, true)}
                                 >
                                   Check in
@@ -293,7 +293,11 @@ function LiveMembers({ createRequested, onCreateHandled }: MembersProps) {
           </>
         )}
       </section>
-      {notice && <p role="status">{notice}</p>}
+      {notice && (
+        <p role="status" data-notification-sound>
+          {notice}
+        </p>
+      )}
       <p className="page-note">
         {canManage ? 'Open a member to view your available actions. ' : ''}Check in selects rentals
         for checkout. Rentals start only after the order succeeds.

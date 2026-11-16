@@ -1,3 +1,4 @@
+import { membershipStatus } from '../../../../domain/legacy'
 import { useEffect, useRef, useState } from 'react'
 import type {
   MembershipReader,
@@ -11,7 +12,7 @@ export default function OrderMemberPicker({
   onClose,
 }: {
   reader: MembershipReader
-  onSelect(member: OrderMember): void
+  onSelect(member: OrderMember, expired?: boolean): void
   onClose(): void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
@@ -111,7 +112,13 @@ export default function OrderMemberPicker({
       )}
       <div className="order-member-results">
         {page?.members.map((m) => (
-          <button key={m.id} disabled={busy} onClick={() => onSelect({ id: m.id, name: m.name })}>
+          <button
+            key={m.id}
+            disabled={busy}
+            onClick={() =>
+              onSelect({ id: m.id, name: m.name }, membershipStatus(m, Date.now()) === 'Expired')
+            }
+          >
             <strong>{m.name}</strong>
             <span>
               #{m.number} · {m.membership}

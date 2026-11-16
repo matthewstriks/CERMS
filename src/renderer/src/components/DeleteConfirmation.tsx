@@ -26,6 +26,7 @@ export default function DeleteConfirmation({
   }, [])
   return (
     <dialog
+      data-notification-sound="delete-confirmation"
       ref={dialog}
       className="member-dialog"
       aria-label={title}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
 delete env.ELECTRON_RUN_AS_NODE
-const app = await electron.launch({ args: ['.'], env })
+const app = await electron.launch({ args: ['.', '--mute-audio'], env })
 try {
   const login = await app.firstWindow()
   await login.getByRole('heading', { name: 'Sign in to CERMS' }).waitFor()

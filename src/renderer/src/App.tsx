@@ -1,3 +1,4 @@
+import { requestNotificationSound } from './lib/notification-audio'
 import { hasStaffPermission } from '../../domain/staff-permissions'
 import BrandLogo from './components/BrandLogo'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -17,6 +18,7 @@ const Products = lazy(() => import('./features/Products'))
 const Registers = lazy(() => import('./features/Registers'))
 const PointOfSale = lazy(() => import('./features/PointOfSale'))
 const Staff = lazy(() => import('./features/Staff'))
+const Reports = lazy(() => import('./features/Reports'))
 const Messages = lazy(() => import('./features/Messages'))
 const Settings = lazy(() => import('./features/Settings'))
 
@@ -26,6 +28,37 @@ function readRoute(): ModuleId {
 }
 export default function App() {
   const membership = useMembershipSession()
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const messagingUid = membership.reader?.uid
+  const messagingBusiness = membership.reader?.club
+  useEffect(() => {
+    let active = true
+    let stop: (() => void) | undefined
+    setUnreadMessages(0)
+    if (messagingUid && messagingBusiness && !membership.switching) {
+      void import('../../data/firebase-messaging')
+        .then((m) => {
+          if (active)
+            stop = m
+              .createMessaging({ uid: messagingUid, club: messagingBusiness })
+              .subscribeUnreadCount(
+                (count) => {
+                  if (active) setUnreadMessages(count)
+                },
+                () => {
+                  if (active) requestNotificationSound('message')
+                },
+              )
+        })
+        .catch(() => {
+          if (active) setUnreadMessages(0)
+        })
+    }
+    return () => {
+      active = false
+      stop?.()
+    }
+  }, [messagingUid, messagingBusiness, membership.switching])
   const info = useQuery(() => window.desktop.getAppInfo(), [])
   const [route, setRoute] = useState<ModuleId>(readRoute)
   const [newMemberRequested, setNewMemberRequested] = useState(false)
@@ -129,7 +162,21 @@ export default function App() {
                   >
                     <module.icon size={18} />
                     {module.label}
-                    {route === module.id && <span className="active-dot" />}
+                    {module.id === 'messages' && unreadMessages > 0 ? (
+                      <span
+                        className="nav-unread-badge"
+                        title={`${unreadMessages} unread messages`}
+                      >
+                        <span aria-hidden="true">
+                          {unreadMessages > 99 ? '99+' : unreadMessages}
+                        </span>
+                        <span className="sr-only">
+                          {unreadMessages} unread {unreadMessages === 1 ? 'message' : 'messages'}
+                        </span>
+                      </span>
+                    ) : route === module.id ? (
+                      <span className="active-dot" />
+                    ) : null}
                   </a>
                 ))}
             </div>
@@ -218,6 +265,8 @@ export default function App() {
               <Registers key={`${membership.reader?.uid}:${membership.reader?.club}`} />
             ) : route === 'staff' ? (
               <Staff key={`${membership.reader?.uid}:${membership.reader?.club}`} />
+            ) : route === 'reports' ? (
+              <Reports key={`${membership.reader?.uid}:${membership.reader?.club}`} />
             ) : route === 'messages' ? (
               <Messages key={`${membership.reader?.uid}:${membership.reader?.club}`} />
             ) : route === 'settings' ? (

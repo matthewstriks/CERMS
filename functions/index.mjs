@@ -160,3 +160,24 @@ export const staffMessaging = onCall(
     }
   },
 )
+
+import { saveNotificationSoundPreference as saveNotificationSoundHandler } from './notification-sounds.mjs'
+export const saveNotificationSoundPreference = onCall(
+  { region: 'us-central1', maxInstances: 3, timeoutSeconds: 30 },
+  async (request) => {
+    try {
+      return await saveNotificationSoundHandler(request, {
+        db,
+        fail: (code, message) => {
+          throw new HttpsError(code, message)
+        },
+      })
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      throw new HttpsError(
+        'unavailable',
+        'Sound preferences could not be confirmed. Try again when connected.',
+      )
+    }
+  },
+)

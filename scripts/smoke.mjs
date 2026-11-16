@@ -6,7 +6,7 @@ import { mkdir } from 'node:fs/promises'
 const launchEnv = { ...process.env, ELECTRON_RENDERER_URL: '' }
 // Some IDE hosts set this for their own runtime; a desktop test needs GUI mode.
 delete launchEnv.ELECTRON_RUN_AS_NODE
-const app = await electron.launch({ args: ['.'], env: launchEnv })
+const app = await electron.launch({ args: ['.', '--mute-audio'], env: launchEnv })
 try {
   const page = await app.firstWindow({ timeout: 20000 })
   page.setDefaultTimeout(15000)
