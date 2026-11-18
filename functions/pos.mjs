@@ -1,3 +1,5 @@
+import {prepareDiscount} from './discounts.mjs'
+import {validDiscountSelection} from './discount-domain.mjs'
 import { createHash, randomInt } from 'node:crypto'
 import {
   validateDevMember,
@@ -31,6 +33,7 @@ export function validateSale(d, fail) {
     'taxRateBps',
     'note',
     'customerName',
+    ...('discount' in d ? ['discount'] : []),
     ...('member' in d ? ['member'] : []),
     ...('rentals' in d ? ['rentals'] : []),
     ...('pendingMembers' in d ? ['pendingMembers'] : []),
@@ -40,6 +43,7 @@ export function validateSale(d, fail) {
   require(id(d.business) &&
     /^[a-f0-9-]{36}$/.test(d.requestId) &&
     /^[a-f0-9-]{36}$/.test(d.registerId), fail, 'Invalid sale or register.')
+  require(d.discount===undefined||validDiscountSelection(d.discount),fail,'Check the applied discount.')
   require(Array.isArray(d.lines) &&
     d.lines.length > 0 &&
     d.lines.length <= 100, fail, 'Add between 1 and 100 products.')
@@ -301,7 +305,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
       } catch (e) {
         fail('invalid-argument', e.message)
       }
-      entry.membershipUpdate = { membership_type: p.name, id_expiration: expiry }
+      entry.membershipUpdate = { membership_type: p.name, id_expiration: expiry, membershipOrderId:d.requestId }
       for (const a of memberPurchases)
         membershipReceipts.push({
           id: a.id,
@@ -309,6 +313,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
           memberId,
           action: 'renewal',
           mode: a.mode,
+          previousMembershipType: entry.member.membership_type ?? null,
           previousExpiresAt:
             entry.member.id_expiration != null &&
             Number.isFinite(Number(entry.member.id_expiration))
@@ -405,7 +410,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
     member: snapshots.find((m) => m.id === d.member?.id) ?? null,
     members: snapshots,
     memberships: [
-      ...pending.map((m) => ({ productId: m.draft.membershipProductId, memberId: m.id })),
+      ...pending.map((m) => ({ productId: m.draft.membershipProductId, memberId: m.id, action:"new", expiresAt:records.get(m.id).member.id_expiration })),
       ...membershipReceipts,
     ],
     rentals: assignments,
@@ -419,7 +424,7 @@ async function fulfillment(tx, db, d, products, uid, timestamp, fail, now, staff
         })
       for (const [memberId, e] of records) {
         if (e.isNew) {
-          tx.create(e.ref, { ...e.member, checkedIn: e.visits.length > 0 })
+          tx.create(e.ref, { ...e.member, membershipOrderId:d.requestId, checkedIn: e.visits.length > 0 })
           if (e.initialNote)
             tx.create(db.doc(`system/${d.business}/memberNotes/${memberId}/entries/${memberId}`), {
               text: e.initialNote,
@@ -596,6 +601,18 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
         totalCents: lineSubtotal + lineTax,
       })
     }
+    let appliedDiscount=null, discountCents=0
+    if(d.discount){
+      appliedDiscount=await prepareDiscount(tx,{db,business:d.business,selection:d.discount,lines:lines.map(l=>({...l,categoryId:l.categoryId,kind:l.membership?'membership':l.rental?'rental':'retail'})),memberId:d.member&&!d.member.draft?d.member.id:null,fail,now:now(),timestamp})
+      discountCents=appliedDiscount.quote.expectedDiscountCents
+      subtotalCents=0;taxCents=0
+      for(let i=0;i<lines.length;i++){
+        const l=lines[i],reduction=appliedDiscount.quote.lineDiscounts[i]
+        l.grossSubtotalCents=l.subtotalCents;l.discountCents=reduction;l.subtotalCents-=reduction
+        l.taxCents=l.taxable?Math.round(Math.abs(l.subtotalCents)*d.taxRateBps/10000)*Math.sign(l.subtotalCents):0
+        l.totalCents=l.subtotalCents+l.taxCents;subtotalCents+=l.subtotalCents;taxCents+=l.taxCents
+      }
+    }
     const totalCents = subtotalCents + taxCents,
       outgoing = totalCents < 0
     require(cents(Math.abs(totalCents)) &&
@@ -650,6 +667,7 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
       note: d.note,
       lines,
       payments,
+      ...(appliedDiscount?{discount:appliedDiscount.snapshot,discountCents}:{}),
       subtotalCents,
       taxCents,
       totalCents,
@@ -662,11 +680,14 @@ export async function completeSale(request, { db, fail, timestamp, now = () => D
       fingerprint,
     }
     fulfilled.apply()
+    appliedDiscount?.apply()
     tx.create(saleRef, receipt)
     tx.set(totalsRef, {
+      ...previous,
       schemaVersion: 1,
       registerId: d.registerId,
       saleCount: (previous.saleCount ?? 0) + 1,
+      discountCents:(previous.discountCents??0)+discountCents,
       totalCents: (previous.totalCents ?? 0) + totalCents,
       taxCents: (previous.taxCents ?? 0) + taxCents,
       netByMethod,
@@ -748,6 +769,7 @@ export async function cashDrop(request, { db, fail, timestamp }) {
       createdAt: timestamp(),
     })
     tx.set(totalsRef, {
+      ...previous,
       schemaVersion: 1,
       registerId: d.registerId,
       saleCount: previous.saleCount ?? 0,

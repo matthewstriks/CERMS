@@ -1,0 +1,48 @@
+{
+  "verifiedAt": "2026-11-18T01:19:50.219Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/submitBugReport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T01:19:10.831005920Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/submitLoginSupport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T01:19:00.954317105Z"
+    }
+  ],
+  "allOtherFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "loginSupportSeparateFromStaffAuthorization": true,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/bug-report.mjs": "fb4f955e4ecedda87f6703a2cf885fa1d1163bf6768be4a0c8f542e44d2a2e87",
+    "functions/support-email.mjs": "c104162a3c3f115ac1010157bccd920fd580a1d1399ec83650d39c6ea9cd1191",
+    "functions/index.mjs": "6e5344414443fdbef23cb1e9849c8ac21c2021f74411226b6e1eec78cb11ab2f",
+    "src/shared/support-files.ts": "443ad0bb9ee57f6f24599228b00c10a6e528da4cc25080630baf3298b0878c5c"
+  },
+  "validation": {
+    "focusedServerChecks": 9,
+    "focusedClientChecks": 2,
+    "loginSupportDesktopFlowPassed": true,
+    "originalAttachmentBytesFilenameAndTypeVerified": true,
+    "emailLayoutVisuallyReviewed": true,
+    "desktopBuilds": 1,
+    "unrelatedSuitesRun": false,
+    "noLiveTestEmailOrUpload": true
+  },
+  "desktopRelease": {
+    "version": "5.0.0-alpha.8",
+    "verifiedAt": "2026-11-18T01:24:24.648Z",
+    "installer": "https://storage.googleapis.com/cerms-7af24-cerms5-releases/windows/CERMS-5-5.0.0-alpha.8-win-x64.exe",
+    "publicManifestMatchesBuild": true,
+    "publicAssetHashesVerifiedByPublisher": true
+  }
+}

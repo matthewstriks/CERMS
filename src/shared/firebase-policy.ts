@@ -1,4 +1,16 @@
+import {
+  memberFilesEndpoint,
+  isMemberFilesRequest,
+  isSignedMemberFileUrl,
+} from './member-files-policy'
+import { discountEndpoint, isDiscountRequest } from './discount-policy'
+import { refundEndpoint, isRefundRequest } from './refund-policy'
+import { accountEndpoint, isAccountRequest, isSelfAccountAuthRequest } from './account-policy'
+import { staffManagementEndpoint, isStaffManagementRequest } from './staff-management-policy'
+import { inventoryEmailEndpoint, isInventoryEmailRequest } from './inventory-email-policy'
+import { aiConversationEndpoint, isAiConversationRequest } from './ai-conversation-policy'
 import { notificationSoundEndpoint, isNotificationSoundRequest } from './notification-sound-policy'
+import { installationEndpoint, isInstallationRequest } from './installation-policy'
 import { isMessagingRequest, staffMessagingEndpoint } from './messaging-policy'
 import { isMemberNotesRequest, memberNotesEndpoint } from './member-notes-policy'
 import { themeEndpoint, isThemeRequest } from './theme-policy'
@@ -13,7 +25,7 @@ import { isCatalogCommit, isDeleteProductCommit } from './catalog-policy'
 import { isRegisterCommit } from './register-policy'
 import { isMemberManagementCommit } from './member-management-policy'
 import { isMemberViewCommit } from './member-log-policy'
-import { bugReportEndpoint, isBugReportRequest } from './bug-report-policy'
+import { bugReportEndpoint, loginSupportEndpoint, isBugReportRequest } from './bug-report-policy'
 /** Fixed to the existing CERMS project. This is configuration, not a credential. */
 export const firebaseProjectId = 'cerms-7af24'
 export const firebaseDatabaseId = 'cerms'
@@ -36,6 +48,22 @@ export const firebaseBucket = 'cerms-7af24.appspot.com'
 export function allowFirebaseRequest(rawUrl: string, method: string, body?: string): boolean {
   try {
     const url = new URL(rawUrl)
+    if (url.href === memberFilesEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isMemberFilesRequest(body))
+    if (url.href === discountEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isDiscountRequest(body))
+    if (url.href === refundEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isRefundRequest(body))
+    if (url.href === accountEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isAccountRequest(body))
+    if (url.href === staffManagementEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isStaffManagementRequest(body))
+    if (url.href === inventoryEmailEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isInventoryEmailRequest(body))
+    if (url.href === aiConversationEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isAiConversationRequest(body))
+    if (url.href === installationEndpoint)
+      return method === 'OPTIONS' || (method === 'POST' && isInstallationRequest(body))
     if (url.protocol !== 'https:' || url.username || url.password || url.port) return false
     if (url.href === staffMessagingEndpoint)
       return method === 'OPTIONS' || (method === 'POST' && isMessagingRequest(body))
@@ -51,7 +79,7 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
       return method === 'OPTIONS' || (method === 'POST' && isProductImageRequest(url.href, body))
     if (url.href === staffAccountEndpoint)
       return method === 'OPTIONS' || (method === 'POST' && isCreateStaffRequest(body))
-    if (url.href === bugReportEndpoint)
+    if (url.href === bugReportEndpoint || url.href === loginSupportEndpoint)
       return method === 'OPTIONS' || (method === 'POST' && isBugReportRequest(body))
     if (method === 'OPTIONS')
       return [
@@ -96,6 +124,7 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
       )
     }
     if (url.hostname === 'identitytoolkit.googleapis.com') {
+      if (method === 'POST' && isSelfAccountAuthRequest(url.pathname, body)) return true
       if (method === 'POST' && url.pathname === '/v1/accounts:sendOobCode') {
         const payload = JSON.parse(body ?? '{}')
         return (
@@ -120,6 +149,7 @@ export function allowFirebaseRequest(rawUrl: string, method: string, body?: stri
 }
 
 export function isMemberFileUrl(rawUrl: string): boolean {
+  if (isSignedMemberFileUrl(rawUrl)) return true
   try {
     const url = new URL(rawUrl)
     if (url.protocol !== 'https:' || url.username || url.password || url.port) return false

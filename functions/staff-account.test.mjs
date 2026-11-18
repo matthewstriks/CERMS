@@ -66,6 +66,25 @@ function fixture() {
   }
   return { docs, users, dependencies, request, creates: () => creates }
 }
+test('waiver permissions default off, support explicit assignment and reject malformed rights', async () => {
+  const old = fixture()
+  const result = await createAccount(old.request, old.dependencies)
+  assert.equal(
+    old.docs.get(`system/club-a/staffPermissions/${result.uid}`).permissions.waiveProducts,
+    false,
+  )
+  const enabled = fixture()
+  enabled.request.data.permissions.waiveProducts = true
+  const created = await createAccount(enabled.request, enabled.dependencies)
+  assert.equal(
+    enabled.docs.get(`system/club-a/staffPermissions/${created.uid}`).permissions.waiveProducts,
+    true,
+  )
+  const invalid = fixture()
+  invalid.request.data.permissions.waiveProducts = 'yes'
+  await assert.rejects(createAccount(invalid.request, invalid.dependencies))
+  assert.equal(invalid.creates(), 0)
+})
 test('creates a login, cerms profile and assigned permissions; retries do not recreate or overwrite', async () => {
   const f = fixture(),
     result = await createAccount(f.request, f.dependencies)

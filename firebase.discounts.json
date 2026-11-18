@@ -1,0 +1,20 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "cerms-staff",
+      "ignore": ["node_modules", "*.test.mjs"],
+      "predeploy": [
+        "npm run build:checkout-domain",
+        "npm run build:discount-domain",
+        "npm run build:receipt-domain"
+      ]
+    },
+    {
+      "source": "report-functions",
+      "codebase": "cerms-reports",
+      "ignore": ["node_modules", "*.test.mjs", "fixtures.mjs"]
+    }
+  ],
+  "firestore": [{ "database": "cerms", "rules": "firebase/releases/discounts-2026-11-17.rules" }]
+}

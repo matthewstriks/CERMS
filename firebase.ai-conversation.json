@@ -1,0 +1,10 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "cerms-staff",
+      "ignore": ["node_modules", "*.test.mjs"],
+      "predeploy": ["npm run build:ai-conversation-domain"]
+    }
+  ]
+}

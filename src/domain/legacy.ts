@@ -5,6 +5,7 @@ export interface Member {
   number: string
   name: string
   firstName?: string
+  middleName?: string
   lastName?: string
   membership: string
   expiresAt: number | null
@@ -111,6 +112,7 @@ export function memberFromLegacy(id: string, doc: LegacyDocument, access: string
       [text(doc.fname), text(doc.lname)].filter(Boolean).join(' ') ||
       'Unnamed member',
     firstName: text(doc.fname),
+    middleName: text(doc.mname),
     lastName: text(doc.lname),
     membership: text(doc.membership_type, 'Unspecified'),
     expiresAt: unixSecondsToMillis(doc.id_expiration),

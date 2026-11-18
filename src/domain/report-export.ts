@@ -58,6 +58,10 @@ export function exportReport(data: ReportData, kind: ReportExport, timeZone: str
           ['Membership renewal units', sales.renewals, 'Units'],
           ['New rental units', sales.rentalUnits, 'Units'],
           ['Rental renewal units', sales.rentalRenewals, 'Units'],
+          ['Discounts net of returns', sales.discounts / 100, 'USD'],
+          ['Refund count', sales.refunds, 'Count'],
+          ['Refunded including tax', sales.refunded / 100, 'USD'],
+          ['Tax refunded', sales.refundedTax / 100, 'USD'],
           ['Previous period net sales before tax', sales.previous.net / 100, 'USD'],
           ['Previous period transactions', sales.previous.orders, 'Count'],
         ]
@@ -124,6 +128,8 @@ export function exportReport(data: ReportData, kind: ReportExport, timeZone: str
           'Net sales USD',
           'Tax USD',
           'Collected USD',
+          'Discount code',
+          'Discount net USD',
         ]
         rows = sales.selected.map((s) => [
           displayReference('order', s.receiptNumber),
@@ -135,6 +141,8 @@ export function exportReport(data: ReportData, kind: ReportExport, timeZone: str
           s.subtotalCents / 100,
           s.taxCents / 100,
           s.totalCents / 100,
+          s.discount?.code ?? '',
+          (s.discountCents ?? 0) / 100,
         ])
         break
     }
@@ -162,6 +170,10 @@ export function exportReport(data: ReportData, kind: ReportExport, timeZone: str
       'Owner',
       'Closed ISO',
       'Closed by',
+      'Refund count',
+      'Refunded including tax USD',
+      'Tax refunded USD',
+      'Discounts net USD',
       'Opening cash USD',
       'Expected cash USD',
       'Counted cash USD',
@@ -174,6 +186,10 @@ export function exportReport(data: ReportData, kind: ReportExport, timeZone: str
       r.ownerName,
       new Date(r.closedAt!).toISOString(),
       r.closedByName ?? '',
+      t.refundCount ?? 0,
+      (t.refundCents ?? 0) / 100,
+      (t.refundTaxCents ?? 0) / 100,
+      (t.discountCents ?? 0) / 100,
       r.openingTotalCents / 100,
       t.expectedCashCents / 100,
       r.closingTotalCents! / 100,

@@ -1,0 +1,63 @@
+{
+  "verifiedAt": "2026-11-18T04:45:43.530Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "rulesBaseline": "firebase/releases/discounts-2026-11-17.rules",
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:44:11.993080917Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:44:12.601276081Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/discountCodes",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:44:07.583769227Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/refundSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:44:13.478591895Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/sendDevDailyReport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:44:31.807371489Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/sendSaleReceipt",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:44:10.881958102Z"
+    }
+  ],
+  "allUntargetedFunctionsUnchanged": true,
+  "allLegacyAndStorageRulesUnchanged": true,
+  "allIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "sharedAuthAccountsUnchanged": true,
+  "discountsSalesAndRegisterAccountingOnlyInNamedCerms": true,
+  "atomicDiscountUseLimitsAndSaleRetries": true,
+  "originalReceiptsAndClosedRegistersPreserved": true,
+  "syntheticRulesChecks": 397,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/discounts.mjs": "bff3bc5caf2de24f0406a711d76d9013c58f3f8dca9064728ae56ce33c05a331",
+    "functions/discount-domain.mjs": "3cfd7ee5a990b8394ca28a7989aa107d9fe061328a2d9a726b5f989d76fa3a39",
+    "functions/pos.mjs": "dbdbec243684a8ed3e0a31cdef6e6e179564203410bf0e59064f735e45c6159f",
+    "functions/refunds.mjs": "b6d6e18a2c8eb1608a4f6685178ca64fa9c2b289c1999106c1c0f3ab7fd3d527",
+    "functions/staff-account.mjs": "6e2f2fdc0e47a80761e63481286854df3c14c082bf8676b4ef0ffcf95d3ad393",
+    "functions/receipt-domain.mjs": "0047ee7534134332d34e44f2826393fd80520dd72316b4a7a80066d283eef7c7",
+    "report-functions/report-data.mjs": "908642971dee052ce3e97608d55543862eca35c20e6561770a9a56cdea1de4a7",
+    "report-functions/report-render.mjs": "52dd8b8ebd917c4b09df81d48d32b1d4a9f0c60928e9314104b91eca53fb86fa",
+    "src/shared/discount-policy.ts": "6e3fca645aae048513577a3125a1ebac7d10874ec46cdbcadacc69c34b438ef9",
+    "firebase/releases/discounts-2026-11-17.rules": "dd723f6d0a121d578adb5a03f40f4fb3229472ed33f5c043343c588bba923456"
+  }
+}

@@ -1,3 +1,4 @@
+import type { DiscountSelection } from '../shared/discount-policy'
 import { parsePrice, type CatalogProduct, type CatalogRecord } from './catalog'
 import type { MemberDraft } from './member-creation'
 import type { MembershipRenewalMode } from './membership-renewal'
@@ -104,6 +105,7 @@ export interface RentalAssignment {
   memberId?: string
 }
 export interface SaleRequest {
+  discount?: DiscountSelection
   noteAcknowledgements?: { memberId: string; revision: number }[]
   membershipAssignments?: MembershipAssignment[]
   member?: OrderMember
@@ -131,6 +133,10 @@ export interface PosSettings {
   receiptFooter: string
 }
 export interface RegisterTotals {
+  discountCents?: number
+  refundCount?: number
+  refundCents?: number
+  refundTaxCents?: number
   saleCount: number
   totalCents: number
   taxCents: number
@@ -143,8 +149,20 @@ export interface RegisterTotals {
 }
 export interface SaleReceipt extends Omit<
   SaleRequest,
-  'lines' | 'payments' | 'requestId' | 'membershipAssignments' | 'noteAcknowledgements'
+  'lines' | 'payments' | 'requestId' | 'membershipAssignments' | 'noteAcknowledgements' | 'discount'
 > {
+  discount?: {
+    code: string
+    name: string
+    kind: 'percent' | 'amount'
+    value: number
+    version: number
+  }
+  discountCents?: number
+  kind?: 'refund'
+  originalSaleId?: string
+  originalReceiptNumber?: string
+  reason?: string
   members?: OrderMember[]
   memberships?: {
     productId: string
@@ -168,6 +186,8 @@ export interface SaleReceipt extends Omit<
   totalCents: number
   lines: (SaleRequest['lines'][number] & {
     name: string
+    discountCents?: number
+    grossSubtotalCents?: number
     subtotalCents: number
     taxCents: number
     totalCents: number
@@ -177,17 +197,18 @@ export interface SaleReceipt extends Omit<
   })[]
   payments: (Payment & { direction: 'in' | 'out'; changeCents: number })[]
 }
-export function cartTotals(lines: CartLine[], rate: number | null) {
-  const subtotalCents = lines.reduce(
-    (s, l) => s + (l.waived ? 0 : l.unitPriceCents) * l.quantity * (l.product.data.payout ? -1 : 1),
-    0,
+export function cartTotals(lines: CartLine[], rate: number | null, discounts: number[] = []) {
+  const subtotals = lines.map(
+    (l, i) =>
+      (l.waived ? 0 : l.unitPriceCents) * l.quantity * (l.product.data.payout ? -1 : 1) -
+      (discounts[i] ?? 0),
   )
+  const subtotalCents = subtotals.reduce((a, b) => a + b, 0)
   const taxCents = lines.reduce(
-    (s, l) =>
-      s +
+    (sum, l, i) =>
+      sum +
       (l.product.data.taxable
-        ? Math.round(((l.waived ? 0 : l.unitPriceCents) * l.quantity * (rate ?? 0)) / 10000) *
-          (l.product.data.payout ? -1 : 1)
+        ? Math.round((Math.abs(subtotals[i]!) * (rate ?? 0)) / 10000) * Math.sign(subtotals[i]!)
         : 0),
     0,
   )
@@ -204,15 +225,30 @@ export const emptyRegisterTotals = (opening: number): RegisterTotals => ({
   changeGivenCents: 0,
   cashPaidOutCents: 0,
 })
-export function receiptText(r: SaleReceipt): string {
+export function receiptText(r: SaleReceipt, timeZone?: string): string {
+  const date = (value: number) =>
+    new Date(value).toLocaleString(
+      'en-US',
+      timeZone ? { timeZone, timeZoneName: 'short' } : undefined,
+    )
   const money = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n / 100)
   return [
     r.receiptName,
     r.receiptAddress,
     '',
-    r.totalCents < 0 ? 'PAYOUT RECEIPT' : 'SALES RECEIPT',
-    new Date(r.createdAt).toLocaleString(),
+    r.kind === 'refund'
+      ? 'RETURN / REFUND RECEIPT'
+      : r.totalCents < 0
+        ? 'PAYOUT RECEIPT'
+        : 'SALES RECEIPT',
+    ...(r.kind === 'refund'
+      ? [
+          `Original order: ${displayReference('order', r.originalSaleId ?? '')}`,
+          `Reason: ${r.reason ?? r.note}`,
+        ]
+      : []),
+    date(r.createdAt),
     `Order: ${displayReference('order', r.receiptNumber)}`,
     `Cashier: ${r.cashierName}`,
     `Register: ${displayReference('register', r.registerId)}`,
@@ -226,7 +262,7 @@ export function receiptText(r: SaleReceipt): string {
         ?.filter((a) => a.productId === l.productId)
         .map(
           (a) =>
-            `Membership ${a.action === 'renewal' ? 'renewal' : 'for'}: ${r.members?.find((m) => m.id === a.memberId)?.name ?? a.memberId}${a.mode ? ` · ${a.mode === 'restart' ? 'Start from today' : 'Add to existing expiration'}` : ''}${a.expiresAt !== undefined ? ` · Expires ${new Date(a.expiresAt * 1000).toLocaleString()}` : ''}`,
+            `Membership ${a.action === 'renewal' ? 'renewal' : 'for'}: ${r.members?.find((m) => m.id === a.memberId)?.name ?? a.memberId}${a.mode ? ` · ${a.mode === 'restart' ? 'Start from today' : 'Add to existing expiration'}` : ''}${a.expiresAt !== undefined ? ` · Expires ${date(a.expiresAt * 1000)}` : ''}`,
         ) ?? []),
       ...(r.rentals
         ?.filter((a) => a.productId === l.productId)
@@ -237,6 +273,11 @@ export function receiptText(r: SaleReceipt): string {
         ]) ?? []),
     ]),
     '--------------------------------',
+    ...(r.discount
+      ? [
+          `${r.kind === 'refund' ? 'Discount reversed' : 'Discount'} ${r.discount.code}: ${money(-(r.discountCents ?? 0))}`,
+        ]
+      : []),
     `Subtotal: ${money(r.subtotalCents)}`,
     `Tax (${r.taxRateBps / 100}%): ${money(r.taxCents)}`,
     `TOTAL: ${money(r.totalCents)}`,

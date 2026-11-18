@@ -179,6 +179,57 @@
 .pos-receipt-dialog {
   max-width: 540px !important;
 }
+.receipt-delivery-dialog .pos-receipt {
+  max-height: 26vh;
+}
+.receipt-delivery-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+}
+.receipt-delivery-options legend {
+  padding: 0 0 10px;
+  font-weight: 600;
+}
+.receipt-delivery-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.receipt-delivery-options label:has(input:checked) {
+  border-color: var(--green);
+}
+.receipt-delivery-options label:has(input:disabled) {
+  opacity: 0.55;
+}
+.receipt-delivery-options input {
+  width: auto;
+  accent-color: var(--green);
+}
+.receipt-delivery-options p,
+.receipt-delivery-options > button {
+  grid-column: 1 / -1;
+}
+.receipt-email-field {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.receipt-email-field input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface);
+}
 .pos-receipt {
   max-width: 100%;
   white-space: pre-wrap;
@@ -374,4 +425,98 @@
 }
 .pos-product-image strong {
   padding: 10px 12px;
+}
+
+.refund-dialog {
+  width: min(900px, calc(100vw - 2rem));
+}
+.refund-dialog fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.refund-dialog input[type='number'] {
+  width: 110px;
+}
+.refund-dialog td {
+  vertical-align: top;
+}
+.refund-dialog label {
+  display: block;
+  margin-block: 12px;
+}
+.refund-dialog textarea {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+}
+.refund-payments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.refund-payments label {
+  display: grid;
+  gap: 6px;
+}
+.refund-payments small {
+  max-width: 190px;
+}
+.discount-editor {
+  width: min(880px, calc(100vw - 2rem));
+}
+.discount-editor fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.discount-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.discount-editor label {
+  display: grid;
+  gap: 6px;
+  margin-block: 12px;
+}
+.discount-editor label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.discount-editor input:not([type='checkbox']),
+.discount-editor select,
+.discount-editor textarea {
+  width: 100%;
+  font: inherit;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface, white);
+  color: inherit;
+}
+.discount-editor small,
+.discount-editor p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.pos-discount {
+  border-block: 1px solid var(--line);
+  padding-block: 12px;
+  margin-block: 12px;
+}
+.pos-discount input {
+  width: 140px;
+}
+.pos-discount p {
+  font-size: 12px;
+}
+.discount-manager td {
+  vertical-align: top;
+}
+@media (max-width: 700px) {
+  .discount-grid {
+    grid-template-columns: 1fr;
+  }
 }

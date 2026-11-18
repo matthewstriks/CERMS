@@ -1,0 +1,40 @@
+.profile-files {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 16px;
+}
+.profile-files .member-files {
+  padding: 0;
+  list-style: none;
+}
+.profile-files .member-files li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.profile-files .member-files strong {
+  overflow-wrap: anywhere;
+}
+.profile-files small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 11px;
+}
+.member-file-picker {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.profile-files .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.member-file-picker input {
+  max-width: 100%;
+}

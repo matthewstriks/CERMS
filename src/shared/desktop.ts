@@ -1,5 +1,6 @@
 import type { UpdateState } from './updates'
 import type { ServiceStatus } from './service-status'
+import type { AiSupportState, AssistantUser } from './ai-support'
 export interface AppInfo {
   version: string
   electron: string
@@ -16,6 +17,7 @@ export interface BugReportFile {
   size: number
 }
 export interface BugReportContext {
+  mode?: 'login'
   email: string
   uid: string
   business: string
@@ -25,6 +27,7 @@ export interface BugReportContext {
   logs: string[]
 }
 export interface BugReportPayload {
+  replyEmail?: string
   requestId: string
   subject: string
   priority: 'low' | 'normal' | 'high' | 'urgent'
@@ -34,6 +37,19 @@ export interface BugReportPayload {
   files: BugReportFile[]
 }
 export interface DesktopApi {
+  openAssistant(): Promise<void>
+  closeAssistant(): Promise<void>
+  setAssistantUser(user: AssistantUser | null): Promise<void>
+  getAssistantContext(): Promise<{ user: AssistantUser | null; version: string }>
+  removeAiSupport(): Promise<AiSupportState>
+  getAiSupportState(): Promise<AiSupportState>
+  setupAiSupport(): Promise<AiSupportState>
+  askAiSupport(question: string): Promise<AiSupportState>
+  cancelAiSupport(): Promise<AiSupportState>
+  resetAiSupport(): Promise<AiSupportState>
+  finishAiSupport(): Promise<AiSupportState>
+  onAiSupportState(callback: (state: AiSupportState) => void): () => void
+  reportInstallation(token: string): Promise<string>
   getUpdateState(): Promise<UpdateState>
   onUpdateState(callback: (state: UpdateState) => void): () => void
   checkForUpdates(): Promise<UpdateState>
@@ -58,6 +74,7 @@ export interface DesktopApi {
     uid: string
     business: string
   }): Promise<void>
+  openLoginSupport(email?: string): Promise<void>
   getBugReportContext(): Promise<BugReportContext>
   captureMainWindow(): Promise<BugReportFile>
   chooseBugFiles(): Promise<BugReportFile[]>

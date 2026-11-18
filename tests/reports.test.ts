@@ -268,3 +268,32 @@ it('exports scoped CSV with stable IDs, correct units, no private notes, and spr
     exportReport({ ...data, sales: { error: 'Unavailable' } }, 'summary', 'UTC'),
   ).toThrow('unavailable')
 })
+
+it('reports net discount savings after a discounted item return', () => {
+  const sale = receipt()
+  sale.discount = { code: 'SAVE', name: 'Savings', kind: 'amount', value: 100, version: 1 }
+  sale.discountCents = 100
+  const refund = {
+    ...receipt(),
+    id: 'refund',
+    kind: 'refund' as const,
+    discountCents: -40,
+    subtotalCents: -400,
+    taxCents: -32,
+    totalCents: -432,
+    lines: [{ ...sale.lines[0]!, subtotalCents: -400, taxCents: -32, totalCents: -432 }],
+    payments: [
+      {
+        method: 'cash' as const,
+        direction: 'out' as const,
+        amountCents: 432,
+        receivedCents: 432,
+        changeCents: 0,
+        reference: '',
+      },
+    ],
+  }
+  const result = summarizeSales([sale, refund], range)
+  expect(result.discounts).toBe(60)
+  expect(result.collected).toBe(648)
+})

@@ -1,0 +1,28 @@
+{
+  "verifiedAt": "2026-11-18T05:49:25.150Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/emailAiSupportConversation",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-18T05:48:28.661016992Z"
+  },
+  "allOtherFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "privateEvaluationOnlyNoGithubIssues": true,
+  "originalChatUserSnapshotIncluded": true,
+  "legacyPayloadsRemainAccepted": true,
+  "fullTranscriptNotStoredInFirestore": true,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/ai-conversation-email.mjs": "8e79e6899bf506403dece9502b9965dc9a43f2c3e9308098d06fd138235fc371",
+    "functions/ai-conversation-domain.mjs": "917340f06f10430428ca4c206c166c06becc694c7109b4cea067cc9603a0c0ed",
+    "functions/index.mjs": "c065e571426555b617cb28f9b25cee8cb16fe08a4f6fb95cc8b3081ecec79ece",
+    "src/main/ai-conversation-outbox.ts": "851a7dafc6252a4490858d71adc479e2d257f3f3f17eef49b8a1cb6c303c2c93",
+    "src/shared/ai-conversation-policy.ts": "8b4e7d222c9cd1f59c9f7527866defec47f6b2d2f8e9f3eefadc4d1ea79f1829"
+  }
+}

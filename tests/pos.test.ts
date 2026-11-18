@@ -42,6 +42,10 @@ describe('POS money and access', () => {
     }
     expect(effectivePermissions('staff', old)).toEqual({
       ...old,
+      manageDiscountCodes: false,
+      processRefunds: false,
+      editStaffProfiles: false,
+      removeStaffAccounts: false,
       removeMemberNotes: false,
       processSales: false,
       waiveProducts: false,

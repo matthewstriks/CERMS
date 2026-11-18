@@ -1,3 +1,5 @@
+import DiscountManager from './pos/DiscountManager'
+import DiscountEntry, { type AppliedDiscount } from './pos/DiscountEntry'
 import { requestNotificationSound } from '../lib/notification-audio'
 import RegisterCountDialog from './registers/RegisterCountDialog'
 import RegisterRequiredDialog from './registers/RegisterRequiredDialog'
@@ -49,6 +51,7 @@ import './pos/Pos.css'
 type Tender = PaymentEntry
 function readDraft(key: string): {
   cart: CartLine[]
+  discountCode?: string
   customerName: string
   note: string
   pending: SaleRequest | null
@@ -58,6 +61,7 @@ function readDraft(key: string): {
   rentalsOnly?: boolean
   choosingRentals?: boolean
   promptMembership?: boolean
+  membershipProductId?: string
 } {
   const empty = { cart: [], customerName: '', note: '', pending: null }
   let preservedPending: SaleRequest | null = null
@@ -187,6 +191,10 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     [paying, setPaying] = useState(false),
     [customerName, setCustomerName] = useState(initialDraft.customerName),
     [note, setNote] = useState(initialDraft.note),
+    [appliedCode, setAppliedCode] = useState(
+      typeof initialDraft.discountCode === 'string' ? initialDraft.discountCode : '',
+    ),
+    [discountQuote, setDiscountQuote] = useState<AppliedDiscount | null>(null),
     [pending, setPending] = useState<SaleRequest | null>(initialDraft.pending),
     [receipt, setReceipt] = useState<SaleReceipt | null>(null)
   const [member, setMember] = useState<OrderMember | undefined>(initialDraft.member)
@@ -201,7 +209,14 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     productId?: string
     renewalPrompt?: boolean
     memberId?: string
-  } | null>(initialDraft.promptMembership === true ? { renewalPrompt: true } : null)
+  } | null>(
+    initialDraft.promptMembership === true
+      ? {
+          renewalPrompt: !initialDraft.membershipProductId,
+          productId: initialDraft.membershipProductId,
+        }
+      : null,
+  )
   const [registerPrompt, setRegisterPrompt] = useState(false)
   const [checkingRegister, setCheckingRegister] = useState(false)
   const orderStarted = !!(
@@ -320,6 +335,8 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     searchInput = useRef<HTMLInputElement>(null),
     paymentDialog = useRef<HTMLDialogElement>(null)
   const canSell = !!reader && hasStaffPermission(reader.uid, 'processSales', reader.permissions)
+  const canManageCodes =
+    !!reader && hasStaffPermission(reader.uid, 'manageDiscountCodes', reader.permissions)
   const canWaive = !!reader && hasStaffPermission(reader.uid, 'waiveProducts', reader.permissions)
   useEffect(() => {
     try {
@@ -327,6 +344,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
         key,
         JSON.stringify({
           schemaVersion: 1,
+          discountCode: appliedCode,
           cart,
           customerName,
           note,
@@ -337,6 +355,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           rentalsOnly,
           choosingRentals,
           promptMembership: membershipPurchase?.renewalPrompt === true,
+          membershipProductId: membershipPurchase?.productId,
         }),
       )
     } catch {
@@ -347,12 +366,14 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     customerName,
     note,
     pending,
+    appliedCode,
     member,
     pendingMembers,
     existingMembers,
     rentalsOnly,
     choosingRentals,
     membershipPurchase?.renewalPrompt,
+    membershipPurchase?.productId,
     key,
   ])
   async function refresh() {
@@ -405,7 +426,22 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
     if (paying) paymentDialog.current?.showModal()
     else paymentDialog.current?.close()
   }, [paying])
-  const totals = cartTotals(cart, settings?.taxRateBps ?? null),
+  const discountCartKey = JSON.stringify({
+    lines: cart.map((l) => ({
+      productId: l.product.id,
+      version: l.product.version,
+      quantity: l.quantity,
+      unitPriceCents: l.unitPriceCents,
+      ...(l.waived ? { waived: true } : {}),
+    })),
+    memberId: member && !member.draft ? member.id : null,
+  })
+  const activeDiscount =
+    discountQuote?.cartKey === discountCartKey && discountQuote.code === appliedCode
+      ? discountQuote
+      : null
+  const discountReady = !appliedCode || !!activeDiscount
+  const totals = cartTotals(cart, settings?.taxRateBps ?? null, activeDiscount?.lineDiscounts),
     locked =
       busy ||
       !!pending ||
@@ -667,6 +703,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
         key,
         JSON.stringify({
           schemaVersion: 1,
+          discountCode: appliedCode,
           cart,
           customerName,
           note,
@@ -692,6 +729,8 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
       setCart([])
       setCustomerName('')
       setNote('')
+      setAppliedCode('')
+      setDiscountQuote(null)
       setPayments([])
       setPending(null)
       setPaying(false)
@@ -723,6 +762,14 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           <button className={tab === 'history' ? 'selected' : ''} onClick={() => setTab('history')}>
             Sales & payments
           </button>
+          {canManageCodes && (
+            <button
+              className={tab === 'discounts' ? 'selected' : ''}
+              onClick={() => setTab('discounts')}
+            >
+              Discount codes
+            </button>
+          )}
           {reader.uid === ownerUid && (
             <button
               className={tab === 'settings' ? 'selected' : ''}
@@ -768,6 +815,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           }}
         />
       )}
+      {tab === 'discounts' && canManageCodes && <DiscountManager />}
       {tab === 'history' && <SalesHistory client={clients.pos} />}
       {tab === 'sale' &&
         (!canSell ? (
@@ -1175,7 +1223,20 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                     onChange={(e) => setNote(e.target.value)}
                   />
                 </label>
+                <DiscountEntry
+                  code={appliedCode}
+                  onCode={setAppliedCode}
+                  cartKey={discountCartKey}
+                  onQuote={setDiscountQuote}
+                  disabled={locked || paying || !cart.length}
+                />
                 <dl className="pos-totals">
+                  {activeDiscount && (
+                    <div>
+                      <dt>Discount {activeDiscount.code}</dt>
+                      <dd>−{money(activeDiscount.expectedDiscountCents / 100)}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt>Subtotal</dt>
                     <dd>{money(totals.subtotalCents / 100)}</dd>
@@ -1204,6 +1265,7 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
                   className="primary pos-pay-button"
                   disabled={
                     locked ||
+                    !discountReady ||
                     !register ||
                     !settings ||
                     !cart.length ||
@@ -1268,6 +1330,11 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
         }}
       >
         <h2>{totals.totalCents < 0 ? 'Record payout' : 'Take payment'}</h2>
+        {activeDiscount && (
+          <p>
+            Discount {activeDiscount.code}: −{money(activeDiscount.expectedDiscountCents / 100)}
+          </p>
+        )}
         <p className="pos-payment-total">{money(Math.abs(totals.totalCents) / 100)}</p>
         <p>
           Double-click an amount to fill the remaining due. Enter cash received to calculate change.
@@ -1377,12 +1444,21 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           ) : (
             <button
               className="primary"
-              disabled={busy || !!paymentError || settlement.remainingCents !== 0}
+              disabled={busy || !discountReady || !!paymentError || settlement.remainingCents !== 0}
               onClick={() => {
                 if (!register) return
                 try {
                   const request: SaleRequest = {
                     business: reader.club,
+                    ...(activeDiscount
+                      ? {
+                          discount: {
+                            code: activeDiscount.code,
+                            version: activeDiscount.version,
+                            expectedDiscountCents: activeDiscount.expectedDiscountCents,
+                          },
+                        }
+                      : {}),
                     requestId: crypto.randomUUID(),
                     registerId: register.id,
                     taxRateBps: settings?.taxRateBps ?? 0,
@@ -1464,6 +1540,16 @@ export default function PointOfSale({ historyOnly = false }: { historyOnly?: boo
           onClose={() => setAddingMembership(null)}
           onCreated={() => {}}
           onAddToOrder={addMembership}
+          onUseExisting={(m, product) => {
+            setExistingMembers((rows) =>
+              rows.some((p) => p.id === m.id) ? rows : [...rows, { id: m.id, name: m.name }],
+            )
+            if (!member) {
+              setMember({ id: m.id, name: m.name })
+              setCustomerName(m.name)
+            }
+            setMembershipPurchase({ productId: product.id, memberId: m.id })
+          }}
           onViewMember={(m) => {
             setAddingMembership(null)
             setExistingMembers((rows) =>

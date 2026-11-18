@@ -1,5 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { existsSync, readFileSync, mkdirSync, writeFileSync, renameSync, unlinkSync } from 'node:fs'
+import { readFile, writeFile, rename } from 'node:fs/promises'
+import { hostname, release } from 'node:os'
+import { randomUUID } from 'node:crypto'
+import { createInstallationReporter } from './installation-reporting'
+import { installationEndpoint } from '../shared/installation-policy'
 import { autoUpdater } from 'electron-updater'
 import { createUpdateController } from './updates'
 import { createServiceStatusMonitor } from './service-status'
@@ -31,6 +35,12 @@ import type {
   BugReportPayload,
 } from '../shared/desktop'
 import { allowFirebaseRequest, isMemberFileUrl } from '../shared/firebase-policy'
+import { loginSupportEndpoint } from '../shared/bug-report-policy'
+import { supportFileType } from '../shared/support-files'
+import { createAiSupport, ollamaDownloadPage } from './ai-support'
+import { validAssistantUser, type AssistantUser } from '../shared/ai-support'
+import { createAiConversationOutbox } from './ai-conversation-outbox'
+import { aiConversationEndpoint, type AiConversationReason } from '../shared/ai-conversation-policy'
 
 // Keep the new app's local profile separate from CERMS 4, including in development.
 app.setName('CERMS 5')
@@ -45,9 +55,99 @@ const appIcon = app.isPackaged
 let mainWindow: BrowserWindow | null = null
 let aboutWindow: BrowserWindow | null = null
 let bugReportWindow: BrowserWindow | null = null
+let assistantWindow: BrowserWindow | null = null
+let assistantUser: AssistantUser | null = null
+let aiConversationOutbox: ReturnType<typeof createAiConversationOutbox> | undefined
+const aiSupport = createAiSupport({
+  version: app.getVersion(),
+  changed: (state) => {
+    try {
+      aiConversationOutbox?.capture(state.turns, assistantUser)
+    } catch {
+      state.emailError =
+        'This conversation could not be saved for email. Please free disk space and finish the conversation before closing.'
+    }
+    if (assistantWindow && !assistantWindow.isDestroyed())
+      assistantWindow.webContents.send('support-ai:state', state)
+    if (mainWindow && !mainWindow.isDestroyed())
+      mainWindow.webContents.send('support-ai:state', { ...state, turns: [] })
+  },
+})
+function finishAiConversation(reason: AiConversationReason) {
+  aiSupport.cancel()
+  aiConversationOutbox?.capture(aiSupport.state().turns, assistantUser)
+  const queued = aiConversationOutbox?.finish(reason) ?? false
+  aiSupport.reset(queued ? 'Chat finished.' : undefined)
+  void aiConversationOutbox?.flush().catch(() => {})
+  return aiSupport.state()
+}
 let bugReportAuth: { token: string; email: string; uid: string; business: string } | null = null
+let loginSupport = false
 const bugReportEndpoint = 'https://us-central1-cerms-7af24.cloudfunctions.net/submitBugReport'
 const bugReportId = /^[a-zA-Z0-9_-]{1,128}$/
+const installationPath = join(app.getPath('userData'), 'installation-tracking.json')
+const installationReporter = createInstallationReporter({
+  enabled: app.isPackaged,
+  version: app.getVersion(),
+  device: {
+    hostname: hostname() || 'Unnamed device',
+    platform: process.platform,
+    arch: process.arch,
+    osRelease: release(),
+  },
+  read: async () => {
+    try {
+      return await readFile(installationPath, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        // Exclusive creation keeps one identity even if two app processes sign in together.
+        try {
+          await writeFile(
+            installationPath,
+            JSON.stringify({
+              schemaVersion: 1,
+              installationId: randomUUID(),
+              version: app.getVersion(),
+              previousVersion: null,
+              acknowledged: [],
+            }),
+            { flag: 'wx', mode: 0o600 },
+          )
+        } catch (creationError) {
+          if ((creationError as NodeJS.ErrnoException).code !== 'EEXIST') throw creationError
+        }
+        return readFile(installationPath, 'utf8')
+      }
+      throw error
+    }
+  },
+  write: async (value) => {
+    const temporary = installationPath + `.${process.pid}.tmp`
+    await writeFile(temporary, value, { mode: 0o600 })
+    await rename(temporary, installationPath)
+  },
+  post: async (token, data) => {
+    const response = await net.fetch(installationEndpoint, {
+      method: 'POST',
+      signal: AbortSignal.timeout(20000),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ data }),
+    })
+    const result = (await response.json()) as {
+      result?: { status: 'sent' | 'pending' | 'review' }
+      error?: { status: string }
+    }
+    if (!response.ok || result.error)
+      throw Object.assign(Error('Installation notification not confirmed'), {
+        permanent: ['INVALID_ARGUMENT', 'UNAUTHENTICATED', 'PERMISSION_DENIED'].includes(
+          result.error?.status || '',
+        ),
+      })
+    if (!result.result || !['sent', 'pending', 'review'].includes(result.result.status))
+      throw Error('Installation notification not confirmed')
+    return result.result
+  },
+})
 
 function aboutInfo(): AboutInfo {
   return {
@@ -59,21 +159,94 @@ function aboutInfo(): AboutInfo {
   }
 }
 
-async function openBugReport(auth: {
-  token: string
-  email: string
-  uid: string
-  business: string
-}): Promise<void> {
+async function openAssistant(): Promise<void> {
+  if (assistantWindow && !assistantWindow.isDestroyed()) {
+    if (assistantWindow.isMinimized()) assistantWindow.restore()
+    assistantWindow.show()
+    assistantWindow.focus()
+    return
+  }
+  const window = new BrowserWindow({
+    icon: appIcon,
+    width: 780,
+    height: 820,
+    minWidth: 540,
+    minHeight: 620,
+    show: false,
+    title: 'CERMS Assistant',
+    backgroundColor: '#f4f7f5',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  })
+  assistantWindow = window
+  window.setMenu(null)
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+  window.webContents.on('will-attach-webview', (event) => event.preventDefault())
+  window.once('ready-to-show', () => window.show())
+  window.on('close', (event) => {
+    try {
+      finishAiConversation('window-closed')
+    } catch {
+      event.preventDefault()
+      dialog.showErrorBox(
+        'Conversation could not be saved',
+        'Free disk space and try closing again. Your chat remains open.',
+      )
+    }
+  })
+  window.once('closed', () => {
+    if (assistantWindow !== window) return
+    assistantWindow = null
+    try {
+      finishAiConversation('window-closed')
+    } catch {
+      /* Journal recovers on next launch. */
+    }
+  })
+  try {
+    await window.loadURL(
+      devUrl ? new URL('assistant.html', devUrl).href : 'cerms://app/assistant.html',
+    )
+  } catch (error) {
+    window.destroy()
+    throw error
+  }
+}
+
+async function openBugReport(
+  auth: {
+    token: string
+    email: string
+    uid: string
+    business: string
+  },
+  login = false,
+): Promise<void> {
   if (
-    typeof auth.token !== 'string' ||
-    !auth.token ||
+    (!login &&
+      (typeof auth.token !== 'string' ||
+        !auth.token ||
+        !bugReportId.test(auth.uid) ||
+        !bugReportId.test(auth.business))) ||
     typeof auth.email !== 'string' ||
-    auth.email.length > 320 ||
-    !bugReportId.test(auth.uid) ||
-    !bugReportId.test(auth.business)
+    auth.email.length > 320
   )
     throw new Error('Bug reports require an authenticated staff session.')
+  if (
+    bugReportWindow &&
+    (loginSupport !== login ||
+      bugReportAuth?.uid !== auth.uid ||
+      bugReportAuth?.business !== auth.business)
+  )
+    bugReportWindow.destroy()
+  loginSupport = login
   bugReportAuth = auth
   if (bugReportWindow && !bugReportWindow.isDestroyed()) {
     if (bugReportWindow.isMinimized()) bugReportWindow.restore()
@@ -88,7 +261,7 @@ async function openBugReport(auth: {
     minWidth: 620,
     minHeight: 620,
     show: false,
-    title: 'Report a bug · CERMS',
+    title: login ? 'Contact support · CERMS' : 'Report a bug · CERMS',
     backgroundColor: '#f5f6f8',
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
     webPreferences: {
@@ -231,6 +404,10 @@ app
     const updates = createUpdateController(autoUpdater, {
       version: app.getVersion(),
       enabled: releaseUpdatesEnabled && ['darwin', 'win32'].includes(process.platform),
+      disabledReason:
+        app.isPackaged && process.platform === 'darwin' && !releaseUpdatesEnabled
+          ? 'This Mac build uses manual updates. Automatic updates require a signed CERMS release.'
+          : undefined,
       changed: (state) => {
         if (mainWindow && !mainWindow.isDestroyed())
           mainWindow.webContents.send('app:update-state', state)
@@ -252,6 +429,7 @@ app
             details.url,
             details.method,
             details.url.includes('/accounts:sendOobCode') ||
+              details.url.includes('/accounts:update') ||
               details.url.startsWith('https://us-central1-cerms-7af24.cloudfunctions.net/') ||
               new URL(details.url).pathname.endsWith('/documents:commit')
               ? details.uploadData?.map((part) => part.bytes?.toString('utf8') ?? '').join('')
@@ -419,6 +597,21 @@ app
         throw new Error('Untrusted request')
       await setWindowMode(mainWindow, mode)
     })
+    ipcMain.handle('app:report-installation', async (event, token: unknown) => {
+      if (
+        !trustedWindow(event, mainWindow) ||
+        typeof token !== 'string' ||
+        !token ||
+        token.length > 20000
+      )
+        throw Error('Untrusted installation report')
+      try {
+        return await installationReporter.report(token)
+      } catch {
+        console.warn('Installation notification remains pending; it will retry after sign-in.')
+        return 'pending'
+      }
+    })
     ipcMain.handle('app:info', (event): AppInfo => {
       if (
         !mainWindow ||
@@ -452,6 +645,96 @@ app
         throw new Error('Untrusted request')
       await openBugReport(auth as { token: string; email: string; uid: string; business: string })
     })
+    ipcMain.handle('bug-report:open-login', async (event, email: unknown) => {
+      if (
+        !trustedWindow(event, mainWindow) ||
+        (email !== undefined && (typeof email !== 'string' || email.length > 320))
+      )
+        throw new Error('Untrusted support request')
+      await openBugReport(
+        { token: '', email: typeof email === 'string' ? email : '', uid: '', business: '' },
+        true,
+      )
+    })
+    ipcMain.handle('assistant:open', async (event) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      await openAssistant()
+    })
+    ipcMain.handle('assistant:context', (event) => {
+      if (!trustedWindow(event, assistantWindow)) throw new Error('Untrusted request')
+      return { user: assistantUser, version: app.getVersion() }
+    })
+    ipcMain.handle('assistant:close', (event) => {
+      if (!trustedWindow(event, assistantWindow)) throw new Error('Untrusted request')
+      assistantWindow?.close()
+    })
+    ipcMain.handle('assistant:user', (event, user: unknown) => {
+      if (!trustedWindow(event, mainWindow) || !(user === null || validAssistantUser(user)))
+        throw new Error('Untrusted assistant context')
+      if (assistantUser?.uid !== user?.uid || assistantUser?.business !== user?.business) {
+        finishAiConversation('session-changed')
+        assistantWindow?.close()
+      }
+      assistantUser = user === null ? null : { ...user }
+    })
+    ipcMain.handle('support-ai:remove', async (event) => {
+      if (!trustedWindow(event, mainWindow)) throw new Error('Untrusted request')
+      if (aiSupport.state().busy)
+        throw new Error('Finish or cancel the current assistant operation first.')
+      const choice = await dialog.showMessageBox(mainWindow!, {
+        type: 'question',
+        title: 'Remove CERMS Assistant download?',
+        message: 'Remove the CERMS Assistant model from this computer?',
+        detail:
+          'Ollama and other models stay installed. Other apps using this same model will need to download it again.',
+        buttons: ['Cancel', 'Remove download'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      })
+      if (choice.response !== 1) return { ...aiSupport.state(), turns: [] }
+      const state = await aiSupport.remove()
+      if (!state.modelReady && !state.error) finishAiConversation('model-removed')
+      return { ...aiSupport.state(), turns: [] }
+    })
+    ipcMain.handle('support-ai:state', async (event) => {
+      if (!trustedWindow(event, assistantWindow) && !trustedWindow(event, mainWindow))
+        throw new Error('Untrusted request')
+      const state = await aiSupport.check()
+      return trustedWindow(event, mainWindow) ? { ...state, turns: [] } : state
+    })
+    ipcMain.handle('support-ai:setup', async (event) => {
+      if (!trustedWindow(event, assistantWindow)) throw new Error('Untrusted request')
+      const state = await aiSupport.check()
+      // Only the user-triggered setup action opens the official runtime download page.
+      // CERMS never silently executes a downloaded installer or arbitrary shell command.
+      if (state.runtime === 'missing') {
+        await shell.openExternal(ollamaDownloadPage(process.platform))
+        return aiSupport.state()
+      }
+      if (state.runtime !== 'available' || state.busy) return state
+      return aiSupport.download()
+    })
+    ipcMain.handle('support-ai:ask', async (event, question: unknown) => {
+      if (!trustedWindow(event, assistantWindow)) throw new Error('Untrusted request')
+      if (!aiConversationOutbox)
+        throw new Error(
+          'AI conversation email storage is unavailable. You can still submit a ticket.',
+        )
+      return aiSupport.ask(question)
+    })
+    ipcMain.handle('support-ai:cancel', (event) => {
+      if (!trustedWindow(event, assistantWindow)) throw new Error('Untrusted request')
+      return aiSupport.cancel()
+    })
+    ipcMain.handle('support-ai:reset', (event) => {
+      if (!trustedWindow(event, assistantWindow)) throw new Error('Untrusted request')
+      return finishAiConversation('new-conversation')
+    })
+    ipcMain.handle('support-ai:finish', (event) => {
+      if (!trustedWindow(event, assistantWindow)) throw new Error('Untrusted request')
+      return finishAiConversation('end-button')
+    })
     ipcMain.handle('bug-report:context', async (event): Promise<BugReportContext> => {
       if (!trustedWindow(event, bugReportWindow) || !bugReportAuth || !mainWindow)
         throw new Error('Bug report session is unavailable.')
@@ -467,6 +750,7 @@ app
         logs = ['Unable to read renderer diagnostics.']
       }
       return {
+        ...(loginSupport ? { mode: 'login' as const } : {}),
         email: bugReportAuth.email,
         uid: bugReportAuth.uid,
         business: bugReportAuth.business,
@@ -499,12 +783,12 @@ app
       let total = 0
       for (const path of result.filePaths.slice(0, 10)) {
         const data = await readFile(path)
-        if (data.byteLength > 8 * 1024 * 1024 || total + data.byteLength > 20 * 1024 * 1024)
-          throw new Error('Attachments must be no larger than 8 MB each and 20 MB total.')
+        if (data.byteLength > 8 * 1024 * 1024 || total + data.byteLength > 8 * 1024 * 1024)
+          throw new Error('Screenshots and attachments must total no more than 8 MB.')
         total += data.byteLength
         files.push({
           name: path.split(/[\\/]/).pop() || 'attachment',
-          contentType: 'application/octet-stream',
+          contentType: supportFileType(path),
           base64: data.toString('base64'),
           size: data.byteLength,
         })
@@ -515,10 +799,20 @@ app
       if (!trustedWindow(event, bugReportWindow) || !bugReportAuth)
         throw new Error('Bug report session is unavailable.')
       if (!payload || typeof payload !== 'object') throw new Error('Invalid bug report.')
-      const response = await net.fetch(bugReportEndpoint, {
+      const report = payload as BugReportPayload
+      if (
+        !Array.isArray(report.files) ||
+        !Array.isArray(report.screenshots) ||
+        report.files.length > 10 ||
+        report.screenshots.length > 5 ||
+        [...report.files, ...report.screenshots].reduce((sum, file) => sum + file.size, 0) >
+          8 * 1024 * 1024
+      )
+        throw new Error('Use at most 10 files and 5 screenshots, totaling no more than 8 MB.')
+      const response = await net.fetch(loginSupport ? loginSupportEndpoint : bugReportEndpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${bugReportAuth.token}`,
+          ...(!loginSupport ? { Authorization: `Bearer ${bugReportAuth.token}` } : {}),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ data: payload as BugReportPayload }),
@@ -534,6 +828,94 @@ app
     ipcMain.handle('bug-report:close', (event) => {
       if (!trustedWindow(event, bugReportWindow)) throw new Error('Untrusted request')
       bugReportWindow?.close()
+    })
+    const aiOutboxPath = join(app.getPath('userData'), 'ai-support-email-outbox.json')
+    try {
+      aiConversationOutbox = createAiConversationOutbox({
+        version: app.getVersion(),
+        platform: process.platform,
+        device: hostname() || 'Unnamed device',
+        read: () => {
+          try {
+            return readFileSync(aiOutboxPath, 'utf8')
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+            throw error
+          }
+        },
+        write: (text) => {
+          mkdirSync(app.getPath('userData'), { recursive: true, mode: 0o700 })
+          const temporary = aiOutboxPath + '.' + randomUUID() + '.tmp'
+          try {
+            writeFileSync(temporary, text, {
+              encoding: 'utf8',
+              mode: 0o600,
+              flag: 'wx',
+              flush: true,
+            })
+            renameSync(temporary, aiOutboxPath)
+          } catch (error) {
+            try {
+              unlinkSync(temporary)
+            } catch {
+              /* Preserve the existing journal. */
+            }
+            throw error
+          }
+        },
+        post: async (data) => {
+          const response = await net.fetch(aiConversationEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data }),
+            signal: AbortSignal.timeout(60000),
+          })
+          const result = (await response.json()) as { result?: { status?: string } }
+          if (!response.ok || !['sent', 'review'].includes(result.result?.status ?? ''))
+            throw new Error('Conversation email is pending.')
+          return result.result!.status as 'sent' | 'review'
+        },
+      })
+    } catch {
+      console.error('AI conversation email storage needs review; existing files were preserved.')
+    }
+    void aiConversationOutbox?.flush().catch(() => {})
+    const aiEmailRetry = setInterval(() => {
+      void aiConversationOutbox?.flush().catch(() => {})
+    }, 60000)
+    aiEmailRetry.unref()
+    let finishingQuit = false
+    app.on('before-quit', (event) => {
+      if (finishingQuit) return
+      try {
+        finishAiConversation('application-quit')
+      } catch {
+        event.preventDefault()
+        dialog.showErrorBox(
+          'AI conversation could not be saved',
+          'Free disk space and try quitting again.',
+        )
+        return
+      }
+      if (!aiConversationOutbox?.pending()) {
+        clearInterval(aiEmailRetry)
+        return
+      }
+      event.preventDefault()
+      finishingQuit = true
+      clearInterval(aiEmailRetry)
+      let deadline: ReturnType<typeof setTimeout>
+      void Promise.race([
+        aiConversationOutbox.flush(),
+        new Promise<void>((resolve) => {
+          deadline = setTimeout(resolve, 8000)
+        }),
+      ])
+        .catch(() => {})
+        .finally(() => {
+          clearTimeout(deadline)
+          app.quit()
+        })
     })
     await createWindow()
     const startupUpdate = setTimeout(() => {

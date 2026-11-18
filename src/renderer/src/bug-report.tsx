@@ -17,14 +17,29 @@ function BugReport() {
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [requestId] = useState(() => crypto.randomUUID())
-
+  const [replyEmail, setReplyEmail] = useState('')
+  const login = context?.mode === 'login'
   useEffect(() => {
+    let active = true
     void window.desktop
       .getBugReportContext()
-      .then(setContext)
-      .catch((failure) =>
-        setError(failure instanceof Error ? failure.message : 'Bug report details could not load.'),
-      )
+      .then((value) => {
+        if (active) {
+          setContext(value)
+          setReplyEmail(value.email)
+        }
+      })
+      .catch((failure) => {
+        if (active)
+          setError(
+            failure instanceof Error ? failure.message : 'Bug report details could not load.',
+          )
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !busy) void window.desktop.closeBugReport()
     }
@@ -34,22 +49,42 @@ function BugReport() {
 
   async function captureScreenshot() {
     if (busy) return
+    setBusy(true)
     setError('')
     try {
+      if (screenshots.length >= 5) throw new Error('Use at most five screenshots.')
       const screenshot = await window.desktop.captureMainWindow()
+      if (
+        [...screenshots, ...files, screenshot].reduce((sum, file) => sum + file.size, 0) >
+        8 * 1024 * 1024
+      )
+        throw new Error('Screenshots and attachments must total no more than 8 MB.')
       setScreenshots((previous) => [...previous, screenshot])
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Screenshot could not be captured.')
+    } finally {
+      setBusy(false)
     }
   }
   async function chooseFiles() {
     if (busy) return
+    setBusy(true)
     setError('')
     try {
       const selected = await window.desktop.chooseBugFiles()
+      if (
+        files.length + selected.length > 10 ||
+        [...screenshots, ...files, ...selected].reduce((sum, file) => sum + file.size, 0) >
+          8 * 1024 * 1024
+      )
+        throw new Error(
+          'Use at most 10 files, with screenshots and attachments totaling no more than 8 MB.',
+        )
       setFiles((previous) => [...previous, ...selected])
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Files could not be attached.')
+    } finally {
+      setBusy(false)
     }
   }
   async function submit() {
@@ -61,6 +96,13 @@ function BugReport() {
     setBusy(true)
     setError('')
     try {
+      const attachments = [...files]
+
+      if (
+        attachments.length > 10 ||
+        [...attachments, ...screenshots].reduce((sum, file) => sum + file.size, 0) > 8 * 1024 * 1024
+      )
+        throw new Error('Use at most 10 files and 8 MB combined.')
       await window.desktop.submitBugReport({
         requestId,
         subject: subject.trim(),
@@ -68,7 +110,8 @@ function BugReport() {
         message: message.trim(),
         context,
         screenshots,
-        files,
+        files: attachments,
+        ...(login ? { replyEmail: replyEmail.trim() } : {}),
       })
       setSent(true)
     } catch (failure) {
@@ -82,10 +125,8 @@ function BugReport() {
       <header>
         <div>
           <span className="bug-kicker">CERMS 5 SUPPORT</span>
-          <h1>Report a bug</h1>
-          <p>
-            Tell us what went wrong. Your report includes the diagnostic information shown below.
-          </p>
+          <h1>{login ? 'Contact support' : 'Report a bug'}</h1>
+          <p>Send a support ticket with the details of the issue.</p>
         </div>
         <button
           className="secondary"
@@ -100,7 +141,8 @@ function BugReport() {
           <h2>Report sent</h2>
           <p>
             Thank you. Your report was emailed to support. Keep an eye on{' '}
-            <strong>{context?.email}</strong> for follow-up communication.
+            <strong>{login ? replyEmail.trim() : context?.email}</strong> for follow-up
+            communication.
           </p>
           <button className="primary" onClick={() => void window.desktop.closeBugReport()}>
             Done
@@ -108,14 +150,34 @@ function BugReport() {
         </section>
       ) : (
         <form
+          id="support-ticket"
           onSubmit={(event) => {
             event.preventDefault()
             void submit()
           }}
         >
+          <p>
+            Ticket descriptions may appear on public GitHub issues. Keep customer details out.
+            Email, diagnostics and attachments stay private.
+          </p>
+          {login && (
+            <label>
+              Reply email
+              <input
+                type="email"
+                required
+                maxLength={254}
+                value={replyEmail}
+                disabled={busy}
+                autoComplete="email"
+                onChange={(event) => setReplyEmail(event.target.value)}
+              />
+            </label>
+          )}
           <label>
             Subject
             <input
+              id="ticket-subject"
               required
               maxLength={200}
               value={subject}
@@ -154,9 +216,7 @@ function BugReport() {
             <div className="section-heading">
               <div>
                 <h2 id="attachments-heading">Evidence</h2>
-                <p>
-                  Capture the main CERMS window as many times as needed or attach supporting files.
-                </p>
+                <p>Add up to five screenshots and 10 files, totaling no more than 8 MB.</p>
               </div>
               <div className="button-row">
                 <button
@@ -183,6 +243,16 @@ function BugReport() {
                   <figure key={`${file.name}-${index}`}>
                     <img src={fileUrl(file)} alt={`Captured main window ${index + 1}`} />
                     <figcaption>{file.name}</figcaption>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={`Remove screenshot ${index + 1}`}
+                      onClick={() =>
+                        setScreenshots((previous) => previous.filter((_, i) => i !== index))
+                      }
+                    >
+                      Remove
+                    </button>
                   </figure>
                 ))}
               </div>
@@ -192,6 +262,14 @@ function BugReport() {
                 {files.map((file, index) => (
                   <li key={`${file.name}-${index}`}>
                     {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={`Remove file ${file.name}`}
+                      onClick={() => setFiles((previous) => previous.filter((_, i) => i !== index))}
+                    >
+                      Remove
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -202,7 +280,7 @@ function BugReport() {
               <summary>Included diagnostic information</summary>
               <p>
                 CERMS {context.version} · {context.platform} · Electron {context.electron} ·
-                Business {context.business}
+                {login ? 'Login support · not signed in' : `Business ${context.business}`}
               </p>
               <pre>
                 {context.logs.length ? context.logs.join('\n') : 'No renderer errors recorded.'}
@@ -224,7 +302,7 @@ function BugReport() {
               Cancel
             </button>
             <button className="primary" type="submit" disabled={busy || !context}>
-              {busy ? 'Sending…' : 'Send bug report'}
+              {busy ? 'Sending…' : login ? 'Send support request' : 'Send bug report'}
             </button>
           </div>
         </form>

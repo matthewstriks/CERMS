@@ -39,10 +39,12 @@ export function registerRows(data) {
       'Invalid included register',
     )
     const total = data.totals.get(r.id)
+    const cashDropCents = total?.cashDropCents ?? 0
+    assert.ok(Number.isSafeInteger(cashDropCents) && cashDropCents >= 0, 'Invalid cash drop total')
     if (total)
       assert.equal(
         total.expectedCashCents,
-        r.openingTotalCents + total.netByMethod.cash,
+        r.openingTotalCents + total.netByMethod.cash - cashDropCents,
         'Register cash mismatch',
       )
     const countCash = (values) =>
@@ -84,6 +86,11 @@ export function registerRows(data) {
         ? 'Full register lifetime totals'
         : 'No CERMS 5 POS ledger recorded; opening cash is the baseline',
       'Not recorded in CERMS 5',
+      cashDropCents / 100,
+      total?.refundCount ?? 0,
+      (total?.refundCents ?? 0) / 100,
+      (total?.refundTaxCents ?? 0) / 100,
+      (total?.discountCents ?? 0) / 100,
     ])
     for (const [key, label, cents] of denominations)
       counts.push([
@@ -173,7 +180,11 @@ export async function renderWorkbook(data, summary = summarize(data)) {
         ? 'Test preview; current-day data may be incomplete'
         : 'Scheduled daily report',
     ],
-    ['Completed orders', data.sales.length],
+    ['Completed orders', summary.completedOrders],
+    ['Discounts net of returns', summary.discounts / 100],
+    ['Refund count', summary.refundCount],
+    ['Refunded including tax', summary.refundCents / 100],
+    ['Tax refunded', summary.refundTaxCents / 100],
     ['Net sales before tax', summary.subtotal / 100],
     ['Tax', summary.tax / 100],
     ['Net transaction total', summary.total / 100],
@@ -210,7 +221,9 @@ export async function renderWorkbook(data, summary = summarize(data)) {
   ]
   const overview = sheet('Summary', ['Metric', 'Value'], summaryRows)
   summaryRows.forEach(([label], i) => {
-    if (/^(Net |Tax$|Waived product value$|Cash received$|Change given$|Cash paid out$)/.test(label))
+    if (
+      /^(Net |Tax$|Waived product value$|Cash received$|Change given$|Cash paid out$)/.test(label)
+    )
       overview.getCell(i + 5, 2).numFmt = moneyFormat
   })
   overview.getColumn(1).width = 38
@@ -234,6 +247,8 @@ export async function renderWorkbook(data, summary = summarize(data)) {
       'Change given',
       'Note',
       'Waived product value',
+      'Discount code',
+      'Discount net',
     ],
     data.sales.map((s) => {
       const paid = (key) =>
@@ -258,11 +273,13 @@ export async function renderWorkbook(data, summary = summarize(data)) {
         cash ? cash.changeCents / 100 : null,
         s.note || '',
         s.lines
-          .filter((l) => l.waived)
+          .filter((l) => l.waived && s.kind !== 'refund')
           .reduce((sum, l) => sum + Math.abs(l.quantity * l.unitPriceCents), 0) / 100,
+        s.discount?.code ?? '',
+        (s.discountCents ?? 0) / 100,
       ]
     }),
-    [8, 9, 10, 12, 13, 14, 15, 16, 17, 18],
+    [8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 20, 22],
   )
   sheet(
     'Order Items',
@@ -281,9 +298,10 @@ export async function renderWorkbook(data, summary = summarize(data)) {
       'Total',
       'Waived',
       'Waived value',
+      'Discount (net)',
     ],
     summary.orderItems,
-    [9, 10, 11, 12],
+    [9, 10, 11, 12, 15],
   )
   sheet(
     'Payments',
@@ -315,6 +333,7 @@ export async function renderWorkbook(data, summary = summarize(data)) {
       'Net total',
       'Waived units',
       'Waived value',
+      'Discount (net)',
     ],
     summary.products.map((p) => [
       p.id,
@@ -358,6 +377,32 @@ export async function renderWorkbook(data, summary = summarize(data)) {
     ]),
     [4, 5, 6, 7, 8, 9, 10],
   )
+  sheet(
+    'Refunds',
+    [
+      'Refund ID',
+      'Original order',
+      'Recorded at',
+      'Cashier',
+      'Issuing register',
+      'Reason',
+      'Refund including tax',
+      'Tax refunded',
+    ],
+    data.sales
+      .filter((s) => s.kind === 'refund')
+      .map((s) => [
+        s.id,
+        s.originalSaleId,
+        time(s.createdAt),
+        s.cashierName,
+        s.registerId,
+        s.reason,
+        -s.totalCents / 100,
+        -s.taxCents / 100,
+      ]),
+    [7, 8],
+  )
   const { rows, counts } = registerRows(data)
   const registerHeaders = [
     'Register ID',
@@ -380,8 +425,13 @@ export async function renderWorkbook(data, summary = summarize(data)) {
     'Closing note',
     'Reconciliation basis',
     'Payout-slip count (legacy)',
+    'Cash dropped (shift)',
+    'Refund count (shift)',
+    'Refunded including tax (shift)',
+    'Tax refunded (shift)',
+    'Discounts net of returns (shift)',
   ]
-  const registerMoney = [7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+  const registerMoney = [7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 27, 28, 29]
   sheet(
     'Registers',
     registerHeaders,
@@ -457,7 +507,10 @@ export function renderEmail(data, summary = summarize(data)) {
   const register = registerRows(data).rows.filter((r) => r[1] === 'Closed')
   const cards = [
     ['Net transactions', currency(summary.total)],
-    ['Completed orders', data.sales.length],
+    ['Completed orders', summary.completedOrders],
+    ['Refunds', `${summary.refundCount} · ${currency(summary.refundCents)}`],
+    ['Tax refunded', currency(summary.refundTaxCents)],
+    ['Discounts net of returns', currency(summary.discounts)],
     ['Tax recorded', currency(summary.tax)],
     ['Waived product value', currency(summary.waivedTotal)],
     ['Registers closed', data.registers.length],
@@ -471,7 +524,7 @@ export function renderEmail(data, summary = summarize(data)) {
       ['Cash paid out', currency(summary.cashPaidOut)],
     ],
   )}<h2 style="font-size:18px;margin:28px 0 6px">Register closeouts</h2>${register.length ? table(register.map((r) => [`${r[2]} · ${String(r[0]).slice(0, 8)}`, `Counted ${currency(r[8] * 100)} · Over/short ${currency(r[9] * 100)}`])) : '<p style="line-height:1.6;color:#52675f">No registers closed during this reporting day.</p>'}${data.openRegisters.length ? `<p style="padding:14px;background:#fff5df;color:#70531c;line-height:1.6;border-radius:8px">${data.openRegisters.length} register(s) remain open at report time. Their balances are provisional and are listed separately in the workbook.</p>` : ''}<div style="margin-top:28px;padding:20px;background:#f0f6f2;border:1px solid #d9e8de;border-radius:10px"><strong>Excel workbook attached</strong><p style="line-height:1.65;margin:8px 0 0;color:#52675f">Includes orders, line items, split payments, product and category totals, cashier summaries, register closeouts and denomination counts, memberships and rental assignments.</p></div><p style="font-size:12px;line-height:1.7;color:#6b7e73;margin:24px 0 0">Reporting timezone: ${config.timeZone}. Sales cover ${escape(time(data.window.start))} through the next midnight (exclusive). Register balances cover each complete shift, which can cross midnight. Only Dev System in CERMS 5 is included; legacy business reports remain separate.</p></td></tr><tr><td style="padding:20px 32px;background:#f7faf8;font-size:12px;color:#6b7e73">CERMS 5 · Automated daily report · No payment processing or settlement is performed by this report.</td></tr></table></td></tr></table></body></html>`
-  const text = `${data.testDelivery ? 'TEST PREVIEW — current-day activity may be incomplete.\n\n' : ''}${data.name} — Daily register report\n${data.window.date} (${config.timeZone})\nDev System / CERMS 5 only\n\nCompleted orders: ${data.sales.length}\nNet transactions: ${currency(summary.total)}\nTax: ${currency(summary.tax)}\nWaived product value: ${currency(summary.waivedTotal)}\nRegisters closed: ${data.registers.length}\nStill open: ${data.openRegisters.length}\n\n${Object.entries(
+  const text = `${data.testDelivery ? 'TEST PREVIEW — current-day activity may be incomplete.\n\n' : ''}${data.name} — Daily register report\n${data.window.date} (${config.timeZone})\nDev System / CERMS 5 only\n\nCompleted orders: ${summary.completedOrders}\nRefunds: ${summary.refundCount} (${currency(summary.refundCents)})\nNet transactions: ${currency(summary.total)}\nTax: ${currency(summary.tax)}\nDiscounts net of returns: ${currency(summary.discounts)}\nWaived product value: ${currency(summary.waivedTotal)}\nRegisters closed: ${data.registers.length}\nStill open: ${data.openRegisters.length}\n\n${Object.entries(
     methods,
   )
     .map(([key, name]) => `${name}: ${currency(summary.payments[key])}`)

@@ -45,6 +45,7 @@ export default function AppUpdates() {
         className="app-update-notice"
         aria-label="Application updates"
         data-notification-sound={`update:${state.phase}:${state.version ?? ''}`}
+        data-notification-sound-kind={state.phase === 'error' ? 'error' : 'notification'}
       >
         <div role="status">
           <strong>{state.phase === 'ready' ? 'Update ready' : 'Application updates'}</strong>
@@ -132,7 +133,15 @@ export function UpdateSettings() {
           onClose={() => setNotesVersion(null)}
         />
       )}
-      <p role="status">{state?.message ?? 'Loading update information…'}</p>
+      <p
+        role="status"
+        data-notification-sound={
+          state?.phase === 'error' ? `update-error:${state.message}` : undefined
+        }
+        data-notification-sound-kind="error"
+      >
+        {state?.message ?? 'Loading update information…'}
+      </p>
       {error && <p role="alert">{error}</p>}
       <button
         disabled={!state || ['disabled', 'checking', 'downloading', 'ready'].includes(state.phase)}

@@ -1,0 +1,48 @@
+{
+  "verifiedAt": "2026-11-18T03:24:39.089Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/inventoryEmailSettings",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T03:16:23.195657906Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/inventoryEmailSettingsWritten",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T03:16:34.074451435Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/inventoryProductWritten",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T03:16:41.292793159Z"
+    }
+  ],
+  "allExistingFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketPoliciesUnchanged": true,
+  "projectIamUnchangedExceptScopedEventarcGrants": true,
+  "pubsubTokenCreationScopedToSupportAccount": true,
+  "triggerInvocationScopedToNewServices": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "onlyNamedCermsTriggers": true,
+  "noCatalogOrBusinessMutationsByNotificationService": true,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/inventory-email.mjs": "b8d9e704b44521a52abe7ed22333b3ea3e582526bca1a36e97b24d632385910c",
+    "functions/inventory-email-domain.mjs": "27f47e83f902d720ef93c414b9fcbabac90f33ed8a24be83cca29dc38ead64dd",
+    "functions/index.mjs": "6d6fb2a890a5f7145a6bc7971b7363db83193715a30ea864b66366d82b312587",
+    "src/data/firebase-inventory-email.ts": "c0ca977a293cb1958868c579147301744b298d43fdc629958fad83d8e935ab06",
+    "src/shared/inventory-email-policy.ts": "658bae0fbe34b50c3dab93d946815f17d4dc77c3c48a70b89ade35a1263235ee"
+  },
+  "focusedVerification": {
+    "serverChecks": 4,
+    "clientChecks": 2,
+    "typecheckPassed": true,
+    "isolatedRecipientUiPassed": true,
+    "noProductionTestStockSettingsOrEmails": true
+  }
+}

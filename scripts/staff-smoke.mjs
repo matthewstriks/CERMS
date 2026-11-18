@@ -1,9 +1,24 @@
 import { _electron as electron, expect } from 'playwright/test'
 import assert from 'node:assert/strict'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, copyFile, writeFile, readFile, rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+const dir = await mkdtemp(join(tmpdir(), 'cerms-staff-create-'))
+await mkdir(join(dir, 'profile'))
+await mkdir(join(dir, 'resources/branding'), { recursive: true })
+await copyFile('resources/branding/icon.png', join(dir, 'resources/branding/icon.png'))
+const pkg = JSON.parse(await readFile('package.json', 'utf8'))
+await writeFile(
+  join(dir, 'package.json'),
+  JSON.stringify({ name: 'staff-create-fixture', version: pkg.version, main: 'bootstrap.cjs' }),
+)
+await writeFile(
+  join(dir, 'bootstrap.cjs'),
+  `const {app}=require('electron');const original=app.setPath.bind(app);app.setPath=(name,value)=>original(name,name==='userData'?${JSON.stringify(join(dir, 'profile'))}:value);require(${JSON.stringify(resolve('out/main/index.js'))});`,
+)
 const env = { ...process.env, ELECTRON_RENDERER_URL: '' }
 delete env.ELECTRON_RUN_AS_NODE
-const app = await electron.launch({ args: ['.', '--mute-audio'], env, timeout: 20000 })
+let app
 const base = 'projects/cerms-7af24/databases/cerms/documents',
   uid = 'c7D7AH07kgXmjn8tSiOgzHscLZ12',
   club = 'fixture-club',
@@ -30,6 +45,15 @@ documents.set(ownerPath, {
   },
 })
 try {
+  app = await electron.launch({ args: [dir, '--mute-audio'], env, timeout: 20000 })
+  await app.firstWindow()
+  await app.evaluate(({ net }) => {
+    const original = net.fetch.bind(net)
+    net.fetch = async (url, opts) => {
+      if (String(url).startsWith('file:')) return original(url, opts)
+      throw Error('Unexpected external request in isolated staff fixture')
+    }
+  })
   const admissions = await readFile(
     new URL('./fixtures/admissions-module.mjs', import.meta.url),
     'utf8',
@@ -86,6 +110,25 @@ try {
           ],
         })
     }
+    if (url.href === 'https://us-central1-cerms-7af24.cloudfunctions.net/manageStaffAccounts') {
+      const { data } = request.postDataJSON()
+      assert.equal(data.action, 'list')
+      assert.equal(data.business, club)
+      return respond({
+        result: {
+          rows: [...documents.values()]
+            .filter((d) => d.name.startsWith(base + '/users/'))
+            .map((d) => ({
+              uid: d.fields.uid.stringValue,
+              name: d.fields.displayName.stringValue,
+              email: d.fields.email.stringValue,
+              club,
+            })),
+          more: false,
+          cursor: null,
+        },
+      })
+    }
     if (url.href === 'https://us-central1-cerms-7af24.cloudfunctions.net/createStaffAccount') {
       const { data } = request.postDataJSON()
       assert.equal(data.business, club)
@@ -118,6 +161,10 @@ try {
       })
     }
     if (url.hostname === 'firestore.googleapis.com') {
+      if (url.pathname.includes('/Listen/')) {
+        assert.equal(url.searchParams.get('database'), 'projects/cerms-7af24/databases/cerms')
+        return route.abort()
+      }
       assert.ok(url.pathname.startsWith('/v1/' + base), 'Must only request cerms')
       const body = request.postDataJSON()
       if (url.pathname.endsWith(':batchGet'))
@@ -197,5 +244,6 @@ try {
     'Staff desktop flow passed: protected owner, create login, view/edit persisted permissions. All network traffic intercepted.',
   )
 } finally {
-  await app.close()
+  if (app) await app.close().catch(() => {})
+  await rm(dir, { recursive: true, force: true })
 }

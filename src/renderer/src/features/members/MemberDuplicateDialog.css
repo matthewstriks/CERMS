@@ -1,0 +1,45 @@
+.member-duplicate-dialog {
+  width: min(760px, calc(100vw - 48px));
+}
+.duplicate-entered-details {
+  padding: 12px;
+  background: var(--surface-soft, #f1f5f9);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.duplicate-member-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.duplicate-member-list > li {
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 10px;
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+.duplicate-member-list h3 {
+  margin: 0;
+}
+.duplicate-member-list h3 small,
+.duplicate-reasons {
+  color: var(--muted, #64748b);
+}
+.duplicate-member-list dl {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 6px 12px;
+}
+.duplicate-member-list dd {
+  margin: 0;
+}
+.duplicate-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+.duplicate-confirmation input {
+  width: auto;
+}

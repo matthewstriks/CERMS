@@ -1,5 +1,7 @@
 export const bugReportEndpoint =
   'https://us-central1-cerms-7af24.cloudfunctions.net/submitBugReport'
+export const loginSupportEndpoint =
+  'https://us-central1-cerms-7af24.cloudfunctions.net/submitLoginSupport'
 
 export function isBugReportRequest(body?: string): boolean {
   try {

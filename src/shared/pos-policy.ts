@@ -1,9 +1,11 @@
+import { validDiscountSelection } from './discount-policy'
 export const posEndpoints = {
   checkOutRental: 'https://us-central1-cerms-7af24.cloudfunctions.net/checkOutRental',
   updateRental: 'https://us-central1-cerms-7af24.cloudfunctions.net/updateRental',
   completeSale: 'https://us-central1-cerms-7af24.cloudfunctions.net/completeSale',
   savePosSettings: 'https://us-central1-cerms-7af24.cloudfunctions.net/savePosSettings',
   cashDrop: 'https://us-central1-cerms-7af24.cloudfunctions.net/cashDrop',
+  sendSaleReceipt: 'https://us-central1-cerms-7af24.cloudfunctions.net/sendSaleReceipt',
 } as const
 export function isPosRequest(url: string, body?: string): boolean {
   try {
@@ -17,6 +19,21 @@ export function isPosRequest(url: string, body?: string): boolean {
       !/^[a-zA-Z0-9_-]{1,128}$/.test(d.business)
     )
       return false
+    if (url === posEndpoints.sendSaleReceipt)
+      return (
+        typeof d.saleId === 'string' &&
+        /^[a-f0-9-]{36}$/.test(d.saleId) &&
+        (d.action === 'recipient'
+          ? Object.keys(d).sort().join() === 'action,business,saleId'
+          : d.action === 'send' &&
+            Object.keys(d).sort().join() === 'action,business,email,requestId,saleId,timeZone' &&
+            typeof d.requestId === 'string' &&
+            /^[a-f0-9-]{36}$/.test(d.requestId) &&
+            typeof d.email === 'string' &&
+            d.email.length <= 254 &&
+            typeof d.timeZone === 'string' &&
+            d.timeZone.length <= 80)
+      )
     if (url === posEndpoints.checkOutRental)
       return (
         Object.keys(d).sort().join() ===
@@ -74,6 +91,7 @@ export function isPosRequest(url: string, body?: string): boolean {
       Object.keys(d)
         .filter(
           (k) =>
+            k !== 'discount' &&
             k !== 'member' &&
             k !== 'rentals' &&
             k !== 'pendingMembers' &&
@@ -82,6 +100,7 @@ export function isPosRequest(url: string, body?: string): boolean {
         )
         .sort()
         .join() === 'business,customerName,lines,note,payments,registerId,requestId,taxRateBps' &&
+      (d.discount === undefined || validDiscountSelection(d.discount)) &&
       (d.noteAcknowledgements === undefined ||
         (Array.isArray(d.noteAcknowledgements) &&
           d.noteAcknowledgements.length <= 50 &&

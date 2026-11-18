@@ -1,0 +1,43 @@
+{
+  "verifiedAt": "2026-11-18T01:44:15.487Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/reportInstallation",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-18T01:43:15.707287236Z"
+  },
+  "allExistingFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "onlyInstallationAuditsWrittenAfterSuccessfulSignIn": true,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/installation.mjs": "2eb7062297b9602338919618c05b65f6d87d8d7361916fa1a690856253b41995",
+    "functions/installation-domain.mjs": "67a6049080021d896977347dbf22079c034d597e7b093e497b7c9e1eae65f5bb",
+    "functions/index.mjs": "c5e0b28fb191247738db01ce7140b9d009021c96e938d0ea23629d465f491160",
+    "src/main/installation-reporting.ts": "106e52485daf25a7bf9174510fd5714996ff3d2f929ebd1b5887af2a89a8858e",
+    "src/shared/installation-policy.ts": "c8fbf73c265855708bfdf946a44173d6bd19ee254945e38590dbfd00a31f702e"
+  },
+  "recipient": "matthew@rocmtssolutions.com",
+  "validation": {
+    "focusedClientChecks": 3,
+    "focusedServerChecks": 3,
+    "successfulLoginOnlyAndNonblockingFailureFlowPassed": true,
+    "separateInstallationsAndVersionDeduplicationPassed": true,
+    "stableInstallationIdAndTokenFreePersistencePassed": true,
+    "desktopBuilds": 1,
+    "unrelatedSuitesRun": false,
+    "noProductionTestEmailsOrLogins": true
+  },
+  "desktopRelease": {
+    "version": "5.0.0-alpha.9",
+    "verifiedAt": "2026-11-18T01:49:39.851Z",
+    "installer": "https://storage.googleapis.com/cerms-7af24-cerms5-releases/windows/CERMS-5-5.0.0-alpha.9-win-x64.exe",
+    "publicFeedMatchesBuild": true,
+    "publicAssetsHashVerifiedByPublisher": true
+  }
+}

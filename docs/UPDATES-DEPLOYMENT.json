@@ -1,0 +1,80 @@
+{
+  "verifiedAt": "2026-11-18T00:45:09.796Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "rulesBaseline": "firebase/releases/updates-2026-11-17.rules",
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/cashDrop",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T00:36:47.939098018Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T00:36:53.487638758Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T00:36:53.218900845Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/sendDevDailyReport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T00:35:18.180693199Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/submitBugReport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T00:42:18.511231777Z"
+    }
+  ],
+  "privateSupportBucket": "cerms-7af24-cerms5-bug-reports",
+  "supportServiceAccount": "cerms5-support@cerms-7af24.iam.gserviceaccount.com",
+  "smtpAuthenticationVerifiedWithoutEmail": true,
+  "allUntargetedFunctionsUnchanged": true,
+  "allLegacyAndSharedSettingsUnchanged": true,
+  "allIndexesAndSchedulesUnchanged": true,
+  "legacyAndReportSecretPoliciesUnchanged": true,
+  "onlyProjectIamAdditionIsDatabaseScopedSupportIdentity": true,
+  "noLiveTestWrites": true,
+  "noTestEmailsSent": true,
+  "sources": {
+    "functions/index.mjs": "5adbb4ed1c948e5426730ee0061d1d67f757431637149338203afa540c9f6009",
+    "functions/pos.mjs": "02e0c03ccdbeca83b6026b4b241e43aeab75e87146a07a684db761313d798152",
+    "functions/staff-account.mjs": "c063c5c0ba01f5fd6fbac5301f7647235724338e8c9794c1d603e1185af1b732",
+    "functions/bug-report.mjs": "8d58795121dd3124e5ccb6c7b156c404a379e877b5dcb0c7d2c50acd53912d7c",
+    "functions/checkout-domain.mjs": "8183a8d95a33589e6a2b3dd4403ffee483ed17c24a55a057f25cb8dc69388ce4",
+    "functions/package-lock.json": "0186d98cfbcc5b20ed5ca4e55e9771741dc0cf48d9b82cf7563d72db281a34b9",
+    "report-functions/report-render.mjs": "45920a7c9aff2b6fcd52dae49cfd7d4d2bd81100db8dcc2861390134309dde09",
+    "report-functions/report-data.mjs": "26495c4e86472224295d1fd9c9e5e4a6423a168c13fc3149ec0510c172dab40a",
+    "firebase/releases/updates-2026-11-17.rules": "2462167fd2712885e498ff0a05d4f41041fcdda4a50a4d3e51724c1601cb3273"
+  },
+  "validation": {
+    "clientTests": 233,
+    "skippedClientTests": 2,
+    "serverAndReportTests": 77,
+    "syntheticRulesChecks": 373,
+    "releasePublisherTests": 13,
+    "realSdkConcurrentTransactionsPassed": true,
+    "interceptedSetupUpdatesFlowPassed": true,
+    "interceptedGroupCheckoutPassed": true,
+    "interceptedStandardPosPassed": true,
+    "typecheckAndBuildPassed": true,
+    "smtpAuthenticationWithoutSendingEmailPassed": true,
+    "physicalWindowsInstallTested": false,
+    "realSupportEmailOrArtifactCreatedForTesting": false
+  },
+  "desktopRelease": {
+    "version": "5.0.0-alpha.6",
+    "verifiedAt": "2026-11-18T00:45:41.795Z",
+    "installer": "https://storage.googleapis.com/cerms-7af24-cerms5-releases/windows/CERMS-5-5.0.0-alpha.6-win-x64.exe",
+    "installerBytes": 133116047,
+    "installerSha512": "OlGArqnhq5jgPSeTdcpC2kUwAq7bZEMyR8vCisPoZHhRHaq4zC7Q7/QM+Z3/1c+3usPkrlevjAjoYb2u0DFsxg==",
+    "publicFeedMatchesBuild": true,
+    "publicAssetsHashVerifiedByPublisher": true,
+    "publicRangeDownloadsVerified": true,
+    "feedCacheControl": "no-store, max-age=0"
+  }
+}

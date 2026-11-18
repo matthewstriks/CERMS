@@ -149,3 +149,7 @@ attachments, paging, duplicate/concurrent suppression, preparation retry and
 uncertain-SMTP behavior. Preview artifacts use synthetic data only:
 `artifacts/dev-daily-report-preview.html`, `artifacts/dev-daily-report-preview.xlsx`
 and `artifacts/dev-daily-report-email.png`.
+
+## November 17, 2026 setup completion
+
+The deployed CERMS 5 report now includes waived product units/value and subtracts saved cash drops from expected shift cash. The Registers, Open Registers and per-cashier workbook sheets include Cash dropped (shift). Historical ledgers with no cash-drop field use zero. The fixed Dev scope, recipients, schedule, SMTP configuration and uncertain-delivery suppression are unchanged; no test email was sent. See `UPDATES-DEPLOYMENT.json`.

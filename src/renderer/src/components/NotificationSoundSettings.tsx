@@ -10,13 +10,24 @@ export default function NotificationSoundSettings() {
     [volume, setVolume] = useState(preference.volume)
   const [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
-    [testing, setTesting] = useState(false)
+    [testing, setTesting] = useState<'notification' | 'error' | null>(null)
   useEffect(() => {
     setEnabled(preference.enabled)
     setVolume(preference.volume)
     setError('')
   }, [reader?.uid, preference.enabled, preference.volume])
   useEffect(() => setNotice(''), [reader?.uid])
+  async function preview(kind: 'notification' | 'error') {
+    if (testing) return
+    setTesting(kind)
+    setError('')
+    setNotice('')
+    const played = await notificationAudio.play(volume, true, kind)
+    if (played)
+      setNotice(`${kind === 'error' ? 'Test error sound' : 'Test sound'} played at ${volume}%.`)
+    else setError('Audio could not play. Check your audio output and try again.')
+    setTesting(null)
+  }
   const dirty = enabled !== preference.enabled || volume !== preference.volume
   return (
     <section
@@ -28,8 +39,8 @@ export default function NotificationSoundSettings() {
         Notification sounds
       </h2>
       <p>
-        Play a chime for incoming staff messages, popup warnings, errors, and app notifications.
-        Saved to your account across businesses and devices.
+        Messages and notifications use a chime; errors use a distinct lower tone. Saved to your
+        account across businesses and devices.
       </p>
       <form
         onSubmit={async (event) => {
@@ -78,21 +89,17 @@ export default function NotificationSoundSettings() {
           <div className="sound-actions">
             <button
               type="button"
-              disabled={testing || volume === 0}
-              onClick={async () => {
-                setTesting(true)
-                setError('')
-                setNotice('')
-                const played = await notificationAudio.play(volume, true)
-                if (played) setNotice(`Test sound played at ${volume}%.`)
-                else
-                  setError(
-                    'Audio could not play. Check your audio output and try Test sound again.',
-                  )
-                setTesting(false)
-              }}
+              disabled={testing !== null || volume === 0}
+              onClick={() => void preview('notification')}
             >
-              {testing ? 'Testing…' : 'Test sound'}
+              {testing === 'notification' ? 'Testing…' : 'Test sound'}
+            </button>
+            <button
+              type="button"
+              disabled={testing !== null || volume === 0}
+              onClick={() => void preview('error')}
+            >
+              {testing === 'error' ? 'Testing…' : 'Test error sound'}
             </button>
             <button type="submit" className="primary" disabled={!dirty}>
               {saving ? 'Saving…' : 'Save sound preferences'}

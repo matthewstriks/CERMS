@@ -5,3 +5,9 @@ artifacts
 package-lock.json
 
 functions/checkout-domain.mjs
+functions/receipt-domain.mjs
+functions/installation-domain.mjs
+
+functions/ai-conversation-domain.mjs
+
+functions/inventory-email-domain.mjs

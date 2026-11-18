@@ -1,13 +1,17 @@
 # Users & permissions
 
-Prepared locally September 30, 2026; the staff-account function and revised permissions rules have **not been deployed**. The user clarified that “create members” here means staff login accounts, not customer memberships. No live staff accounts or permission records were created during development.
+Staff creation and permissions were deployed September 30, 2026; subsequent additions use the current archived rules baseline. The user clarified that “create members” here means staff login accounts, not customer memberships. No live staff accounts or permission records were created during development.
 
 ## Owner and staff access
 
-Read-only inspection confirmed `matthew@striks.com` belongs to existing protected Auth UID `c7D7AH07kgXmjn8tSiOgzHscLZ12`. That UID has full owner access in its selected business without adding profile fields or relying on editable email/rank values. Only the owner can create staff accounts, list business users, or assign permissions. Owner privileges cannot be revoked through the permission editor. The existing owner system switch remains unchanged.
+Read-only inspection confirmed `matthew@striks.com` belongs to existing protected Auth UID `c7D7AH07kgXmjn8tSiOgzHscLZ12`. That UID has full owner access in its selected business without adding profile fields or relying on editable email/rank values. Only the owner can create staff accounts or assign permissions. Staff with an explicit edit-profile or remove-access permission may list their own business’s staff through the dedicated server service. Owner privileges cannot be revoked through the permission editor. The existing owner system switch remains unchanged.
 
 Users & permissions lists the selected business's `cerms/users` profiles in pages of 50. Staff can inspect their own effective permissions. The owner can inspect and edit these independent flags:
 
+- Edit staff profiles: change CERMS 5 names and profile emails, preserving shared login credentials.
+- Remove staff access: remove a CERMS 5 profile and its business permissions, preserving shared logins and legacy access.
+- Manage discount codes: create/edit/archive codes and read the business catalog for eligibility; independent of selling and product editing.
+- Process returns and refunds: independent permission, default off; includes deliberate stock/service cancellation options.
 - Use point of sale: record sales/payouts on one’s own open register.
 - Waive products: set selected eligible order lines to $0 before checkout.
 - Edit member records.
@@ -47,3 +51,7 @@ The exact release passed 282 local rules checks and four focused server checks. 
 The POS release adds optional `processSales`, defaulting off for existing staff without changing their other permissions. The owner retains all rights. Account-request fingerprints remain compatible when the new flag is false.
 
 All-product deletion adds optional `deleteProducts`, defaulting off for existing non-owner staff. Owner access remains full. See `PRODUCT-MANAGEMENT-DEPLOYMENT.json`; category deletion remains disabled.
+
+## Staff profile management — November 17, 2026
+
+The user explicitly chose CERMS 5 profiles and access only. See [STAFF-MANAGEMENT.md](STAFF-MANAGEMENT.md) for the edit/removal boundary, independent admin permissions, owner protection and verification. The current release is `firebase/releases/staff-management-2026-11-17.rules`; deployment verification is recorded in `STAFF-MANAGEMENT-DEPLOYMENT.json` (deployment verified; both callables ACTIVE). Shared Firebase Auth users, passwords and login emails remain unchanged.

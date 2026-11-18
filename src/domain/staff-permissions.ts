@@ -2,6 +2,26 @@
 export const ownerUid = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 export const permissionDefinitions = [
   {
+    key: 'manageDiscountCodes',
+    label: 'Manage discount codes',
+    description: 'Create, edit, activate and archive business discount codes.',
+  },
+  {
+    key: 'processRefunds',
+    label: 'Process returns and refunds',
+    description: 'Refund original receipts and optionally restock or cancel their services.',
+  },
+  {
+    key: 'editStaffProfiles',
+    label: 'Edit staff profiles',
+    description: 'Edit CERMS 5 staff names and profile emails in this business.',
+  },
+  {
+    key: 'removeStaffAccounts',
+    label: 'Remove staff access',
+    description: 'Remove staff from CERMS 5 while preserving shared and legacy logins.',
+  },
+  {
     key: 'removeMemberNotes',
     label: 'Remove member notes',
     description: 'Admin permission to remove member notes, including DNA reasons.',
@@ -55,6 +75,10 @@ export const permissionDefinitions = [
 export type StaffPermission = (typeof permissionDefinitions)[number]['key']
 export type StaffPermissions = Record<StaffPermission, boolean>
 export const defaultStaffPermissions: StaffPermissions = {
+  manageDiscountCodes: false,
+  processRefunds: false,
+  editStaffProfiles: false,
+  removeStaffAccounts: false,
   removeMemberNotes: false,
   closeOtherRegisters: false,
   processSales: false,
@@ -67,6 +91,10 @@ export const defaultStaffPermissions: StaffPermissions = {
   closeRegisters: true,
 }
 export const allStaffPermissions: StaffPermissions = {
+  manageDiscountCodes: true,
+  processRefunds: true,
+  editStaffProfiles: true,
+  removeStaffAccounts: true,
   removeMemberNotes: true,
   closeOtherRegisters: true,
   processSales: true,
@@ -79,6 +107,10 @@ export const allStaffPermissions: StaffPermissions = {
   closeRegisters: true,
 }
 export const noStaffPermissions: StaffPermissions = {
+  manageDiscountCodes: false,
+  processRefunds: false,
+  editStaffProfiles: false,
+  removeStaffAccounts: false,
   removeMemberNotes: false,
   closeOtherRegisters: false,
   processSales: false,
@@ -98,11 +130,15 @@ export function validStaffPermissions(value: unknown): value is StaffPermissions
     permissionDefinitions.every(
       ({ key }) =>
         ([
+          'manageDiscountCodes',
+          'processRefunds',
           'processSales',
           'waiveProducts',
           'deleteProducts',
           'closeOtherRegisters',
           'removeMemberNotes',
+          'editStaffProfiles',
+          'removeStaffAccounts',
         ].includes(key) &&
           data[key] === undefined) ||
         typeof data[key] === 'boolean',

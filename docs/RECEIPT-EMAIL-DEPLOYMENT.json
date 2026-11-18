@@ -1,0 +1,56 @@
+{
+  "verifiedAt": "2026-11-18T01:06:35.667Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/sendSaleReceipt",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-18T00:59:47.146598561Z"
+  },
+  "allExistingFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "onlyDeliveryAuditsWrittenByConfirmedCustomerSends": true,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/receipt-email.mjs": "268762dd26bf72be252b93806cd347a59c0f6fe96bbe86b7bdb5c0716f852313",
+    "functions/receipt-domain.mjs": "54e4f4bda2998f3068127662ed0090ed07e32526cdda7982c7a2806b73e25f3a",
+    "functions/index.mjs": "577922d99a344141ca47aa79e86543781b6d6ed0e7d7f14ac5bc07ffecc85535",
+    "src/domain/pos.ts": "b762c639de31bedd4e4540bcf0c5da3067243602786e21adecb0ee5e30db1361",
+    "src/domain/receipt-email.ts": "0db6e9faa7a821cd9410a86cea6f0287158ddf041b3a41ad5d76079c9f70eac0"
+  },
+  "rulesBaselineUnchanged": "firebase/releases/updates-2026-11-17.rules",
+  "validation": {
+    "clientTests": 235,
+    "clientTestsSkipped": 2,
+    "serverAndReportTests": 82,
+    "syntheticRulesChecks": 382,
+    "realSdkConcurrentReceiptDeliveryPassed": true,
+    "releasePublisherTests": 13,
+    "buildTypecheckAndFormattingPassed": true,
+    "interceptedFourReceiptOptionsPassed": true,
+    "editableAddressConfirmationAndCancellationPassed": true,
+    "missingEmailProtectionPassed": true,
+    "lostResponseEmailDeduplicationPassed": true,
+    "emailPlusPrintFailureRecoveryPassed": true,
+    "interceptedGroupCheckoutPassed": true,
+    "interceptedRegisterCloseoutPassed": true,
+    "lightAndDarkVisualReviewPassed": true,
+    "realEmailsSentForTesting": false,
+    "physicalPrintJobsOrWindowsInstallerExecuted": false
+  },
+  "desktopRelease": {
+    "version": "5.0.0-alpha.7",
+    "verifiedAt": "2026-11-18T01:07:11.693Z",
+    "installer": "https://storage.googleapis.com/cerms-7af24-cerms5-releases/windows/CERMS-5-5.0.0-alpha.7-win-x64.exe",
+    "bytes": 133116817,
+    "sha512": "RGRJZE04KGr+501U/fD1n42oShQY9kJ+WM6EnyD4H/99dweLZCS3qBxlPLYqMRuprmLFJmTtyDAFaB+SD/TswA==",
+    "publicManifestMatchesBuild": true,
+    "publicAssetsHashVerifiedByPublisher": true,
+    "publicRangeDownloadsVerified": true,
+    "cacheControl": "no-store, max-age=0"
+  }
+}

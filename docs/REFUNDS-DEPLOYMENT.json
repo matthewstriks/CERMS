@@ -1,0 +1,50 @@
+{
+  "verifiedAt": "2026-11-18T04:20:13.306Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "rulesBaseline": "firebase/releases/refunds-2026-11-17.rules",
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/completeSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:19:24.389583784Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:19:23.081833105Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/refundSale",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:19:15.665021057Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/sendDevDailyReport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T04:19:20.388765652Z"
+    }
+  ],
+  "allUntargetedFunctionsUnchanged": true,
+  "allLegacyAndStorageRulesUnchanged": true,
+  "allIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "sharedAuthAccountsUnchanged": true,
+  "refundSalesAndRegisterAccountingOnlyInNamedCerms": true,
+  "originalReceiptsAndClosedRegistersPreserved": true,
+  "syntheticRulesChecks": 391,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/refunds.mjs": "44d54ae16f5b23ef49646133a63d28aa30986ee8428a68a7be4e168fd25850ef",
+    "functions/refund-domain.mjs": "92a2c383c17fb9ed78b8ac4544b66cca60a4f6ce915946b2b818e2c106d97488",
+    "functions/pos.mjs": "9116491dae4ac50653edff89984a1f5bfe14308d476caadfb5066a02a5360759",
+    "functions/staff-account.mjs": "82d23e4d1b94569cc853ffc16dc8bd5279cf7baf00e07bff4b029ffe2aa4556e",
+    "report-functions/report-data.mjs": "0ca6c95f3793419b5a1794b9a77d20c323037818c9b3dc9327778099676c270f",
+    "report-functions/report-render.mjs": "f50da5d3e3f138fe1ddf2f5ecf0da578b48e11378711e36bdee19ced3e89d93c",
+    "src/shared/refund-policy.ts": "5330a032817daf8f1dd66029465d1260fb58d94bafe13eb43227da626d95cc2f",
+    "firebase/releases/refunds-2026-11-17.rules": "ff7c168fd9848400393ce794faf60337a0ad99c731b78e1cfc67dfe44caa9d07"
+  }
+}

@@ -1,12 +1,12 @@
+import MemberFiles from './MemberFiles'
 import MemberNotes from './MemberNotes'
 import MemberLog from './MemberLog'
 import { phoneLabel } from '../../../../domain/phone'
 import { dobLabel } from '../../lib/data'
 import { useEffect, useRef, useState } from 'react'
-import { X, UserRound, ExternalLink } from 'lucide-react'
+import { X, UserRound } from 'lucide-react'
 import type { Member } from '../../../../domain/legacy'
 import { membershipStatus } from '../../../../domain/legacy'
-import { isMemberFileUrl } from '../../../../shared/firebase-policy'
 import { useMembershipSession } from '../../lib/membership-session'
 import { dateLabel, money } from '../../lib/data'
 import { Badge } from '../../components/ui'
@@ -149,34 +149,11 @@ export default function MemberDetails({
           member={member}
           reader={reader}
         />
-        <h3>Files & signed waiver</h3>
-        {member.files.length ? (
-          <ul className="member-files">
-            {member.files.map((file, index) => (
-              <li key={index}>
-                <span>{file.name}</span>
-                <button
-                  disabled={!isMemberFileUrl(file.url)}
-                  title={
-                    isMemberFileUrl(file.url)
-                      ? 'Open existing file in your browser'
-                      : 'This file URL is outside the existing CERMS storage bucket'
-                  }
-                  onClick={() => {
-                    void window.desktop
-                      .openMemberFile(file.url)
-                      .catch(() => setError('This attachment could not be opened.'))
-                  }}
-                >
-                  View
-                  <ExternalLink size={14} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">No files recorded.</p>
-        )}
+        <MemberFiles
+          key={`${reader?.uid}:${reader?.club}:${member.id}`}
+          member={member}
+          reader={reader}
+        />
       </div>
       {tab === 'history' && (
         <>

@@ -9,6 +9,22 @@ import { deliverDailyReport } from './delivery.mjs'
 import { fixtureData } from './fixtures.mjs'
 import { reportConfig } from './config.mjs'
 
+test('cash drops reconcile shift balances, export separately and preserve historical totals', async () => {
+  const d = fixtureData()
+  registerRows(d)
+  const total = d.totals.get(d.registers[0].id)
+  total.cashDropCents = 100
+  total.expectedCashCents -= 100
+  const { rows } = registerRows(d)
+  assert.equal(rows[0][24], 1)
+  assert.ok((await renderWorkbook(d)).length > 0)
+  assert.ok(renderEmail(d).text.includes('Dev System'))
+  total.cashDropCents = -1
+  assert.throws(() => registerRows(d), /Invalid cash drop total/)
+  total.cashDropCents = 0
+  assert.throws(() => registerRows(d), /Register cash mismatch/)
+})
+
 test('previous Central calendar day uses exclusive midnight and follows 23/25-hour DST days and month rollover', () => {
   for (const [scheduled, date, hours] of [
     ['2026-03-09T12:00:00Z', '2026-03-08', 23],
@@ -394,4 +410,75 @@ test('first confirmed forced preview is retained as audit history when its norma
   assert.equal(f.records.get(path).deliveryKind, 'scheduled')
   await deliverDailyReport(scheduled, deps)
   assert.equal(sends, 1)
+})
+
+test('refund-only day reports negative net, separate refunds and original-order linkage without inventing new purchases', async () => {
+  const d = fixtureData(),
+    source = d.sales[0]
+  d.sales = [
+    {
+      ...source,
+      id: 'refund-1',
+      receiptNumber: 'refund-1',
+      kind: 'refund',
+      originalSaleId: 'older-sale',
+      reason: 'Returned item',
+      subtotalCents: -1000,
+      taxCents: -80,
+      totalCents: -1080,
+      memberships: [],
+      rentals: [],
+      lines: [
+        { ...source.lines[0], quantity: 1, subtotalCents: -1000, taxCents: -80, totalCents: -1080 },
+      ],
+      payments: [
+        {
+          method: 'cash',
+          direction: 'out',
+          amountCents: 1080,
+          receivedCents: 1080,
+          changeCents: 0,
+          reference: '',
+        },
+      ],
+    },
+  ]
+  const result = summarize(d)
+  assert.equal(result.completedOrders, 0)
+  assert.equal(result.refundCount, 1)
+  assert.equal(result.refundCents, 1080)
+  assert.equal(result.total, -1080)
+  assert.equal(result.payments.cash, -1080)
+  assert.equal(result.membershipRows.length, 0)
+  const book = new ExcelJS.Workbook()
+  await book.xlsx.load(await renderWorkbook(d))
+  assert.equal(book.getWorksheet('Refunds').getRow(5).getCell(2).value, 'older-sale')
+  assert.match(renderEmail(d).text, /Refunds: 1/)
+})
+
+test('daily discount totals and workbook retain the code and savings alongside net tax/payments', async () => {
+  const d = fixtureData(),
+    s = d.sales[0]
+  Object.assign(s, {
+    discount: { code: 'SAVE10', name: 'Save ten', kind: 'percent', value: 1000, version: 1 },
+    discountCents: 200,
+    subtotalCents: 1800,
+    taxCents: 144,
+    totalCents: 1944,
+  })
+  Object.assign(s.lines[0], {
+    grossSubtotalCents: 2000,
+    discountCents: 200,
+    subtotalCents: 1800,
+    taxCents: 144,
+    totalCents: 1944,
+  })
+  s.payments[1].amountCents = 944
+  s.payments[1].receivedCents = 944
+  const summary = summarize(d)
+  assert.equal(summary.discounts, 200)
+  const book = new ExcelJS.Workbook()
+  await book.xlsx.load(await renderWorkbook(d))
+  assert.equal(book.getWorksheet('Orders').getRow(5).getCell(21).value, 'SAVE10')
+  assert.match(renderEmail(d).text, /Discounts net of returns: \$2\.00/)
 })

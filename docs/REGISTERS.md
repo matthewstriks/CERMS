@@ -37,6 +37,8 @@ The subsequent POS release connects immutable server-owned payment totals to eac
 
 ## Cash drops
 
+Deployed with the November 17, 2026 CERMS 5 setup completion; see `UPDATES-DEPLOYMENT.json`. The client retains an unconfirmed request under a user/business/register-scoped local key and locks its amount/note until the identical retry is confirmed. Closing/reopening the dialog preserves that recovery request. The Dev daily report accounts for drops when reconciling shift cash and includes a separate cash-dropped column; older totals without the field remain valid.
+
 The **Cash drop** action is available on an open cashier register to staff with POS access. Enter a positive dollar amount and an optional note to record cash removed from the drawer mid-shift. The server verifies the register owner, current open status and available recorded cash, then atomically writes the audit record and updates the register ledger. Dropped cash is subtracted from expected cash and is therefore not counted as a shortage when the register closes. Cash drops cannot be edited or deleted, and retries with the same request are safe.
 
 ## Manager closeout
@@ -96,3 +98,5 @@ Deployed under standing approval. Current rules archive: `firebase/releases/regi
 POS checks the signed-in user's own register afresh when an order begins: the first retail/barcode item, a membership selection, or a member-linked order arriving from member creation/check-in. If none is open, it presents the existing denomination-count opening dialog in place. Opening refreshes POS and keeps the complete order draft; canceling keeps the draft and checkout stays disabled until a register is open. The register strip also offers Open register to revisit the prompt. Staff without `openRegisters` see an explanation to ask an administrator for permission; no rights are granted automatically. Empty POS/history views do not prompt, and unresolved sale retries retain their original request/register. Member notes review and membership dialogs resume after the register prompt.
 
 This desktop-only change uses the existing scoped register client and permissions; no backend deployment or production test writes. `node scripts/pos-smoke.mjs --register-prompt` intercepts every HTTPS request and covers first-item detection after a synthetic register close, cancel/draft preservation, opening denomination counts and checkout readiness, member check-in, and pending new memberships.
+
+Returns/refunds now post to the issuing staff member’s own open register, preserving the original receipt and any closed original shift. Refund counts, amounts and tax appear separately in reconciliation/printed closeouts while net tender, cash paid out, expected drawer and net sales/tax include them. See [RETURNS-REFUNDS.md](RETURNS-REFUNDS.md).

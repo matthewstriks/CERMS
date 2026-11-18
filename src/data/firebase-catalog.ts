@@ -43,7 +43,10 @@ export function createCatalog(reader: Pick<MembershipReader, 'uid' | 'club'>) {
         ? canDeleteProducts(reader.uid, reader.club, permissions)
         : canManageCatalog(reader.uid, reader.club, permissions) ||
           (!write &&
-            (permissions.editMembers || permissions.processSales || permissions.deleteProducts))) ||
+            (permissions.editMembers ||
+              permissions.processSales ||
+              permissions.deleteProducts ||
+              permissions.manageDiscountCodes))) ||
       auth.currentUser?.uid !== reader.uid
     )
       throw new Error(

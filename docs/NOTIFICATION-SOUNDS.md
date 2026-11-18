@@ -1,6 +1,6 @@
 # Notification sounds
 
-Settings → Notification sounds provides an enabled checkbox, 0–100% volume slider, explicit Test sound, Save sound preferences and cancellation of unsaved edits. Defaults are enabled at 100% when no preference exists; defaults are never backfilled on sign-in. Test previews the current draft volume even when automatic sounds are disabled, and never saves a setting. Zero volume is silent. Save applies preferences to the signed-in account; failed saves retain the draft and previous active setting for retry. Preferences reload on sign-in and business changes and follow the account on other devices at the next session load.
+Settings → Notification sounds provides an enabled checkbox, 0–100% volume slider, explicit Test sound and Test error sound, Save sound preferences and cancellation of unsaved edits. Defaults are enabled at 100% when no preference exists; defaults are never backfilled on sign-in. Test previews the current draft volume even when automatic sounds are disabled, and never saves a setting. Zero volume is silent. Save applies preferences to the signed-in account; failed saves retain the draft and previous active setting for retry. Preferences reload on sign-in and business changes and follow the account on other devices at the next session load.
 
 ## Account and Firebase boundary
 
@@ -10,7 +10,7 @@ The sole new profile field is optional `users/{uid}.notificationSoundPreference:
 
 ## Playback
 
-One local two-note sine chime is synthesized with Web Audio; no media downloads, voice, external service, audio files or native privileges are required. App volume scales a bounded gain below full output; device volume still applies. A signed-in account's preference controls automatic sounds on all screens, including a minimized/background workspace. Playback does not mark messages read or change existing read-receipt freshness/focus requirements. Alerts are coalesced within 750 milliseconds to avoid overlapping bursts. Test bypasses that interval. Sign-out, business transition, disable and zero volume stop active/pending playback.
+Local two-note sounds are synthesized with Web Audio: the existing rising sine chime (660 → 880 Hz) for messages/ordinary notifications, and a descending triangle tone (440 → 294 Hz) for errors; no media downloads, voice, external service, audio files or native privileges are required. App volume scales a bounded gain below full output; device volume still applies. A signed-in account's preference controls automatic sounds on all screens, including a minimized/background workspace. Playback does not mark messages read or change existing read-receipt freshness/focus requirements. Alerts are coalesced within 750 milliseconds to avoid overlapping bursts. A new error may interrupt a recent normal chime so it is not lost; repeated errors and following ordinary sounds still coalesce. Test bypasses that interval. Both kinds share existing enable/volume preferences. Sign-out, business transition, disable and zero volume stop active/pending playback.
 
 User pointer/keyboard gestures unlock the audio context before alerts need it. Blocked automatic audio is dropped rather than queued to replay on a later interaction. Test reports unavailable audio instead of throwing an unhandled error. Automated tests use a fake AudioContext or Electron's mute flag; they do not exercise physical speakers.
 
@@ -35,3 +35,9 @@ Deployment completed November 16, 2026: `saveNotificationSoundPreference` is ACT
 Validation passed: 232 client checks, two synthetic server-service tests, all 370 exact local policy checks, desktop build/typecheck/formatting, the mocked-audio Settings/message/popup flow and the existing private messaging regression. The audio flow also verified stable download-progress keys and account persistence without startup replay. Light and dark Settings screenshots are under `artifacts/notification-sounds-settings*.png`.
 
 The user subsequently selected 100% as the default. This changes only the fallback for missing/invalid preferences; existing saved values are preserved, and no profile backfill or additional backend deployment is performed.
+
+## Distinct error sound — November 18, 2026
+
+Visible `role=alert` feedback uses the error tone. Explicit notification surfaces may set `data-notification-sound-kind="error"`; use `"notification"` to retain the ordinary sound for an intentional warning. Update error notices/status are marked as errors. A single observer batch gives errors priority over ordinary notifications, and stable semantic keys still suppress repeated progress/snapshot announcements. Code may also call `requestNotificationSound('error')`. Existing signed-in/session boundaries and blocked-audio behavior remain unchanged.
+
+Settings includes **Test error sound**, using the selected draft volume without saving. No new settings fields, Firebase deployment, native audio permissions, assets, release or version bump. Five focused player/policy checks and an isolated mocked-audio Electron flow verified the distinct frequencies/waveforms, unchanged standard chime, actual error routing, priority, coalescing, mute and explicit preview. Typecheck and one desktop build passed. No physical speakers, real messages or saved user preferences were used as tests.

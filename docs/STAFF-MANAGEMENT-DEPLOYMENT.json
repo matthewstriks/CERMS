@@ -1,0 +1,39 @@
+{
+  "verifiedAt": "2026-11-18T03:49:22.143Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "rulesBaseline": "firebase/releases/staff-management-2026-11-17.rules",
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/createStaffAccount",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T03:48:54.336261826Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/manageStaffAccounts",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T03:48:50.184833541Z"
+    }
+  ],
+  "allUntargetedFunctionsUnchanged": true,
+  "allLegacyAndStorageRulesUnchanged": true,
+  "allIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "sharedAuthAccountsUnchanged": true,
+  "profileEditsAndRemovalOnlyInNamedCerms": true,
+  "syntheticRulesChecks": 387,
+  "focusedServerChecks": 8,
+  "focusedClientChecks": 3,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/staff-management.mjs": "ef32de396c0057cccd39cb30af9bcb413227c98996817bb21e4aae8d30b1db54",
+    "functions/staff-management-domain.mjs": "cf0db12befcc26f2fd1646f00a8bd815b7a5e43a20d1a8cdada54bcf3ef90d96",
+    "functions/staff-account.mjs": "c062f237215d6adb9bf43a563626a2c00d14a3bf38895c822130b578bbab4c3a",
+    "src/shared/staff-management-policy.ts": "8b55e80ce616aaedf0d1ea65c41d92b04b52b0c1e35fca406ddd21795c331094",
+    "src/domain/staff-permissions.ts": "a9c844779565408a36feb63bafef51fe76a5a1a30e3908429d4c987cb64ba8a1",
+    "firebase/releases/staff-management-2026-11-17.rules": "5faf3bfc45c384f4153b1d53a9fba2d39e81690e7642dda95ea022271ec16482"
+  }
+}

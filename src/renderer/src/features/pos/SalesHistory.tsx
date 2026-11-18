@@ -1,3 +1,6 @@
+import RefundDialog from './RefundDialog'
+import { useMembershipSession } from '../../lib/membership-session'
+import { hasStaffPermission } from '../../../../domain/staff-permissions'
 import { useEffect, useState } from 'react'
 import type { PosClient } from '../../../../data/firebase-pos'
 import { paymentMethods, type SaleReceipt, type PaymentMethod } from '../../../../domain/pos'
@@ -5,6 +8,11 @@ import { money } from '../../lib/data'
 import ReceiptDialog from './ReceiptDialog'
 import { displayReference, matchesDisplayReference } from '../../../../domain/display-reference'
 export default function SalesHistory({ client }: { client: PosClient }) {
+  const { reader } = useMembershipSession()
+  const canRefund = !!reader && hasStaffPermission(reader.uid, 'processRefunds', reader.permissions)
+  const pendingKey = `cerms-refund-v1:${reader?.uid}:${reader?.club}`
+  const [returning, setReturning] = useState<SaleReceipt | null>(null)
+  const [pendingRefund, setPendingRefund] = useState(() => !!localStorage.getItem(pendingKey))
   const [rows, setRows] = useState<SaleReceipt[]>([]),
     [more, setMore] = useState(false),
     [busy, setBusy] = useState(false),
@@ -38,7 +46,7 @@ export default function SalesHistory({ client }: { client: PosClient }) {
       (!search ||
         matchesDisplayReference('order', r.receiptNumber, search) ||
         matchesDisplayReference('register', r.registerId, search) ||
-        `${r.receiptNumber} ${r.cashierName} ${r.customerName} ${r.registerId} ${(r.members ?? []).map((m) => `${m.name} ${m.number ?? ''} ${m.id}`).join(' ')} ${r.payments.map((p) => p.reference).join(' ')}`
+        `${r.discount?.code ?? ''} ${r.receiptNumber} ${r.cashierName} ${r.customerName} ${r.registerId} ${(r.members ?? []).map((m) => `${m.name} ${m.number ?? ''} ${m.id}`).join(' ')} ${r.payments.map((p) => p.reference).join(' ')}`
           .toLowerCase()
           .includes(search.toLowerCase())),
   )
@@ -53,6 +61,22 @@ export default function SalesHistory({ client }: { client: PosClient }) {
   return (
     <section className="panel pos-history">
       <h2>Sales & payments</h2>
+      {canRefund && pendingRefund && (
+        <button
+          onClick={async () => {
+            try {
+              const pending = JSON.parse(localStorage.getItem(pendingKey) || 'null')
+              const original = await client.receipt(pending.saleId)
+              if (!original) throw Error('Original receipt could not load.')
+              setReturning(original)
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'Could not resume refund.')
+            }
+          }}
+        >
+          Resume pending refund
+        </button>
+      )}
       <div className="toolbar">
         <input
           aria-label="Search receipts"
@@ -116,7 +140,19 @@ export default function SalesHistory({ client }: { client: PosClient }) {
                   {r.cashierName}
                   <small className="pos-block">{r.customerName || 'Walk-in'}</small>
                 </td>
-                <td>{money(r.totalCents / 100)}</td>
+                <td>
+                  {money(r.totalCents / 100)}
+                  {r.discount && (
+                    <small className="pos-block">
+                      {r.discount.code} · Discount {money((r.discountCents ?? 0) / 100)}
+                    </small>
+                  )}
+                  {r.kind === 'refund' && (
+                    <small className="pos-block">
+                      Refund · original {displayReference('order', r.originalSaleId ?? '')}
+                    </small>
+                  )}
+                </td>
                 <td>
                   {r.payments.map((p, i) => (
                     <small className="pos-block" key={i}>
@@ -128,6 +164,11 @@ export default function SalesHistory({ client }: { client: PosClient }) {
                 </td>
                 <td>
                   <button onClick={() => setReceipt(r)}>View / print</button>
+                  {canRefund && r.kind !== 'refund' && !r.lines.some((l) => l.payout) && (
+                    <button disabled={pendingRefund} onClick={() => setReturning(r)}>
+                      Return / refund
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -140,6 +181,23 @@ export default function SalesHistory({ client }: { client: PosClient }) {
         <button disabled={busy} onClick={() => void load(false)}>
           Load older receipts
         </button>
+      )}
+      {returning && (
+        <RefundDialog
+          receipt={returning}
+          client={client}
+          pendingKey={pendingKey}
+          onClose={() => {
+            setReturning(null)
+            setPendingRefund(!!localStorage.getItem(pendingKey))
+          }}
+          onSaved={(saved) => {
+            setReturning(null)
+            setPendingRefund(false)
+            setReceipt(saved)
+            void load()
+          }}
+        />
       )}
       {receipt && <ReceiptDialog receipt={receipt} onClose={() => setReceipt(null)} />}
     </section>

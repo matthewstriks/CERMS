@@ -1,0 +1,26 @@
+{
+  "verifiedAt": "2026-11-18T04:02:52.764Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/accountSettings",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-18T04:02:17.882815821Z"
+  },
+  "allExistingFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "selfOnlyProfileNameAndVerifiedEmail": true,
+  "noAuthConfigurationOrAccountsModifiedDuringDeployment": true,
+  "noProductionTestEmailsOrWrites": true,
+  "sources": {
+    "functions/account-settings.mjs": "cc579a0176b83382a848b4bc0e09c222f241dd6f12cdb028535c6962f69643f7",
+    "functions/account-domain.mjs": "fd97084d9363f3e47b5f5ad5a048c866c0e015f67d6c5a1b436f89620e6cc4c6",
+    "functions/index.mjs": "0fa1bf5b3a892d1f57c0523c70574639df45d99de93449beeb521f8366e24a8f",
+    "src/data/firebase-account.ts": "88bdca335629bcce53070f0974e8d457aa198df9cc1e32eb11e3e2a079534b01",
+    "src/shared/account-policy.ts": "d4d944dbf312da50a5fae3add306eac965ccc785b163de8a5097bbcbd8c3db7e"
+  }
+}

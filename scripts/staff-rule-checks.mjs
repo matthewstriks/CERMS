@@ -64,6 +64,24 @@ export async function staffRuleChecks({ base, seed, check, fields, str, owner })
   )
   await check('Owner saves staff permissions', base + ':commit', commit(permissionWrite()), true)
   await check(
+    'Owner grants product waiver permission',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, waiveProducts: true })),
+    true,
+  )
+  await check(
+    'Waiver permission rejects nonboolean values',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, waiveProducts: 'yes' })),
+    false,
+  )
+  await check(
+    'Staff cannot grant waiver permission',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, waiveProducts: true }), uid),
+    false,
+  )
+  await check(
     'Owner grants independent note removal admin permission',
     base + ':commit',
     commit(permissionWrite({ ...permissions, removeMemberNotes: true })),
@@ -74,6 +92,107 @@ export async function staffRuleChecks({ base, seed, check, fields, str, owner })
     base + ':commit',
     commit(permissionWrite()),
     true,
+  )
+  await check(
+    'Owner grants separate staff management rights',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, editStaffProfiles: true, removeStaffAccounts: true })),
+    true,
+  )
+  await check(
+    'Staff management rights must be boolean',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, editStaffProfiles: 'yes' })),
+    false,
+  )
+  await check(
+    'Delegated staff cannot grant staff management rights',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, editStaffProfiles: true }), uid),
+    false,
+  )
+  await check(
+    'Staff management requires callable for profile edits',
+    base + ':commit',
+    commit(
+      {
+        writes: [
+          {
+            update: { name: base + '/users/' + uid, fields: { displayName: str('Changed') } },
+            updateMask: { fieldPaths: ['displayName'] },
+          },
+        ],
+      },
+      uid,
+    ),
+    false,
+  )
+  await check(
+    'Staff management requires callable for removal',
+    base + '/users/' + uid,
+    { uid, method: 'DELETE' },
+    false,
+  )
+  await check(
+    'Owner grants optional independent refund permission',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, processRefunds: true })),
+    true,
+  )
+  await check(
+    'Refund permission must be boolean',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, processRefunds: 'yes' })),
+    false,
+  )
+  await check(
+    'Staff cannot grant refund permission',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, processRefunds: true }), uid),
+    false,
+  )
+  await check(
+    'Refund state remains server only',
+    base + '/system/' + club + '/saleRefunds/receipt',
+    { uid, method: 'DELETE' },
+    false,
+  )
+  await check(
+    'Owner grants code management without catalog writes',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, manageDiscountCodes: true })),
+    true,
+  )
+  await seed('system/' + club + '/products/read-only', catalogFields({ membership: false }))
+  await check(
+    'Discount managers read current-business products',
+    base + '/system/' + club + '/products/read-only',
+    { uid },
+    true,
+  )
+  await check(
+    'Discount managers cannot edit products',
+    base + '/system/' + club + '/products/read-only',
+    { uid, method: 'DELETE' },
+    false,
+  )
+  await check(
+    'Discount management flag must be boolean',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, manageDiscountCodes: 'yes' })),
+    false,
+  )
+  await check(
+    'Staff cannot grant code management',
+    base + ':commit',
+    commit(permissionWrite({ ...permissions, manageDiscountCodes: true }), uid),
+    false,
+  )
+  await check(
+    'Discount codes stay server written',
+    base + '/system/' + club + '/discountCodes/SAVE',
+    { uid, method: 'DELETE' },
+    false,
   )
   await check('Staff reads own permissions', permissionPath, { uid }, true)
   await check('Other staff permissions private', permissionPath, { uid: 'staff' }, false)

@@ -1,5 +1,6 @@
 {
   "project": "cerms-7af24",
   "bucket": "cerms-7af24-cerms5-releases",
-  "windowsFeed": "https://storage.googleapis.com/cerms-7af24-cerms5-releases/windows/"
+  "windowsFeed": "https://storage.googleapis.com/cerms-7af24-cerms5-releases/windows/",
+  "macosFeed": "https://storage.googleapis.com/cerms-7af24-cerms5-releases/macos/"
 }

@@ -85,5 +85,5 @@ jobs:
             release/beta*.yml
             release/rc*.yml
 
-  # Firebase Windows alpha releases are published deliberately from the developer
+  # Firebase Windows + Mac alpha releases are published deliberately from the developer
   # machine with npm run release:alpha. CI remains build-only; no cloud keys here.

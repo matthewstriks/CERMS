@@ -67,10 +67,11 @@ function NotificationSoundRuntime() {
   useEffect(() => {
     const unlock = () => void notificationAudio.unlock()
     const play = (event: Event) => {
-      if (!['message', 'notification'].includes((event as CustomEvent).detail)) return
+      const kind = (event as CustomEvent).detail
+      if (!['message', 'notification', 'error'].includes(kind)) return
       const current = state.current
       if (current.reader && !current.switching && current.preference.enabled)
-        void notificationAudio.play(current.preference.volume)
+        void notificationAudio.play(current.preference.volume, false, kind)
     }
     document.addEventListener('pointerdown', unlock, true)
     document.addEventListener('keydown', unlock, true)
@@ -87,7 +88,7 @@ function NotificationSoundRuntime() {
     if (!reader || switching) return
     const seen = new WeakMap<Element, string>()
     const scan = (announce = true) => {
-      let changed = false
+      let changed: 'notification' | 'error' | null = null
       for (const node of document.querySelectorAll('[role="alert"], [data-notification-sound]')) {
         if (!node.getClientRects().length || node.closest('dialog:not([open]), [hidden]')) {
           seen.delete(node)
@@ -95,13 +96,22 @@ function NotificationSoundRuntime() {
         }
         const explicit = node.getAttribute('data-notification-sound')
         const key = explicit && explicit !== 'true' ? explicit : (node.textContent?.trim() ?? '')
-        if (key && seen.get(node) !== key && announce) changed = true
-        seen.set(node, key)
+        const explicitKind = node.getAttribute('data-notification-sound-kind')
+        const kind =
+          explicitKind === 'error'
+            ? 'error'
+            : explicitKind === 'notification'
+              ? 'notification'
+              : node.getAttribute('role') === 'alert'
+                ? 'error'
+                : 'notification'
+        const signature = `${kind}:${key}`
+        if (key && seen.get(node) !== signature && announce)
+          changed = kind === 'error' ? 'error' : (changed ?? 'notification')
+        seen.set(node, signature)
       }
       if (changed)
-        window.dispatchEvent(
-          new CustomEvent('cerms:notification-sound', { detail: 'notification' }),
-        )
+        window.dispatchEvent(new CustomEvent('cerms:notification-sound', { detail: changed }))
     }
     scan(false)
     const observer = new MutationObserver(() => scan())
@@ -110,7 +120,15 @@ function NotificationSoundRuntime() {
       childList: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ['open', 'hidden', 'class', 'style', 'data-notification-sound'],
+      attributeFilter: [
+        'open',
+        'hidden',
+        'class',
+        'style',
+        'role',
+        'data-notification-sound',
+        'data-notification-sound-kind',
+      ],
     })
     return () => {
       observer.disconnect()

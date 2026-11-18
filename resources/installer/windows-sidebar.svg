@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="164" height="314" viewBox="0 0 164 314">
+  <defs>
+    <linearGradient id="forest" x2=".8" y2="1"><stop stop-color="#204e3b"/><stop offset="1" stop-color="#0b2118"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#bad5b0" stop-opacity=".17"/><stop offset="1" stop-color="#bad5b0" stop-opacity="0"/></radialGradient>
+  </defs>
+  <path fill="url(#forest)" d="M0 0h164v314H0z"/>
+  <circle cx="84" cy="53" r="114" fill="url(#glow)"/>
+  <g fill="none" stroke="#9cbd9f" stroke-opacity=".12">
+    <circle cx="174" cy="305" r="54"/><circle cx="174" cy="305" r="78"/><circle cx="174" cy="305" r="102"/><circle cx="174" cy="305" r="126"/>
+  </g>
+  <image x="24" y="27" width="80" height="80" xlink:href="../branding/cerms-logo.png"/>
+  <g font-family="Arial, sans-serif">
+    <text x="24" y="151" fill="#f2f6eb" font-size="27" font-weight="700" letter-spacing="1">CERMS</text>
+    <text x="25" y="180" fill="#c7d9bd" font-size="11" letter-spacing="1.2">YOUR CLUB.</text>
+    <text x="25" y="197" fill="#c7d9bd" font-size="11" letter-spacing="1.2">CONNECTED.</text>
+    <path d="M25 221h30" stroke="#bbd494" stroke-width="2"/>
+    <text x="25" y="278" fill="#b7cbbb" font-size="8" letter-spacing=".7">SET UP. SIGN IN.</text>
+    <text x="25" y="292" fill="#b7cbbb" font-size="8" letter-spacing=".7">GET TO WORK.</text>
+  </g>
+</svg>

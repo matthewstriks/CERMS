@@ -1,0 +1,199 @@
+{
+  "verifiedAt": "2026-11-18T00:24:44.654Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "scope": "Read-only setup audit of commit b1d02b2; no cloud resources or business documents changed",
+  "currentRules": {
+    "baseline": "firebase/releases/notification-sounds-2026-11-16.rules",
+    "release": "projects/cerms-7af24/releases/cloud.firestore/cerms",
+    "updated": "2026-11-16T18:22:48.868927Z",
+    "matchesLastDeployed": true,
+    "matchesLocal": false,
+    "liveSha256": "7961ea2cd868af444035caee2ae76c71693dfa7a7efe09b105dc56187a1323e5"
+  },
+  "unfinished": [
+    {
+      "feature": "Bug reports",
+      "status": "Blocked before deployment",
+      "findings": [
+        "submitBugReport is absent from live functions.",
+        "The dedicated cerms-7af24-cerms5-bug-reports bucket returns HTTP 404.",
+        "functions/index.mjs imports functions/bug-report.mjs, which is missing; importing the function entry point fails with ERR_MODULE_NOT_FOUND.",
+        "docs/BUG-REPORTS.md proposes the existing Trigger Email extension. Existing deployment instructions preserve the legacy (default)/mail extension; no compatible CERMS 5 email path is implemented."
+      ],
+      "required": [
+        "Implement and test the missing authenticated/idempotent handler.",
+        "Use a CERMS 5 email delivery path that does not write to (default) or change the legacy extension; keep credentials server-only.",
+        "Provision the isolated private bucket, least-privilege upload/signing access, then deploy only the requested callable after compatibility checks."
+      ]
+    },
+    {
+      "feature": "Cash drops",
+      "status": "Not deployed; report compatibility blocker",
+      "findings": [
+        "cashDrop is absent from live functions.",
+        "Local completeSale includes cash-drop-aware register totals, but live completeSale still has the November 16 pre-update timestamp.",
+        "Synthetic fixture with cashDropCents=100 and expectedCashCents reduced by 100 is rejected by report-functions/report-render.mjs registerRows with Register cash mismatch.",
+        "The current staff function entry point cannot load because the bug-report module is missing."
+      ],
+      "required": [
+        "Fix and test daily-report reconciliation for historical totals and cash drops before enabling drops.",
+        "Deploy the compatible Dev report update and scoped cashDrop/completeSale updates; preserve all legacy services."
+      ]
+    },
+    {
+      "feature": "Product waivers (zero-price products, not signed membership waivers)",
+      "status": "Local only",
+      "findings": [
+        "Local rules add optional waiveProducts permission; live rules exactly match the prior notification-sounds release.",
+        "Live createStaffAccount, completeSale and sendDevDailyReport timestamps match their recorded deployments before the latest commit.",
+        "All Firebase feature configurations still reference the notification-sounds release rather than a new waiver release."
+      ],
+      "required": [
+        "Verify waiver permission defaults/denials and receipt/report behavior with synthetic checks.",
+        "Archive and deploy the exact named-cerms optional permission rules and scoped createStaffAccount/completeSale/report updates after resolving entry-point and report blockers."
+      ]
+    },
+    {
+      "feature": "Desktop delivery",
+      "status": "New features remain Unreleased",
+      "findings": [
+        "Public Windows alpha feed serves 5.0.0-alpha.5.",
+        "CHANGELOG.md lists bug reports, cash drops and waivers under Unreleased."
+      ],
+      "required": [
+        "After backend readiness and end-to-end synthetic verification, package/publish a deliberate desktop release; no release was published during this audit."
+      ]
+    }
+  ],
+  "confirmedReady": {
+    "functions": [
+      {
+        "name": "checkOutRental",
+        "state": "ACTIVE",
+        "updated": "2026-11-15T17:09:25.311219397Z"
+      },
+      {
+        "name": "completeSale",
+        "state": "ACTIVE",
+        "updated": "2026-11-16T17:34:24.432158293Z"
+      },
+      {
+        "name": "createStaffAccount",
+        "state": "ACTIVE",
+        "updated": "2026-11-15T17:26:10.163347858Z"
+      },
+      {
+        "name": "getProductImage",
+        "state": "ACTIVE",
+        "updated": "2026-10-12T02:32:23.546586244Z"
+      },
+      {
+        "name": "memberNotes",
+        "state": "ACTIVE",
+        "updated": "2026-11-15T17:26:06.408738292Z"
+      },
+      {
+        "name": "saveNotificationSoundPreference",
+        "state": "ACTIVE",
+        "updated": "2026-11-16T18:23:36.468947557Z"
+      },
+      {
+        "name": "savePosSettings",
+        "state": "ACTIVE",
+        "updated": "2026-10-01T03:36:46.798294704Z"
+      },
+      {
+        "name": "saveThemePreference",
+        "state": "ACTIVE",
+        "updated": "2026-11-13T17:57:09.328538447Z"
+      },
+      {
+        "name": "sendDevDailyReport",
+        "state": "ACTIVE",
+        "updated": "2026-11-14T18:07:52.074042288Z"
+      },
+      {
+        "name": "staffMessaging",
+        "state": "ACTIVE",
+        "updated": "2026-11-15T17:51:05.145481192Z"
+      },
+      {
+        "name": "updateRental",
+        "state": "ACTIVE",
+        "updated": "2026-11-13T17:48:27.041499140Z"
+      },
+      {
+        "name": "uploadProductImage",
+        "state": "ACTIVE",
+        "updated": "2026-10-01T03:10:38.214238011Z"
+      }
+    ],
+    "indexes": [
+      {
+        "collection": "members",
+        "state": "READY"
+      },
+      {
+        "collection": "registers",
+        "state": "READY"
+      },
+      {
+        "collection": "staffChats",
+        "state": "READY"
+      }
+    ],
+    "schedules": [
+      {
+        "name": "projects/cerms-7af24/locations/us-central1/jobs/firebase-schedule-sendDevDailyReport-us-central1",
+        "state": "ENABLED",
+        "schedule": "0 7 * * *",
+        "timeZone": "America/Chicago"
+      },
+      {
+        "name": "projects/cerms-7af24/locations/us-central1/jobs/firebase-schedule-generateDailyRegisterReport-us-central1",
+        "state": "ENABLED",
+        "schedule": "0 7 * * *",
+        "timeZone": "America/Chicago"
+      }
+    ],
+    "imageBucket": {
+      "name": "cerms-7af24-cerms5-product-images",
+      "publicAccessPrevention": "enforced",
+      "uniformBucketLevelAccess": true,
+      "publicBindings": []
+    },
+    "releaseBucket": {
+      "name": "cerms-7af24-cerms5-releases",
+      "publicRoles": ["roles/storage.objectViewer"],
+      "versioningEnabled": true,
+      "publicFeedStatus": 200,
+      "publicVersion": "5.0.0-alpha.5"
+    }
+  },
+  "validation": {
+    "clientTestsPassed": 233,
+    "clientTestsSkipped": 2,
+    "scopedServerAndReportTestsPassed": 40,
+    "desktopBuildPassed": true,
+    "functionEntryPointLoads": false,
+    "syntheticCashDropReportRegressionReproduced": true,
+    "rulesEmulatorRerun": false,
+    "liveTestWrites": false,
+    "emailsSent": false,
+    "deploymentsPerformed": false
+  },
+  "legacyObservation": {
+    "name": "ext-firestore-user-document-backfillExistingUsers",
+    "state": "FAILED",
+    "updated": "2024-05-22T15:47:50.495Z",
+    "action": "Historical legacy extension; left unchanged and outside this setup scope."
+  },
+  "resolution": {
+    "completedAt": "2026-11-18T00:45:41.798Z",
+    "allListedSetupCompleted": true,
+    "evidence": "docs/UPDATES-DEPLOYMENT.json",
+    "desktopVersion": "5.0.0-alpha.6",
+    "legacySystemUnchanged": true
+  }
+}

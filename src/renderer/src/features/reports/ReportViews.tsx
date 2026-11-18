@@ -33,7 +33,7 @@ export function SalesOverview({ sales }: { sales: SalesSummary }) {
           previous={sales.previous.orders}
         />
         <ReportMetric
-          label="Collected after payouts"
+          label="Collected after payouts/refunds"
           value={money(sales.collected / 100)}
           current={sales.collected}
           previous={sales.previous.collected}
@@ -46,7 +46,7 @@ export function SalesOverview({ sales }: { sales: SalesSummary }) {
       </div>
       <ReportPanel
         title="Daily sales"
-        description="Net sales before tax. Payouts reduce sales; negative days appear below the baseline."
+        description="Net sales before tax. Payouts and refunds reduce sales; negative days appear below the baseline."
       >
         <ReportChart
           label="Daily net sales before tax"
@@ -57,15 +57,21 @@ export function SalesOverview({ sales }: { sales: SalesSummary }) {
       <div className="report-two-col">
         <ReportPanel title="Sales reconciliation">
           <dl className="report-totals">
-            <dt>Gross sales before payouts and tax</dt>
+            <dt>Sales after discounts, before payouts/tax</dt>
             <dd>{money(sales.gross / 100)}</dd>
+            <dt>Discounts, net of returns</dt>
+            <dd>{money(sales.discounts / 100)}</dd>
             <dt>Payouts before tax</dt>
             <dd>{money(sales.payouts / 100)}</dd>
+            <dt>Refunds (including tax)</dt>
+            <dd>
+              {money(sales.refunded / 100)} · {sales.refunds}
+            </dd>
             <dt>Net sales before tax</dt>
             <dd>{money(sales.net / 100)}</dd>
             <dt>Net tax recorded</dt>
             <dd>{money(sales.tax / 100)}</dd>
-            <dt>Collected after payouts</dt>
+            <dt>Collected after payouts/refunds</dt>
             <dd>{money(sales.collected / 100)}</dd>
             <dt>Cash handed over</dt>
             <dd>{money(sales.cashReceived / 100)}</dd>
@@ -391,6 +397,9 @@ export function RegisterReport({ data }: { data: ReportData }) {
           </span>,
           r.closedByName || 'Not recorded',
           hasLedger ? t.saleCount : 'No POS ledger',
+          t.refundCount ?? 0,
+          money((t.refundCents ?? 0) / 100),
+          money((t.discountCents ?? 0) / 100),
         ],
       })),
     [rows],
@@ -441,6 +450,9 @@ export function RegisterReport({ data }: { data: ReportData }) {
             'Over / short',
             'Closed by',
             'Transactions',
+            'Refunds',
+            'Refunded incl. tax',
+            'Discounts net',
           ]}
           rows={tableRows}
         />

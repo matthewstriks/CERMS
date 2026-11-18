@@ -1,10 +1,12 @@
-// Local synthesized chime only: no media downloads, telemetry or native audio privileges.
+export type NotificationSoundKind = 'message' | 'notification' | 'error'
+// Local synthesized tones only: no media downloads, telemetry or native audio privileges.
 export function createNotificationAudio(
   factory = () => new AudioContext(),
   now = () => Date.now(),
 ) {
   let context: AudioContext | null = null,
     lastAutomatic = -Infinity,
+    lastAutomaticKind: NotificationSoundKind | null = null,
     generation = 0
   const playing = new Set<OscillatorNode>()
   function get() {
@@ -35,12 +37,18 @@ export function createNotificationAudio(
       generation++
       stop()
     },
-    async play(volume: number, preview = false): Promise<boolean> {
+    async play(
+      volume: number,
+      preview = false,
+      kind: NotificationSoundKind = 'notification',
+    ): Promise<boolean> {
       if (
         !Number.isInteger(volume) ||
         volume <= 0 ||
         volume > 100 ||
-        (!preview && now() - lastAutomatic < 750)
+        (!preview &&
+          now() - lastAutomatic < 750 &&
+          !(kind === 'error' && lastAutomaticKind !== 'error'))
       )
         return false
       const currentGeneration = generation
@@ -67,14 +75,21 @@ export function createNotificationAudio(
         stop()
         const start = c.currentTime,
           level = 0.15 * (volume / 100) ** 2
-        for (const [offset, frequency] of [
-          [0, 660],
-          [0.15, 880],
-        ]) {
+        const notes =
+          kind === 'error'
+            ? [
+                [0, 440],
+                [0.16, 294],
+              ]
+            : [
+                [0, 660],
+                [0.15, 880],
+              ]
+        for (const [offset, frequency] of notes) {
           const oscillator = c.createOscillator(),
             gain = c.createGain(),
             time = start + offset!
-          oscillator.type = 'sine'
+          oscillator.type = kind === 'error' ? 'triangle' : 'sine'
           oscillator.frequency.value = frequency!
           gain.gain.setValueAtTime(0.0001, time)
           gain.gain.exponentialRampToValueAtTime(level, time + 0.02)
@@ -90,7 +105,10 @@ export function createNotificationAudio(
           oscillator.start(time)
           oscillator.stop(time + 0.25)
         }
-        if (!preview) lastAutomatic = now()
+        if (!preview) {
+          lastAutomatic = now()
+          lastAutomaticKind = kind
+        }
         return true
       } catch {
         return false
@@ -102,11 +120,12 @@ export function createNotificationAudio(
       const previous = context
       context = null
       lastAutomatic = -Infinity
+      lastAutomaticKind = null
       void previous?.close().catch(() => {})
     },
   }
 }
 export const notificationAudio = createNotificationAudio()
-export function requestNotificationSound(kind: 'message' | 'notification' = 'notification') {
+export function requestNotificationSound(kind: NotificationSoundKind = 'notification') {
   window.dispatchEvent(new CustomEvent('cerms:notification-sound', { detail: kind }))
 }

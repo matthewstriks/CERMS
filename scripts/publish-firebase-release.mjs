@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { validateRelease } from './release-check.mjs'
 import { releaseToken } from './firebase-release-auth.mjs'
 const require = createRequire(import.meta.url)
@@ -18,6 +19,7 @@ assert.equal(
   'Only the isolated release bucket is permitted',
 )
 assert.equal(settings.windowsFeed, `https://storage.googleapis.com/${settings.bucket}/windows/`)
+assert.equal(settings.macosFeed, `https://storage.googleapis.com/${settings.bucket}/macos/`)
 const hash = (bytes) => createHash('sha512').update(bytes).digest('base64')
 
 export function versionParts(version) {
@@ -110,7 +112,7 @@ export function storageClient(token, request = fetch) {
   }
   return {
     async read(name) {
-      assert.ok(name.startsWith('windows/'))
+      assert.ok(/^(windows|macos)\//.test(name))
       const url = `${base}/o/${encodeURIComponent(name)}`
       const r = await api(url, {}, true)
       if (!r) return null
@@ -119,7 +121,7 @@ export function storageClient(token, request = fetch) {
       return { generation: metadata.generation, bytes: Buffer.from(await content.arrayBuffer()) }
     },
     async put(name, bytes, generation = '0', mutable = false) {
-      assert.ok(name.startsWith('windows/'))
+      assert.ok(/^(windows|macos)\//.test(name))
       const metadata = {
         name,
         contentType: name.endsWith('.yml') ? 'text/yaml' : 'application/octet-stream',
@@ -156,14 +158,16 @@ export function storageClient(token, request = fetch) {
   }
 }
 
-export async function publishWindows(assets, store) {
-  const { version, manifest, files } = assets
+// All immutable downloads for both platforms must verify before either feed advances.
+async function preparePublication(assets, store, platform) {
+  const { version, manifest } = assets
   validateNotes(load(manifest.toString()).releaseNotes)
-  const channels = announcementChannels(version)
-  // Capture generations before uploading: concurrent publishes cannot replace a newer feed.
+  const suffix = platform === 'macos' ? '-mac' : ''
+  const channels = assets.updatesEnabled === false ? [] : announcementChannels(version)
   const previous = new Map()
   for (const channel of channels) {
-    const state = await store.read(`windows/${channel}.yml`)
+    const name = `${platform}/${channel}${suffix}.yml`
+    const state = await store.read(name)
     if (state) {
       const current = load(state.bytes.toString())
       assert.ok(
@@ -179,9 +183,13 @@ export async function publishWindows(assets, store) {
     }
     previous.set(channel, state)
   }
+  return { assets, platform, suffix, channels, previous }
+}
+async function stagePublication({ assets, platform }, store) {
+  const { version, manifest, files } = assets
   const immutable = [...files, { name: `releases/${version}.yml`, bytes: manifest }]
   for (const file of immutable) {
-    const name = `windows/${file.name}`
+    const name = `${platform}/${file.name}`
     const existing = await store.read(name)
     if (existing)
       assert.equal(
@@ -190,18 +198,106 @@ export async function publishWindows(assets, store) {
         'Never overwrite a version asset; increment the version',
       )
     else {
-      console.log(`Uploading ${file.name} (${file.bytes.length} bytes)…`)
+      console.log(`Uploading ${platform}/${file.name} (${file.bytes.length} bytes)…`)
       await store.put(name, file.bytes)
     }
     await store.verify(name, file.bytes)
   }
-  // All immutable files are public and hash-verified before any client learns of the version.
+}
+async function announcePublication({ assets, platform, suffix, channels, previous }, store) {
   for (const channel of channels) {
-    const name = `windows/${channel}.yml`
-    await store.put(name, manifest, previous.get(channel)?.generation ?? '0', true)
-    await store.verify(name, manifest)
+    const name = `${platform}/${channel}${suffix}.yml`
+    await store.put(name, assets.manifest, previous.get(channel)?.generation ?? '0', true)
+    await store.verify(name, assets.manifest)
   }
-  return new URL(files[0].name, settings.windowsFeed).href
+}
+export async function publishDesktop(releases, store) {
+  assert.ok(releases.length && releases.every((r) => ['windows', 'macos'].includes(r.platform)))
+  assert.equal(new Set(releases.map((r) => r.platform)).size, releases.length)
+  for (const { assets } of releases) {
+    assert.equal(assets.version, releases[0].assets.version, 'Platform versions must match')
+    assert.equal(
+      load(assets.manifest.toString()).releaseNotes,
+      load(releases[0].assets.manifest.toString()).releaseNotes,
+      'Platform release notes must match',
+    )
+  }
+  const prepared = []
+  for (const { assets, platform } of releases)
+    prepared.push(await preparePublication(assets, store, platform))
+  for (const publication of prepared) await stagePublication(publication, store)
+  for (const publication of prepared) await announcePublication(publication, store)
+  return Object.fromEntries(
+    releases.map(({ platform, assets }) => [
+      platform,
+      new URL(
+        assets.files[0].name,
+        platform === 'macos' ? settings.macosFeed : settings.windowsFeed,
+      ).href,
+    ]),
+  )
+}
+export async function publishWindows(assets, store) {
+  return (await publishDesktop([{ platform: 'windows', assets }], store)).windows
+}
+export function verifyMacSigning(appPath) {
+  assert.equal(process.platform, 'darwin', 'Signed Mac publication must be verified on macOS')
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'pipe' })
+  const signature = spawnSync('codesign', ['--display', '--verbose=4', appPath], {
+    encoding: 'utf8',
+  })
+  assert.equal(signature.status, 0, 'Mac signing identity cannot be verified')
+  assert.match(
+    signature.stderr,
+    /Authority=Developer ID Application:/,
+    'Mac updater requires a Developer ID Application signature',
+  )
+  execFileSync('xcrun', ['stapler', 'validate', appPath], { stdio: 'pipe' })
+}
+export async function macosAssets(directory, version, { verifySigning = verifyMacSigning } = {}) {
+  const channel = releaseChannel(version)
+  const dmg = `CERMS-5-${version}-mac-universal.dmg`
+  const zip = `CERMS-5-${version}-mac-universal.zip`
+  const manifest = await readFile(join(directory, `${channel}-mac.yml`))
+  const data = load(manifest.toString())
+  assert.equal(data.version, version, 'Mac manifest version must match package version')
+  const notes = validateNotes(data.releaseNotes)
+  assert.equal(data.path, zip, 'Mac updater must use the universal ZIP')
+  assert.deepEqual(
+    data.files?.map((f) => f.url).sort(),
+    [dmg, zip].sort(),
+    'Mac manifest must list exactly the universal DMG and ZIP',
+  )
+  const files = []
+  for (const name of [dmg, zip]) {
+    const bytes = await readFile(join(directory, name))
+    const listed = data.files.find((f) => f.url === name)
+    assert.equal(listed.sha512, hash(bytes), 'Mac artifact hash mismatch')
+    assert.equal(listed.size, bytes.length, 'Mac artifact size mismatch')
+    if (name === zip) assert.equal(data.sha512, hash(bytes), 'Mac ZIP legacy hash mismatch')
+    files.push({ name, bytes })
+    const blockmap = await readFile(join(directory, name + '.blockmap'))
+    assert.ok(blockmap.length, 'Missing Mac blockmap')
+    files.push({ name: name + '.blockmap', bytes: blockmap })
+  }
+  const appPath = join(directory, 'mac-universal', 'CERMS 5.app')
+  const resources = join(appPath, 'Contents/Resources')
+  const feed = load(await readFile(join(resources, 'app-update.yml'), 'utf8'))
+  assert.equal(feed.provider, 'generic')
+  assert.equal(feed.url, settings.macosFeed)
+  assert.equal(feed.channel, channel)
+  const { default: asar } = await import('@electron/asar')
+  asar.uncache(join(resources, 'app.asar'))
+  const pkg = JSON.parse(asar.extractFile(join(resources, 'app.asar'), 'package.json').toString())
+  assert.equal(pkg.version, version)
+  assert.equal(
+    pkg.cermsRelease?.releaseNotes,
+    notes,
+    'Packaged Mac changelog must match the manifest',
+  )
+  assert.equal(typeof pkg.cermsRelease?.updatesEnabled, 'boolean')
+  if (pkg.cermsRelease.updatesEnabled) await verifySigning(appPath)
+  return { version, manifest, files, updatesEnabled: pkg.cermsRelease.updatesEnabled }
 }
 
 export async function setupBucket() {
@@ -263,8 +359,15 @@ if (process.argv[1]?.endsWith('publish-firebase-release.mjs')) {
   if (process.argv.includes('--setup')) await setupBucket()
   else {
     const { version } = await validateRelease()
-    const assets = await windowsAssets('release', version)
-    const link = await publishWindows(assets, storageClient(await releaseToken()))
-    console.log(`Published CERMS ${version}. Send this installer to the client:\n${link}`)
+    const releases = [{ platform: 'windows', assets: await windowsAssets('release', version) }]
+    if (process.argv.includes('--all'))
+      releases.push({ platform: 'macos', assets: await macosAssets('release', version) })
+    const links = await publishDesktop(releases, storageClient(await releaseToken()))
+    console.log(`Published CERMS ${version}. Download links:`)
+    for (const [platform, link] of Object.entries(links)) console.log(`${platform}: ${link}`)
+    if (releases.some((r) => r.platform === 'macos' && !r.assets.updatesEnabled))
+      console.log(
+        'This Mac download requires manual installation. Mac automatic updates need Apple signing/notarization setup and a first signed installation.',
+      )
   }
 }

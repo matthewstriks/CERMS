@@ -46,8 +46,9 @@ service cloud.firestore {
       return switcher() && businessStaff(systemId);
     }
     function validStaffPermissions(p) {
-      return p is map && p.keys().hasOnly(['removeMemberNotes','closeOtherRegisters','deleteProducts','processSales','waiveProducts','editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
+      return p is map && p.keys().hasOnly(['manageDiscountCodes','processRefunds','editStaffProfiles','removeStaffAccounts','removeMemberNotes','closeOtherRegisters','deleteProducts','processSales','waiveProducts','editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
         && p.keys().hasAll(['editMembers','deleteMembers','manageProducts','openRegisters','closeRegisters'])
+        && p.get('manageDiscountCodes',false) is bool && p.get('processRefunds',false) is bool && p.get('editStaffProfiles',false) is bool && p.get('removeStaffAccounts',false) is bool
         && p.get('removeMemberNotes',false) is bool && p.editMembers is bool && p.deleteMembers is bool && p.manageProducts is bool
         && p.openRegisters is bool && p.closeRegisters is bool && p.get('processSales',false) is bool && p.get('waiveProducts',false) is bool && p.get('deleteProducts',false) is bool && p.get('closeOtherRegisters',false) is bool;
     }
@@ -221,7 +222,7 @@ service cloud.firestore {
       return businessPermission(systemId,'manageProducts');
     }
     function catalogReader(systemId) {
-      return businessPermission(systemId,'deleteProducts') || businessPermission(systemId,'processSales') || catalogAdmin(systemId) || businessPermission(systemId,'editMembers') || (systemId == 'dev' && devCreator());
+      return businessPermission(systemId,'manageDiscountCodes') || businessPermission(systemId,'deleteProducts') || businessPermission(systemId,'processSales') || catalogAdmin(systemId) || businessPermission(systemId,'editMembers') || (systemId == 'dev' && devCreator());
     }
     function catalogMeta(d) {
       return d.version is int && d.version >= 1 && d.version <= 1000000000

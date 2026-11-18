@@ -1,3 +1,4 @@
+import { refundEndpoint, type RefundQuote, type RefundRequest } from '../shared/refund-policy'
 import {
   collection,
   doc,
@@ -59,7 +60,32 @@ export function createPos(reader: Pick<MembershipReader, 'uid' | 'club'>) {
       throw new Error('Receipt could not be loaded.')
     return { ...d, id: snapshot.id, createdAt: d.createdAt.toMillis() } as SaleReceipt
   }
+  async function refundCall<T>(data: unknown): Promise<T> {
+    await session()
+    const response = await fetch(refundEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await auth.currentUser!.getIdToken()}`,
+      },
+      body: JSON.stringify({ data }),
+    })
+    const p = await response.json()
+    if (!response.ok || p.error)
+      throw Object.assign(
+        Error(p.error?.message || 'Refund was not confirmed. Retry the same request.'),
+        {
+          definitive: ['INVALID_ARGUMENT', 'FAILED_PRECONDITION', 'PERMISSION_DENIED'].includes(
+            p.error?.status,
+          ),
+        },
+      )
+    return p.result
+  }
   return {
+    refundQuote: (saleId: string) =>
+      refundCall<RefundQuote>({ action: 'quote', business: reader.club, saleId }),
+    refund: (data: RefundRequest) => refundCall<{ saleId: string }>(data),
     async membershipRecipient(
       id: string,
     ): Promise<{ id: string; name: string; expiresAt: number | null }> {
@@ -125,6 +151,21 @@ export function createPos(reader: Pick<MembershipReader, 'uid' | 'club'>) {
       amountCents: number
       note: string
     }) => call<{ dropId: string }>('cashDrop', { business: reader.club, ...data }),
+    receiptRecipient: (saleId: string) =>
+      call<{ email: string | null }>('sendSaleReceipt', {
+        business: reader.club,
+        action: 'recipient',
+        saleId,
+      }),
+    emailReceipt: (saleId: string, email: string, requestId: string) =>
+      call<{ status: 'sent' }>('sendSaleReceipt', {
+        business: reader.club,
+        action: 'send',
+        saleId,
+        email,
+        requestId,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
     async complete(request: SaleRequest) {
       await call<{ saleId: string }>('completeSale', request)
       return this.receipt(request.requestId)

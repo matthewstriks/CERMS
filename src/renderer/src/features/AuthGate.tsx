@@ -1,5 +1,6 @@
 import ServiceStatus from '../components/ServiceStatus'
 import BrandLogo from '../components/BrandLogo'
+import { CircleHelp } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMembershipSession } from '../lib/membership-session'
@@ -32,7 +33,6 @@ function Login() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [support, setSupport] = useState(false)
   useEffect(() => {
     document.title = 'CERMS · Sign in'
     void window.desktop
@@ -144,16 +144,29 @@ function Login() {
         <button
           className="text-button"
           type="button"
-          onClick={() => setSupport(!support)}
-          aria-expanded={support}
+          onClick={() => {
+            void window.desktop
+              .openLoginSupport(email.trim())
+              .catch((failure) =>
+                setError(failure instanceof Error ? failure.message : 'Unable to open support.'),
+              )
+          }}
         >
           Support
         </button>
-        {support && (
-          <p role="status">
-            Support is not implemented yet. For now, contact your club administrator.
-          </p>
-        )}
+        <button
+          type="button"
+          aria-label="CERMS Assistant"
+          title="CERMS Assistant"
+          className="text-button"
+          onClick={() =>
+            void window.desktop
+              .openAssistant()
+              .catch(() => setError('Could not open CERMS Assistant.'))
+          }
+        >
+          <CircleHelp size={16} /> CERMS Assistant
+        </button>
         <span>Version {info.data?.version ?? (info.loading ? 'loading…' : 'unavailable')}</span>
       </footer>
     </main>

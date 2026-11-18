@@ -1,4 +1,5 @@
 import { messagingEmulatorChecks } from './messaging-emulator-checks.mjs'
+import { updatesEmulatorChecks } from './updates-emulator-checks.mjs'
 import { messagingRuleChecks } from './messaging-rule-checks.mjs'
 import { posRuleChecks } from './pos-rule-checks.mjs'
 import { productImageRuleChecks } from './product-image-rule-checks.mjs'
@@ -1041,9 +1042,19 @@ try {
       false,
     )
     await check('No direct note deletion', notePath, { uid, method: 'DELETE' }, false)
+    const deliveryPath = base + '/system/club-a/sales/synthetic-sale/receiptDelivery/email'
+    await check('No direct receipt email audit read', deliveryPath, { uid }, false)
+    await check(
+      'No forged receipt email delivery',
+      deliveryPath,
+      { uid, method: 'PATCH', body: { fields: { state: str('sent') } } },
+      false,
+    )
+    await check('No receipt email audit deletion', deliveryPath, { uid, method: 'DELETE' }, false)
   }
   await messagingRuleChecks({ base, seed, check, fields, str, owner })
   await messagingEmulatorChecks({ project, port })
+  await updatesEmulatorChecks({ project, port })
   console.log(
     `Firestore rules passed ${checks} allow/deny checks using exact rules on named cerms in isolated ${project}.`,
   )

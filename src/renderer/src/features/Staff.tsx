@@ -10,6 +10,7 @@ import {
   permissionDefinitions,
   defaultStaffPermissions,
   effectivePermissions,
+  hasStaffPermission,
   type StaffPermissions,
 } from '../../../domain/staff-permissions'
 import './staff/Staff.css'
@@ -225,6 +226,145 @@ function StaffDialog({
     </dialog>
   )
 }
+function StaffProfileDialog({
+  account,
+  mode,
+  client,
+  onClose,
+  onSaved,
+}: {
+  account: StaffAccount
+  mode: 'edit' | 'remove'
+  client: ReturnType<typeof createStaffManager>
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const ref = useRef<HTMLDialogElement>(null),
+    requestId = useRef(crypto.randomUUID()),
+    pending = useRef(false)
+  const [profile, setProfile] = useState<StaffAccount | null>(null)
+  const [name, setName] = useState(''),
+    [email, setEmail] = useState(''),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(false),
+    [submitted, setSubmitted] = useState(false)
+  useEffect(() => {
+    ref.current?.showModal()
+    return () => ref.current?.close()
+  }, [])
+  useEffect(() => {
+    let active = true
+    void client
+      .profile(account.uid)
+      .then((value) => {
+        if (active) {
+          setProfile(value)
+          setName(value.name)
+          setEmail(value.email)
+        }
+      })
+      .catch((failure) => {
+        if (active) setError(failure.message)
+      })
+    return () => {
+      active = false
+    }
+  }, [account.uid, client])
+  return (
+    <dialog
+      ref={ref}
+      className="member-dialog staff-dialog"
+      aria-label={mode === 'edit' ? 'Edit staff profile' : 'Remove staff access'}
+      onCancel={(event) => {
+        event.preventDefault()
+        if (!pending.current) onClose()
+      }}
+    >
+      <h2>{mode === 'edit' ? 'Edit staff profile' : 'Remove staff access'}</h2>
+      {!profile && !error && <p role="status">Loading profile…</p>}
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault()
+          if (pending.current || !profile?.profileVersion) return
+          pending.current = true
+          setBusy(true)
+          setSubmitted(true)
+          setError('')
+          try {
+            if (mode === 'edit')
+              await client.updateProfile(
+                profile.uid,
+                { displayName: name.trim(), email: email.trim().toLowerCase() },
+                profile.profileVersion,
+                requestId.current,
+              )
+            else await client.remove(profile.uid, profile.profileVersion, requestId.current)
+            onSaved()
+          } catch (failure) {
+            setError(failure instanceof Error ? failure.message : 'Staff change was not confirmed.')
+          } finally {
+            pending.current = false
+            setBusy(false)
+          }
+        }}
+      >
+        {mode === 'edit' ? (
+          <div className="staff-fields">
+            <label>
+              Full name
+              <input
+                required
+                maxLength={200}
+                value={name}
+                disabled={!profile || busy || submitted}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+            <label>
+              Profile email
+              <input
+                type="email"
+                maxLength={254}
+                value={email}
+                disabled={!profile || busy || submitted}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <small>Login email and password stay unchanged.</small>
+          </div>
+        ) : (
+          <p>
+            Remove <strong>{profile?.name || account.name}</strong> from CERMS 5? Their shared login
+            and legacy access stay unchanged.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="inline-error">
+            {error}
+          </p>
+        )}
+        <div className="dialog-actions">
+          <button type="button" disabled={busy} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className={mode === 'edit' ? 'primary' : 'danger'}
+            disabled={busy || !profile?.profileVersion}
+          >
+            {busy
+              ? 'Saving…'
+              : submitted
+                ? 'Retry same change'
+                : mode === 'edit'
+                  ? 'Save profile'
+                  : 'Remove from CERMS 5'}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  )
+}
 export default function Staff() {
   const { reader } = useMembershipSession()
   const client = useMemo(() => (reader ? createStaffManager(reader) : null), [reader])
@@ -236,8 +376,17 @@ export default function Staff() {
     [revision, setRevision] = useState(0)
   const [editing, setEditing] = useState<{ account: StaffAccount | null } | null>(null)
   const owner = reader?.uid === ownerUid
+  const canEditProfiles =
+    !!reader && hasStaffPermission(reader.uid, 'editStaffProfiles', reader.permissions)
+  const canRemoveStaff =
+    !!reader && hasStaffPermission(reader.uid, 'removeStaffAccounts', reader.permissions)
+  const canManage = owner || canEditProfiles || canRemoveStaff
+  const [profileAction, setProfileAction] = useState<{
+    account: StaffAccount
+    mode: 'edit' | 'remove'
+  } | null>(null)
   useEffect(() => {
-    if (!client || !owner) return
+    if (!client || !canManage) return
     let active = true
     setBusy(true)
     setError('')
@@ -258,9 +407,9 @@ export default function Staff() {
     return () => {
       active = false
     }
-  }, [client, owner, revision])
+  }, [client, canManage, revision])
   if (!reader || !client) return null
-  if (!owner)
+  if (!canManage)
     return (
       <section className="panel settings-card">
         <h2>Your permissions</h2>
@@ -268,20 +417,22 @@ export default function Staff() {
           {reader.staffName} · {reader.club}
         </p>
         <PermissionFields value={effectivePermissions(reader.uid, reader.permissions)} disabled />
-        <p>Contact the owner to change your permissions. Staff administration is owner-only.</p>
+        <p>Contact the owner to change your permissions.</p>
       </section>
     )
   return (
     <>
       <div className="toolbar">
-        <button className="primary" onClick={() => setEditing({ account: null })}>
-          Create staff account
-        </button>
+        {owner && (
+          <button className="primary" onClick={() => setEditing({ account: null })}>
+            Create staff account
+          </button>
+        )}
         <button disabled={busy} onClick={() => setRevision((v) => v + 1)}>
           Refresh users
         </button>
       </div>
-      <p>Staff accounts for {reader.club}. Your owner account has full access in every business.</p>
+      <p>Staff accounts for {reader.club}. Only the owner can grant permissions.</p>
       {notice && (
         <p role="status" data-notification-sound>
           {notice}
@@ -300,7 +451,7 @@ export default function Staff() {
               <th>Name</th>
               <th>Email</th>
               <th>Access</th>
-              <th>Permissions</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -310,12 +461,32 @@ export default function Staff() {
                 <td>{account.email || 'Not recorded'}</td>
                 <td>{account.uid === ownerUid ? 'Owner · Full access' : 'Staff'}</td>
                 <td>
-                  <button
-                    aria-label={`View permissions for ${account.name}`}
-                    onClick={() => setEditing({ account })}
-                  >
-                    View permissions
-                  </button>
+                  {owner && (
+                    <button
+                      aria-label={`View permissions for ${account.name}`}
+                      onClick={() => setEditing({ account })}
+                    >
+                      View permissions
+                    </button>
+                  )}
+                  {canEditProfiles && (account.uid !== ownerUid || owner) && (
+                    <button
+                      aria-label={`Edit profile for ${account.name}`}
+                      onClick={() => setProfileAction({ account, mode: 'edit' })}
+                    >
+                      Edit profile
+                    </button>
+                  )}
+                  {canRemoveStaff && account.uid !== ownerUid && account.uid !== reader.uid && (
+                    <button
+                      className="danger"
+                      aria-label={`Remove staff access for ${account.name}`}
+                      onClick={() => setProfileAction({ account, mode: 'remove' })}
+                    >
+                      Remove access
+                    </button>
+                  )}
+                  {account.uid === ownerUid && !owner && <span>Protected owner</span>}
                 </td>
               </tr>
             ))}
@@ -344,6 +515,23 @@ export default function Staff() {
         >
           Load more users
         </button>
+      )}
+      {profileAction && (
+        <StaffProfileDialog
+          account={profileAction.account}
+          mode={profileAction.mode}
+          client={client}
+          onClose={() => setProfileAction(null)}
+          onSaved={() => {
+            setNotice(
+              profileAction.mode === 'edit'
+                ? 'Staff profile saved.'
+                : 'Staff access removed from CERMS 5.',
+            )
+            setProfileAction(null)
+            setRevision((v) => v + 1)
+          }}
+        />
       )}
       {editing && (
         <StaffDialog

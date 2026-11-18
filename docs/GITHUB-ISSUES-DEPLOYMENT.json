@@ -1,0 +1,33 @@
+{
+  "verifiedAt": "2026-11-18T02:08:55.032Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "functions": [
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/submitBugReport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T02:08:41.810747634Z"
+    },
+    {
+      "name": "projects/cerms-7af24/locations/us-central1/functions/submitLoginSupport",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-18T02:08:46.005295284Z"
+    }
+  ],
+  "allOtherFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allBucketAndIamPoliciesUnchanged": true,
+  "allExistingSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "githubRepository": "matthewstriks/CERMS",
+  "privateEvidenceExcludedFromIssues": true,
+  "noProductionTestIssuesEmailsOrWrites": true,
+  "sources": {
+    "functions/bug-report.mjs": "97013be49f4dadb429c9d826bff8d4841926381caef65978e06a8f8e29a7fd40",
+    "functions/support-email.mjs": "8696d6f20ba0fd269f60e088692d0a0ab5cb35b0ab768b253569392b08349a1b",
+    "functions/github-issues.mjs": "18d5ca67570b5fc4237cdc461cfcc404846bcd5285e3cb2be6a9846eda0cb3e4",
+    "functions/index.mjs": "db8753651ccb6f5f3330e1b8d8156702294be0bab11b01d731ec2e8ab9b1baab",
+    "src/shared/support-files.ts": "443ad0bb9ee57f6f24599228b00c10a6e528da4cc25080630baf3298b0878c5c"
+  }
+}

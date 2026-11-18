@@ -2,7 +2,7 @@ const { build } = require('./package.json')
 const { version } = require('./package.json')
 const { loadReleaseNotes } = require('./scripts/changelog.cjs')
 const releaseNotes = loadReleaseNotes(version)
-const { windowsFeed } = require('./config/desktop-releases.json')
+const { windowsFeed, macosFeed } = require('./config/desktop-releases.json')
 const slug = process.env.CERMS_RELEASE_REPOSITORY || 'matthewstriks/CERMS-5'
 if (!/^[a-zA-Z0-9-]+\/[a-zA-Z0-9_.-]+$/.test(slug))
   throw new Error('Set CERMS_RELEASE_REPOSITORY to owner/repository.')
@@ -21,17 +21,16 @@ module.exports = {
   artifactName: 'CERMS-5-${version}-${os}-${arch}.${ext}',
   releaseInfo: { releaseName: `CERMS ${version}`, releaseNotes },
   electronUpdaterCompatibility: '>=6.8.12',
-  publish:
-    platform === 'windows'
-      ? [
-          {
-            provider: 'generic',
-            url: windowsFeed,
-            channel: version.split('-')[1]?.split('.')[0] || 'latest',
-            useMultipleRangeRequest: false,
-          },
-        ]
-      : [{ provider: 'github', owner, repo, private: false, releaseType: 'draft' }],
+  publish: ['windows', 'macos'].includes(platform)
+    ? [
+        {
+          provider: 'generic',
+          url: platform === 'macos' ? macosFeed : windowsFeed,
+          channel: version.split('-')[1]?.split('.')[0] || 'latest',
+          useMultipleRangeRequest: false,
+        },
+      ]
+    : [{ provider: 'github', owner, repo, private: false, releaseType: 'draft' }],
   extraMetadata: {
     cermsRelease: { updatesEnabled: release && (platform !== 'macos' || signedMac), releaseNotes },
   },
@@ -45,7 +44,26 @@ module.exports = {
     ...(!signedMac ? { identity: null } : {}),
     notarize: signedMac,
   },
+  dmg: {
+    ...build.dmg,
+    background: 'resources/installer/mac-background.tiff',
+    icon: 'resources/branding/icon.icns',
+    title: 'CERMS ${version}',
+    iconSize: 96,
+    iconTextSize: 13,
+    window: { width: 720, height: 460 },
+    contents: [
+      { x: 205, y: 250, type: 'file' },
+      { x: 515, y: 250, type: 'link', path: '/Applications' },
+    ],
+  },
   nsis: {
+    installerIcon: 'resources/branding/icon.ico',
+    uninstallerIcon: 'resources/branding/icon.ico',
+    installerHeader: 'resources/installer/windows-header.bmp',
+    installerSidebar: 'resources/installer/windows-sidebar.bmp',
+    uninstallerSidebar: 'resources/installer/windows-sidebar.bmp',
+    include: 'resources/installer/installer.nsh',
     oneClick: false,
     perMachine: false,
     allowToChangeInstallationDirectory: true,

@@ -149,3 +149,27 @@ it('cancels pending preview playback when the account changes or sounds are disa
   expect(f.oscillators).toHaveLength(0)
   audio.dispose()
 })
+
+it('uses a distinct descending error tone and prioritizes an error over a recent normal notification', async () => {
+  const f = fakeAudio()
+  let now = 0
+  const audio = createNotificationAudio(
+    () => f.context as unknown as AudioContext,
+    () => now,
+  )
+  expect(await audio.play(50)).toBe(true)
+  now = 100
+  expect(await audio.play(50, false, 'error')).toBe(true)
+  expect(f.oscillators.slice(2).map((o) => o.frequency.value)).toEqual([440, 294])
+  expect(f.oscillators.slice(2).map((o) => o.type)).toEqual(['triangle', 'triangle'])
+  expect(f.oscillators[0].stop).toHaveBeenCalledWith()
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0375, 1.02)
+  expect(await audio.play(50, false, 'error')).toBe(false)
+  expect(await audio.play(50, false, 'message')).toBe(false)
+  expect(await audio.play(0, true, 'error')).toBe(false)
+  expect(await audio.play(25, true, 'error')).toBe(true)
+  now = 1000
+  expect(await audio.play(50, false, 'message')).toBe(true)
+  expect(f.oscillators.slice(-2).map((o) => o.frequency.value)).toEqual([660, 880])
+  audio.dispose()
+})

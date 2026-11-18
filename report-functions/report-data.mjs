@@ -140,7 +140,7 @@ export function summarize(data) {
       tax: 0,
       ...Object.fromEntries(Object.keys(methods).map((key) => [key, 0])),
     }
-    cashier.orders++
+    if (sale.kind !== 'refund') cashier.orders++
     cashier.total += sale.totalCents
     cashier.tax += sale.taxCents
     let receiptPayments = 0
@@ -166,7 +166,7 @@ export function summarize(data) {
         sale.registerId,
         sale.cashierName || sale.cashierUid,
         methods[p.method],
-        p.direction === 'out' ? 'Payout' : 'Received',
+        p.direction === 'out' ? (sale.kind === 'refund' ? 'Refund' : 'Payout') : 'Received',
         amount / 100,
         p.method === 'cash' && p.direction === 'in' ? p.receivedCents / 100 : null,
         p.method === 'cash' && p.direction === 'in' ? p.changeCents / 100 : null,
@@ -188,7 +188,7 @@ export function summarize(data) {
         notes.add(
           'Older receipt categories use the current product category when available. Deleted/unavailable categories are labeled explicitly.',
         )
-      const qty = line.quantity * (line.payout ? -1 : 1)
+      const qty = line.quantity * (line.payout || sale.kind === 'refund' ? -1 : 1)
       const product = productSales.get(line.productId) ?? {
         id: line.productId,
         name: line.name,
@@ -200,14 +200,15 @@ export function summarize(data) {
         waivedUnits: 0,
         waivedValue: 0,
       }
-      product[line.payout ? 'payouts' : 'sold'] += line.quantity
+      product[line.payout ? 'payouts' : 'sold'] += line.quantity * (sale.kind === 'refund' ? -1 : 1)
       product.subtotal += cents(line.subtotalCents)
       product.tax += cents(line.taxCents)
       product.total += cents(line.totalCents)
-      const waivedValue = line.waived
-        ? Math.abs(line.quantity * line.unitPriceCents * (line.payout ? -1 : 1))
-        : 0
-      if (line.waived) {
+      const waivedValue =
+        line.waived && sale.kind !== 'refund'
+          ? Math.abs(line.quantity * line.unitPriceCents * (line.payout ? -1 : 1))
+          : 0
+      if (line.waived && sale.kind !== 'refund') {
         waivedUnits += line.quantity
         waivedTotal += waivedValue
         product.waivedUnits += line.quantity
@@ -229,14 +230,23 @@ export function summarize(data) {
         line.productId,
         line.name,
         category,
-        line.membership ? 'Membership' : line.rental ? 'Rental' : line.payout ? 'Payout' : 'Retail',
+        sale.kind === 'refund'
+          ? 'Refund'
+          : line.membership
+            ? 'Membership'
+            : line.rental
+              ? 'Rental'
+              : line.payout
+                ? 'Payout'
+                : 'Retail',
         line.quantity,
         line.unitPriceCents / 100,
         line.subtotalCents / 100,
         line.taxCents / 100,
         line.totalCents / 100,
-        line.waived === true ? 'Yes' : 'No',
+        line.waived === true && sale.kind !== 'refund' ? 'Yes' : 'No',
         waivedValue / 100,
+        (line.discountCents ?? 0) / 100,
       ])
     }
     const recipient = (id) =>
@@ -269,6 +279,17 @@ export function summarize(data) {
     }
   }
   return {
+    discounts: sales.reduce((sum, s) => cents(sum + cents(s.discountCents ?? 0)), 0),
+    completedOrders: sales.filter((s) => s.kind !== 'refund').length,
+    refundCount: sales.filter((s) => s.kind === 'refund').length,
+    refundCents: -sum(
+      sales.filter((s) => s.kind === 'refund'),
+      'totalCents',
+    ),
+    refundTaxCents: -sum(
+      sales.filter((s) => s.kind === 'refund'),
+      'taxCents',
+    ),
     total: sum(sales, 'totalCents'),
     subtotal: sum(sales, 'subtotalCents'),
     tax: sum(sales, 'taxCents'),

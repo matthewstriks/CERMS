@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { createPos } from '../../../../data/firebase-pos'
 import type { MembershipReader } from '../../../../data/membership-contracts'
 import { money } from '../../lib/data'
+import { isPosRequest, posEndpoints } from '../../../../shared/pos-policy'
+
+interface PendingDrop {
+  requestId: string
+  registerId: string
+  business: string
+  amountCents: number
+  note: string
+}
 
 export default function CashDropDialog({
   reader,
@@ -16,8 +25,23 @@ export default function CashDropDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const requestId = useRef(crypto.randomUUID())
-  const [amount, setAmount] = useState('')
-  const [note, setNote] = useState('')
+  const key = `cerms.cash-drop.v1.${reader.uid}.${reader.club}.${registerId}`
+  const [pending, setPending] = useState<PendingDrop | null>(() => {
+    try {
+      const data = JSON.parse(localStorage.getItem(key) || 'null') as PendingDrop | null
+      return data?.business === reader.club &&
+        data.registerId === registerId &&
+        isPosRequest(posEndpoints.cashDrop, JSON.stringify({ data }))
+        ? data
+        : null
+    } catch {
+      return null
+    }
+  })
+  const [amount, setAmount] = useState(() =>
+    pending ? (pending.amountCents / 100).toFixed(2) : '',
+  )
+  const [note, setNote] = useState(() => pending?.note ?? '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   useEffect(() => {
@@ -48,14 +72,29 @@ export default function CashDropDialog({
           setBusy(true)
           setError('')
           try {
-            await createPos(reader).cashDrop({
+            const request = pending ?? {
               requestId: requestId.current,
               registerId,
+              business: reader.club,
               amountCents: cents,
               note: note.trim(),
-            })
+            }
+            // Persist before submission: navigation/restart must retrieve the same result.
+            localStorage.setItem(key, JSON.stringify(request))
+            setPending(request)
+            await createPos(reader).cashDrop(request)
+            localStorage.removeItem(key)
             onSaved()
           } catch (failure) {
+            if (
+              failure &&
+              typeof failure === 'object' &&
+              'definitive' in failure &&
+              failure.definitive === true
+            ) {
+              localStorage.removeItem(key)
+              setPending(null)
+            }
             setError(failure instanceof Error ? failure.message : 'Cash drop was not confirmed.')
           } finally {
             setBusy(false)
@@ -70,6 +109,7 @@ export default function CashDropDialog({
               inputMode="decimal"
               placeholder="0.00"
               value={amount}
+              readOnly={!!pending}
               onChange={(event) => setAmount(event.target.value)}
             />
           </label>
@@ -81,6 +121,7 @@ export default function CashDropDialog({
             <textarea
               maxLength={500}
               value={note}
+              readOnly={!!pending}
               onChange={(event) => setNote(event.target.value)}
             />
           </label>
@@ -94,7 +135,7 @@ export default function CashDropDialog({
               Cancel
             </button>
             <button className="primary" type="submit">
-              {busy ? 'Saving…' : 'Record cash drop'}
+              {busy ? 'Saving…' : pending ? 'Retry same cash drop' : 'Record cash drop'}
             </button>
           </div>
         </fieldset>

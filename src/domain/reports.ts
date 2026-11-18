@@ -94,7 +94,11 @@ export function summarizeSales(rows: SaleReceipt[], range: ReportRange) {
   const selected = rows.filter((r) => inPeriod(r.createdAt, range.start, range.end))
   const prior = rows.filter((r) => inPeriod(r.createdAt, range.previousStart, range.start))
   const totals = (sales: SaleReceipt[]) => ({
-    orders: sales.length,
+    orders: sales.filter((s) => s.kind !== 'refund').length,
+    discounts: sum(sales.map((s) => s.discountCents ?? 0)),
+    refunds: sales.filter((s) => s.kind === 'refund').length,
+    refunded: -sum(sales.filter((s) => s.kind === 'refund').map((s) => s.totalCents)),
+    refundedTax: -sum(sales.filter((s) => s.kind === 'refund').map((s) => s.taxCents)),
     net: sum(sales.map((s) => s.subtotalCents)),
     tax: sum(sales.map((s) => s.taxCents)),
     collected: sum(sales.map((s) => s.totalCents)),
@@ -148,7 +152,7 @@ export function summarizeSales(rows: SaleReceipt[], range: ReportRange) {
     const day = days.get(reportDate(sale.createdAt))!
     day.net = sum([day.net, sale.subtotalCents])
     day.collected = sum([day.collected, sale.totalCents])
-    day.orders++
+    if (sale.kind !== 'refund') day.orders++
     const staff = cashiers.get(sale.cashierUid) ?? {
       id: sale.cashierUid,
       name: sale.cashierName || sale.cashierUid,
@@ -159,7 +163,7 @@ export function summarizeSales(rows: SaleReceipt[], range: ReportRange) {
       tax: 0,
       collected: 0,
     }
-    staff.orders++
+    if (sale.kind !== 'refund') staff.orders++
     staff.net = sum([staff.net, sale.subtotalCents])
     staff.tax = sum([staff.tax, sale.taxCents])
     staff.collected = sum([staff.collected, sale.totalCents])
@@ -185,11 +189,12 @@ export function summarizeSales(rows: SaleReceipt[], range: ReportRange) {
         tax: 0,
         collected: 0,
       }
-      p.units += line.quantity
+      p.units += line.quantity * (sale.kind === 'refund' ? -1 : 1)
       p.net = sum([p.net, line.subtotalCents])
       p.tax = sum([p.tax, line.taxCents])
       p.collected = sum([p.collected, line.totalCents])
       products.set(id, p)
+      if (sale.kind === 'refund') continue
       if (line.payout) payouts = sum([payouts, -line.subtotalCents])
       else gross = sum([gross, line.subtotalCents])
     }

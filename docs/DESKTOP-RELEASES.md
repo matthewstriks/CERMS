@@ -1,9 +1,11 @@
 # Desktop installers and updates
 
-Windows alpha updates are distributed from the isolated Cloud Storage bucket
+Windows and Mac alpha downloads are distributed from the isolated Cloud Storage bucket
 `cerms-7af24-cerms5-releases` in the Firebase project. GitHub is not required to
 publish an alpha. The client installs the Firebase-enabled Windows alpha once,
-then receives newer published versions through `electron-updater`.
+then receives newer published versions through `electron-updater`. Signed Mac
+installations use the separate Mac feed. Apple signing is not configured yet,
+so current Mac packaging produces manual-install downloads with updates disabled.
 
 ## Send the first installer
 
@@ -25,24 +27,47 @@ From this project folder, with the Firebase CLI logged into the publishing accou
 npm run release:alpha
 ```
 
-This increments `5.0.0-alpha.1` to `5.0.0-alpha.2` (and so on), synchronizes the
-lockfile, runs client checks and publisher tests, builds a Windows x64 installer,
-verifies the packaged feed and enabled updater, uploads immutable version files,
-verifies their public download hashes, then updates `windows/alpha.yml` last.
-The command prints the installer link. It does not create a Git commit/tag, push
-source, or publish to GitHub. Commit source and version changes using your usual
-workflow.
+Run this on **macOS**. It increments the alpha version once, synchronizes the
+lockfile, prepares the changelog, builds the desktop once, then packages Windows
+x64 NSIS and a universal Mac DMG plus ZIP (Intel and Apple Silicon). Release-time
+validation checks the actual packaged feeds, release notes and artifact hashes.
+It does not run the broad client test suite. All immutable Windows and Mac files
+are publicly hash-verified before either update feed is advanced. The command
+prints both download links. It does not create a Git commit/tag, push source or
+publish to GitHub.
 
-If the build/upload fails, the version remains incremented. Retry that same version
-with `npm run release:win`; use `npm run release:upload` to retry just the upload of
-an already-built version. Identical uploads can be retried; different bytes cannot
-replace an existing version. After a successful publication, use `release:alpha`
-for the next update. Never reuse an announced version number.
+When no Apple credentials are configured, Mac packaging is explicitly unsigned:
+its DMG/ZIP are uploaded, but its automatic updater stays disabled and no mutable
+Mac channel announcement is published. A manual build can never replace a signed
+Mac update announcement. With complete signing/notarization credentials, the same
+command enables Mac automatic updates, verifies the Developer ID signature and
+stapled notarization ticket, then announces the Mac ZIP in `macos/alpha-mac.yml`.
+Partial Apple setup stops the command before changing the version.
 
-The release command works on the current Mac using electron-builder's Windows
-cross-build tooling, or on Windows with Node and the Firebase CLI installed.
-Publishing credentials stay in the local CLI login; they are never in the app.
-If the login expires, run `firebase login --reauth` and retry.
+If a build fails after incrementing, use `npm run release:desktop` to retry the
+same version for both platforms. Use `npm run release:upload` to retry only the
+upload of already-built artifacts. An interrupted announcement may leave one
+platform advanced; retry the exact existing artifacts to finish the other feed.
+Publication across the two channel objects is not atomic. Identical uploads are
+safe; changed bytes cannot replace a version. Rebuilding already-uploaded signed
+artifacts may change their bytes, so prefer the upload-only retry. After success,
+use `release:alpha` for the next version.
+
+`npm run release:win` remains a Windows-only current-version release/retry,
+usable on Windows or macOS. `npm run release:upload:win` retries its upload only.
+The combined command rejects non-macOS hosts before any version change because
+Mac signing/packaging requires macOS. Publishing uses the existing local Firebase
+CLI login, never a credential embedded in an installer. If that login expires,
+run `firebase login --reauth` and retry.
+
+The printed Mac link has this form (substitute the newly published version):
+
+```text
+https://storage.googleapis.com/cerms-7af24-cerms5-releases/macos/CERMS-5-VERSION-mac-universal.dmg
+```
+
+This change has not published a Mac download or incremented the version. Only run
+the release command when the user explicitly requests a release.
 
 ## Edit the changelog and publish
 
@@ -61,7 +86,8 @@ Headings, paragraphs, bullets, numbered lists and fenced code blocks display in
 the app. Notes are public release information and are rendered as inert text;
 HTML and external links are not executed or loaded.
 
-`release:win` resumes the current version using its recorded notes; it preserves
+`release:desktop` resumes both platforms for the current version (`release:win`
+resumes Windows only) using recorded notes; it preserves
 any new Unreleased draft. `release:upload` retries an already-built upload and
 uses the notes captured in those built artifacts. To publish changed notes,
 create a new version. Published installers and version manifests remain
@@ -127,25 +153,60 @@ before/after compatibility evidence is in `docs/DESKTOP-FIREBASE-DEPLOYMENT.json
 No fake production release, test sale, business record, image or account is created
 for updater tests.
 
-## Mac and CI
+## Mac signing and CI
 
-Mac previews remain unsigned and require manual DMG installation. Mac auto-updates
-are disabled until Apple signing/notarization is configured, and moving Mac to a
-Firebase feed is outside this Windows alpha setup. The first signed Mac build must
-be installed manually. Subsequent signed releases can then auto-update.
+The initial signed `5.0.0-alpha.10` attempt failed before publication because
+electron-builder 26.15.3 used the certificate import password to unlock its
+temporary keychain. The build dependency is now pinned to 26.16.1, which passes
+the correct keychain password. The release runner also removes Mac `CSC_*` and
+`APPLE_*` credentials from the Windows child process, preserving only explicit
+`WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` Windows signing inputs. Resume the current
+version with `npm run release:desktop` from the terminal containing the credentials;
+do not use `release:alpha` to retry a failed build. No retry/build/publication was
+performed as part of this fix. Actual signing/notarization still needs the retry.
 
-The existing GitHub Actions workflow still builds Windows and universal Mac
-artifacts on tags/manual requests, but no longer publishes GitHub Releases.
-Windows artifacts embed the Firebase feed. Local `dist`/`package` commands never
-publish, and previews do not enable updates by default. `release:win` explicitly
-enables the Windows updater. No GitHub credentials or public source repo are
-needed for this local alpha publishing flow.
+Mac downloads now embed the fixed generic Firebase feed from
+`config/desktop-releases.json`, separate from the Windows feed. Signed alpha
+installations read `macos/alpha-mac.yml`; stable installations read
+`macos/latest-mac.yml`. The ZIP is required by the Mac updater; the DMG is the
+human download. Preserve both artifacts and their blockmaps. Unsigned builds do
+not announce updates. The first signed Mac build must be installed manually into
+Applications and launched there; subsequent signed releases can auto-update.
+Older GitHub-feed previews also need that first Firebase-feed installation.
 
-Optional Mac signing requires `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
-`APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`, plus
-`CERMS_MAC_SIGNED_RELEASE=1` in a release build. Windows certificates can use
-`WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`. No signature verification bypass is
-added. Never embed certificates, private keys or tokens in source or binaries.
+**Apple setup is currently missing.** Before automatic Mac updates can activate:
+
+1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/).
+2. Create a [Developer ID Application certificate](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)
+   and export it with its private key as a password-protected `.p12`. Keep it
+   outside the repository.
+3. Configure the release terminal through a private environment/secret manager:
+   `CSC_LINK` (certificate path), `CSC_KEY_PASSWORD` (export password), `APPLE_ID`,
+   `APPLE_APP_SPECIFIC_PASSWORD` (not your normal Apple password), and
+   `APPLE_TEAM_ID`. Never paste passwords into chat or commit them. Complete
+   credentials automatically select signed mode for `release:alpha` and
+   `release:desktop`; a partial configuration fails instead of silently producing
+   an unsigned release.
+4. Install Apple's command-line tools for signing/notarization (`xcode-select --install`
+   if needed). The first signed release must be validated on a real Mac before
+   claiming end-to-end update installation works.
+
+Direct electron-builder/CI builds still require `CERMS_MAC_SIGNED_RELEASE=1` and
+`CERMS_RELEASE_BUILD=1` to enable the signed updater. Windows certificates can
+use `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`. Keep the same application identity
+and signing team across updates. Never add a signature-verification bypass.
+
+The GitHub Actions workflow remains build-only on tags/manual requests. It builds
+Windows and universal Mac artifacts with Firebase feeds; it does not publish them.
+Local `dist`/`package` commands also never publish, and preview builds do not
+enable automatic updates by default.
+
+Focused validation for this change:
+`node --test scripts/release.test.mjs scripts/firebase-release.test.mjs`.
+The tests use synthetic ASAR packages and in-memory Storage, with mocked signing
+verification. No real installer was built, Apple submission made, release uploaded,
+version changed or Firebase configuration modified. Actual signed N-to-N+1 Mac
+installation remains unverified until Apple credentials and signed builds exist.
 
 ## Validation
 
@@ -166,3 +227,15 @@ covered versioned note snapshots, changed-note publication refusal, packaged/fee
 mismatches, safe rendering, missing notes and preserved explicit installation.
 This implementation leaves the version at `5.0.0-alpha.3` and the new notes in
 Unreleased, ready for developer review before the next release command.
+
+## Installation confirmations — November 17, 2026
+
+Installed builds notify `matthew@rocmtssolutions.com` on the first successful CERMS sign-in for each installation/version. A downloaded update does not qualify: the main process reports `app.getVersion()` from the running installed app. The first user to sign in supplies the verified actor identity; later logins, including different users on that same installation/version, do not resend. Each computer/user installation has its own random ID, persisted in `installation-tracking.json` under the CERMS 5 app-data directory. The file survives ordinary upgrades and retained-data reinstalls; clearing the app data creates a new installation identity. No hardware serial, MAC, password or authentication token is stored in that file. Computer name, platform, process architecture and OS release come from the main process. Development runs are disabled.
+
+The first tracked version generates an installation confirmation with no invented previous version. Later changes include the previous tracked version. The client saves the identity before reporting, uses exclusive initial file creation and atomic updates, and deduplicates concurrent requests. Short transient retries reuse the same identity/version; unresolved delivery retries on a later sign-in. A corrupt identity is not silently reset.
+
+The authenticated `reportInstallation` callable derives the user from Auth and the existing named-cerms profile/business. It sends only to the fixed owner address and writes only `installationUpdates/{sha256(installationId:version)}` in named `cerms`. This audit is server-only under the existing default-deny rules. A transaction claims each event once, retains its first actor/device, and suppresses duplicate email across callers and lost responses. Uncertain SMTP acceptance is retained for review rather than automatically resent. These messages confirm a reported installed running version; they are not hardware attestation.
+
+Notification failure never fails sign-in. There are no user/profile version writes, Auth changes, business-record writes, Storage uploads, legacy mail-extension actions or project-wide Auth triggers. The callable uses the existing isolated support mail identity/secret. Deploy only `functions:cerms-staff:reportInstallation` with `firebase.installation.json`; its predeploy command builds the small shared payload validator. Rules, indexes, other functions, schedules, buckets and IAM/secret settings stay unchanged. Evidence: `INSTALLATION-DEPLOYMENT.json`.
+
+Focused checks: `npx vitest run tests/installation-reporting.test.ts`, `node --test functions/installation.test.mjs`, and `node scripts/pos-smoke.mjs --installation-report`. They use memory/synthetic profiles and intercepted mail/network only; no real test notification is sent. Desktop compilation is performed once and reused for packaging.

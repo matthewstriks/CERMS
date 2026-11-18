@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CERMS installer design previews</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 44px;
+      background: #e6ece4;
+      color: #193c2d;
+      font:
+        15px Arial,
+        sans-serif;
+    }
+    h1 {
+      font-size: 27px;
+      margin: 0 0 8px;
+    }
+    body > p {
+      margin: 0 0 30px;
+      color: #52694f;
+    }
+    .previews {
+      display: flex;
+      align-items: flex-start;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+    h2 {
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin: 0 0 14px;
+    }
+    .frame {
+      overflow: hidden;
+      box-shadow: 0 14px 40px #193c2d26;
+      border: 1px solid #c4d1c0;
+    }
+    .titlebar {
+      height: 31px;
+      background: #fafbf9;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 12px;
+      font-size: 11px;
+      color: #4e604b;
+    }
+    .titlebar img {
+      width: 16px;
+      height: 16px;
+    }
+    .windows {
+      width: 540px;
+      border-radius: 8px;
+    }
+    .wizard {
+      display: flex;
+      background: white;
+      height: 314px;
+    }
+    .sidebar {
+      width: 164px;
+      height: 314px;
+    }
+    .copy {
+      padding: 30px 29px;
+      width: 376px;
+      color: #193c2d;
+    }
+    .copy h3 {
+      font-size: 24px;
+      line-height: 1.25;
+      margin: 0 0 29px;
+    }
+    .copy p {
+      font-size: 13px;
+      line-height: 1.65;
+      margin: 0 0 20px;
+    }
+    .actions {
+      height: 53px;
+      background: #f6f7f5;
+      border-top: 1px solid #e3e7e0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 9px;
+      padding: 0 17px;
+    }
+    .credit {
+      margin-right: auto;
+      font-size: 10px;
+      color: #788173;
+    }
+    button {
+      border: 1px solid #b9c4b5;
+      background: white;
+      border-radius: 3px;
+      font: 12px Arial;
+      padding: 6px 18px;
+      color: #193c2d;
+    }
+    button.next {
+      border: 2px solid #427955;
+      padding: 5px 17px;
+    }
+    .mac {
+      width: 720px;
+      border-radius: 10px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 100%;
+      background: #ff6058;
+    }
+    .dot:nth-child(2) {
+      background: #ffbd2e;
+    }
+    .dot:nth-child(3) {
+      background: #28c840;
+    }
+    .mac-title {
+      margin-left: 239px;
+    }
+    .dmg {
+      position: relative;
+      width: 720px;
+      height: 460px;
+      background: url(mac-background@2x.png) center/720px 460px;
+    }
+    .app,
+    .folder {
+      position: absolute;
+      top: 202px;
+      width: 96px;
+      height: 96px;
+    }
+    .app {
+      left: 157px;
+    }
+    .folder {
+      left: 467px;
+    }
+    .label {
+      position: absolute;
+      top: 308px;
+      width: 164px;
+      text-align: center;
+      font-size: 13px;
+      color: #1f2e1f;
+    }
+    .app-label {
+      left: 123px;
+    }
+    .folder-label {
+      left: 433px;
+    }
+    .note {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #647360;
+    }
+  </style>
+  <h1>A warmer welcome to CERMS.</h1>
+  <p>Matching forest-green artwork. Clear, simple setup.</p>
+  <div class="previews">
+    <section>
+      <h2>Windows · setup wizard</h2>
+      <div class="frame windows">
+        <div class="titlebar"><img src="../branding/cerms-logo.png" alt="" />CERMS 5 Setup</div>
+        <div class="wizard">
+          <img class="sidebar" src="windows-sidebar.png" alt="CERMS branding" />
+          <div class="copy">
+            <h3>Welcome to CERMS</h3>
+            <p>Your club. Connected.</p>
+            <p>Set up CERMS on this computer, then sign in to get started.</p>
+            <p>Click Next to continue.</p>
+          </div>
+        </div>
+        <div class="actions">
+          <span class="credit">RocMTSSolutions</span><button class="next">Next &gt;</button
+          ><button>Cancel</button>
+        </div>
+      </div>
+    </section>
+    <section>
+      <h2>Mac · drag to Applications</h2>
+      <div class="frame mac">
+        <div class="titlebar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span
+          ><span class="mac-title">CERMS</span>
+        </div>
+        <div class="dmg">
+          <img class="app" src="../branding/cerms-logo.png" alt="CERMS app" /><svg
+            class="folder"
+            viewBox="0 0 96 96"
+            aria-label="Applications folder"
+          >
+            <defs>
+              <linearGradient id="folder" x2="0" y2="1">
+                <stop stop-color="#86ccf5" />
+                <stop offset="1" stop-color="#4b9edc" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M8 25Q8 19 14 19H37L44 26H82Q88 26 88 32V77Q88 82 82 82H14Q8 82 8 76Z"
+              fill="#4e9fd8"
+            />
+            <rect x="8" y="32" width="80" height="50" rx="6" fill="url(#folder)" stroke="#388bc4" />
+            <g fill="none" stroke="#bde8ff" stroke-width="5" stroke-linecap="round">
+              <path d="m37 69 17-29m6 29L43 40M31 60h34" />
+            </g></svg
+          ><span class="label app-label">CERMS 5</span
+          ><span class="label folder-label">Applications</span>
+        </div>
+      </div>
+    </section>
+  </div>
+  <p class="note">
+    Design previews. Windows controls and the Mac Applications icon follow the installed operating
+    system.
+  </p>
+</html>

@@ -179,3 +179,116 @@ pre {
     flex-direction: column;
   }
 }
+
+.ai-support {
+  padding: 20px;
+  margin-bottom: 26px;
+  border: 1px solid #cbded1;
+  border-radius: 12px;
+  background: #fff;
+}
+.ai-support .section-heading {
+  margin-bottom: 14px;
+}
+.ai-support .button-row {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.ai-status {
+  font-weight: 650;
+  color: #285b43;
+}
+.ai-setup {
+  padding: 16px;
+  background: #f1f6f2;
+  border-radius: 8px;
+}
+.ai-small,
+.ai-ticket-attachment p {
+  font-size: 0.8rem;
+  margin: 12px 0 0;
+}
+.ai-conversation {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+.ai-turn {
+  padding: 14px;
+  border-radius: 8px;
+  background: #f2f6f3;
+  overflow-wrap: anywhere;
+}
+.ai-user {
+  background: #eef1f6;
+}
+.ai-text {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.ai-source {
+  margin-top: 12px;
+  border-top: 1px solid #d7e2da;
+  padding-top: 10px;
+}
+.ai-source summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #285b43;
+}
+.ai-source p {
+  line-height: 1.6;
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+}
+.ai-question {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.ai-download {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.ai-download progress {
+  width: 100%;
+  accent-color: #2f7258;
+}
+.ai-download span {
+  font-size: 0.85rem;
+}
+.ai-checkbox {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.ai-checkbox input {
+  width: auto;
+}
+.ai-ticket-attachment {
+  padding: 16px;
+  border: 1px solid #d7e2da;
+  border-radius: 8px;
+}
+.ai-ticket-attachment details {
+  margin-top: 12px;
+}
+.ai-ticket-attachment pre {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#support-ticket {
+  scroll-margin-top: 20px;
+}
+.ai-email-disclosure {
+  padding: 12px;
+  border-left: 3px solid #2f7258;
+  background: #f1f6f2;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}

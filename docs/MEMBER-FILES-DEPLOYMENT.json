@@ -1,0 +1,31 @@
+{
+  "verifiedAt": "2026-11-18T05:00:00.408Z",
+  "project": "cerms-7af24",
+  "database": "cerms",
+  "function": {
+    "name": "projects/cerms-7af24/locations/us-central1/functions/memberFiles",
+    "state": "ACTIVE",
+    "updateTime": "2026-11-18T04:58:56.505602059Z"
+  },
+  "isolatedPrivateBucket": "cerms-7af24-cerms5-member-files",
+  "uniformAccessAndPublicAccessPrevention": true,
+  "newBucketServiceRoles": [
+    "roles/storage.objectCreator",
+    "roles/storage.objectViewer"
+  ],
+  "existingSigningPolicyUnchanged": true,
+  "allExistingFunctionsUnchanged": true,
+  "allRulesAndIndexesUnchanged": true,
+  "allDatabaseSettingsUnchanged": true,
+  "allExistingBucketsAndIamSecretPoliciesUnchanged": true,
+  "allSchedulesUnchanged": true,
+  "noLegacyDataOrAuthChanges": true,
+  "noProductionTestFilesOrWrites": true,
+  "sources": {
+    "functions/member-files.mjs": "8809ccf2c9d1dd7b926797c62c478e4890e951b33f769a55da8b709e2ab9cf90",
+    "functions/member-files-domain.mjs": "b3d74e3af38b1baa5cc67c6e83c1ae286e7ea6d3266e40a5889371569c819601",
+    "src/shared/member-files-policy.ts": "d2a4814d938f2bf8640bc89daf76855f5ab268a284eb85c81de6329a4526b584",
+    "src/data/firebase-member-files.ts": "c66a5ba9462618ebb8e32935fd7667eed99f360864a37426ab99e2a386c8dcbc",
+    "src/renderer/src/features/members/MemberFiles.tsx": "968b91288ff3208d128b3652fcb59588a724bf2270de3a66e769427223e96fcc"
+  }
+}

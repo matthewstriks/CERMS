@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, useLayoutEffect } from 'react'
+import { createContext, useContext, useRef, useState, useLayoutEffect, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { canSwitchSystems } from '../../../shared/firebase-policy'
 import type { MembershipReader } from '../../../data/membership-contracts'
@@ -14,6 +14,7 @@ interface MembershipSession {
   reader: MembershipReader | null
   connect(email: string, password: string): Promise<void>
   disconnect(): Promise<void>
+  refreshProfile(): Promise<void>
 }
 const Context = createContext<MembershipSession | null>(null)
 export function MembershipSessionProvider({ children }: { children: ReactNode }) {
@@ -26,6 +27,26 @@ export function MembershipSessionProvider({ children }: { children: ReactNode })
   const themeOperation = useRef(false)
   const activeReader = useRef(reader)
   activeReader.current = reader
+  useEffect(() => {
+    let active = true
+    if (!reader) void window.desktop.setAssistantUser(null).catch(() => {})
+    else
+      void import('../../../data/firebase-membership')
+        .then(({ getFirebaseServices }) => {
+          const user = getFirebaseServices().auth.currentUser
+          if (active && user?.uid === reader.uid && user.email)
+            return window.desktop.setAssistantUser({
+              uid: reader.uid,
+              name: reader.staffName,
+              email: user.email,
+              business: reader.club,
+            })
+        })
+        .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [reader])
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
@@ -118,11 +139,27 @@ export function MembershipSessionProvider({ children }: { children: ReactNode })
             setTheme(next.themePreference ?? 'light')
             setThemeError('')
             setReader(next)
+            // The requested installation audit is separate from profile/session writes.
+            void import('../../../data/firebase-installation')
+              .then((module) => module.reportInstallationAfterSignIn(next.uid))
+              .catch(() => {})
           } catch (error) {
             next.close()
             await client.disconnectMembership()
             throw error
           }
+        },
+        async refreshProfile() {
+          if (!reader || operation.current) return
+          const previous = reader
+          const client = await import('../../../data/firebase-membership')
+          const next = await client.loadMembershipSession()
+          if (activeReader.current !== previous) {
+            next.close()
+            return
+          }
+          previous.close()
+          setReader(next)
         },
         async disconnect() {
           if (operation.current) return

@@ -2,7 +2,7 @@ import { requestNotificationSound } from './lib/notification-audio'
 import { hasStaffPermission } from '../../domain/staff-permissions'
 import BrandLogo from './components/BrandLogo'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { Bug, ChevronRight, LogOut, Moon, Sun } from 'lucide-react'
+import { Bug, CircleHelp, ChevronRight, LogOut, Moon, Sun } from 'lucide-react'
 import { modules } from './lib/modules'
 import type { ModuleId } from './lib/modules'
 import { Badge } from './components/ui'
@@ -210,6 +210,32 @@ export default function App() {
           </div>
           <div className="topbar-right">
             <span>CERMS {info.data?.version ?? '…'}</span>
+            <button
+              aria-label="CERMS Assistant"
+              title="CERMS Assistant"
+              disabled={membership.switching}
+              onClick={async () => {
+                if (!membership.reader) return
+                try {
+                  const user = getFirebaseServices().auth.currentUser
+                  if (!user?.email) throw Error('Your signed-in email is unavailable.')
+                  setBugReportError('')
+                  await window.desktop.setAssistantUser({
+                    uid: membership.reader.uid,
+                    name: membership.reader.staffName,
+                    email: user.email,
+                    business: membership.reader.club,
+                  })
+                  await window.desktop.openAssistant()
+                } catch (error) {
+                  setBugReportError(
+                    error instanceof Error ? error.message : 'Unable to open CERMS Assistant.',
+                  )
+                }
+              }}
+            >
+              <CircleHelp size={18} />
+            </button>
             <button
               aria-label="Report a bug"
               title="Report a bug"

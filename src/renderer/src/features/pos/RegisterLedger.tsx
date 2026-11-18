@@ -49,6 +49,14 @@ export default function RegisterLedger({
               <dd>{money(totals.netByMethod[key as keyof typeof paymentMethods] / 100)}</dd>
             </div>
           ))}
+          <dt>Refunds</dt>
+          <dd>{totals.refundCount ?? 0}</dd>
+          <dt>Refunded (including tax)</dt>
+          <dd>{money((totals.refundCents ?? 0) / 100)}</dd>
+          <dt>Tax refunded</dt>
+          <dd>{money((totals.refundTaxCents ?? 0) / 100)}</dd>
+          <dt>Discounts, net of returns</dt>
+          <dd>{money((totals.discountCents ?? 0) / 100)}</dd>
           <dt>Cash received</dt>
           <dd>{money(totals.cashReceivedCents / 100)}</dd>
           <dt>Change given</dt>

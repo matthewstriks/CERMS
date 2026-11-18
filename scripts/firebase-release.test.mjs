@@ -7,6 +7,8 @@ import { join } from 'node:path'
 import asar from '@electron/asar'
 import {
   publishWindows,
+  publishDesktop,
+  macosAssets,
   announcementChannels,
   windowsAssets,
   storageClient,
@@ -175,4 +177,127 @@ test('changelog content is immutable for an announced version and archived when 
   }
   await assert.rejects(publishWindows(missing, store), /Add release notes/)
   assert.equal(store.data.has('windows/releases/5.0.0-alpha.4.yml'), false)
+})
+
+function macFixture(version = '5.0.0-alpha.2', updatesEnabled = true) {
+  const zip = `CERMS-5-${version}-mac-universal.zip`,
+    dmg = `CERMS-5-${version}-mac-universal.dmg`
+  const files = [dmg, zip].flatMap((name) => [
+    { name, bytes: Buffer.from('synthetic ' + name) },
+    { name: name + '.blockmap', bytes: Buffer.from('synthetic blockmap') },
+  ])
+  const zipBytes = files.find((f) => f.name === zip).bytes
+  return {
+    version,
+    updatesEnabled,
+    files,
+    manifest: Buffer.from(
+      JSON.stringify({
+        version,
+        releaseNotes: '### Added\n- Synthetic release notes',
+        path: zip,
+        sha512: digest(zipBytes),
+        files: [zip, dmg].map((name) => {
+          const bytes = files.find((f) => f.name === name).bytes
+          return { url: name, size: bytes.length, sha512: digest(bytes) }
+        }),
+      }),
+    ),
+  }
+}
+test('both platforms stage and verify before feeds advance; unsigned Mac downloads never replace a signed update feed', async () => {
+  const store = memoryStore(),
+    mac = macFixture()
+  const links = await publishDesktop(
+    [
+      { platform: 'windows', assets: fixture() },
+      { platform: 'macos', assets: mac },
+    ],
+    store,
+  )
+  assert.match(links.macos, /macos\/CERMS-5-5.0.0-alpha.2-mac-universal.dmg$/)
+  const announce = store.calls.findIndex((c) => c[0] === 'put' && c[2])
+  assert.equal(store.calls.slice(0, announce).filter((c) => c[0] === 'verify').length, 8)
+  assert.ok(store.data.has('macos/alpha-mac.yml'))
+  assert.ok(!store.data.has('macos/latest-mac.yml'))
+  const original = store.data.get('macos/alpha-mac.yml').bytes
+  await publishDesktop([{ platform: 'macos', assets: macFixture('5.0.0-alpha.3', false) }], store)
+  assert.deepEqual(store.data.get('macos/alpha-mac.yml').bytes, original)
+  assert.ok(store.data.has('macos/CERMS-5-5.0.0-alpha.3-mac-universal.dmg'))
+  const broken = memoryStore()
+  broken.verify = async (name) => {
+    if (name.startsWith('macos/')) throw Error('Mac upload verification failed')
+  }
+  await assert.rejects(
+    publishDesktop(
+      [
+        { platform: 'windows', assets: fixture() },
+        { platform: 'macos', assets: mac },
+      ],
+      broken,
+    ),
+    /Mac upload/,
+  )
+  assert.ok(!broken.data.has('windows/alpha.yml'))
+  assert.ok(!broken.data.has('macos/alpha-mac.yml'))
+})
+test('Mac publisher validates ZIP/DMG hashes, packaged Firebase feed and signing before enabling updates', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cerms-mac-release-'))
+  try {
+    const f = macFixture(),
+      source = join(dir, 'source'),
+      resources = join(dir, 'mac-universal/CERMS 5.app/Contents/Resources')
+    await mkdir(resources, { recursive: true })
+    await mkdir(source)
+    for (const file of f.files) await writeFile(join(dir, file.name), file.bytes)
+    await writeFile(join(dir, 'alpha-mac.yml'), f.manifest)
+    const settings = JSON.parse(
+      await readFile(new URL('../config/desktop-releases.json', import.meta.url)),
+    )
+    await writeFile(
+      join(resources, 'app-update.yml'),
+      JSON.stringify({ provider: 'generic', url: settings.macosFeed, channel: 'alpha' }),
+    )
+    const savePackage = async (enabled) => {
+      await writeFile(
+        join(source, 'package.json'),
+        JSON.stringify({
+          version: f.version,
+          cermsRelease: {
+            updatesEnabled: enabled,
+            releaseNotes: JSON.parse(f.manifest).releaseNotes,
+          },
+        }),
+      )
+      await asar.createPackage(source, join(resources, 'app.asar'))
+    }
+    await savePackage(true)
+    let verified = 0
+    const verifySigning = async () => {
+      verified++
+    }
+    assert.equal((await macosAssets(dir, f.version, { verifySigning })).updatesEnabled, true)
+    assert.equal(verified, 1)
+    await assert.rejects(
+      macosAssets(dir, f.version, {
+        verifySigning: async () => {
+          throw Error('not signed')
+        },
+      }),
+      /not signed/,
+    )
+    await savePackage(false)
+    assert.equal((await macosAssets(dir, f.version, { verifySigning })).updatesEnabled, false)
+    assert.equal(verified, 1)
+    await writeFile(join(dir, f.files[0].name), 'corrupt')
+    await assert.rejects(macosAssets(dir, f.version, { verifySigning }), /hash mismatch/)
+    await writeFile(join(dir, f.files[0].name), f.files[0].bytes)
+    await writeFile(
+      join(resources, 'app-update.yml'),
+      JSON.stringify({ provider: 'generic', url: settings.windowsFeed, channel: 'alpha' }),
+    )
+    await assert.rejects(macosAssets(dir, f.version, { verifySigning }))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })

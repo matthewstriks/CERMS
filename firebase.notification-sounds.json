@@ -2,7 +2,5 @@
   "functions": [
     { "source": "functions", "codebase": "cerms-staff", "ignore": ["node_modules", "*.test.mjs"] }
   ],
-  "firestore": [
-    { "database": "cerms", "rules": "firebase/releases/notification-sounds-2026-11-16.rules" }
-  ]
+  "firestore": [{ "database": "cerms", "rules": "firebase/releases/discounts-2026-11-17.rules" }]
 }

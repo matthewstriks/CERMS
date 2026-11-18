@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="150" height="57" viewBox="0 0 150 57">
+  <path fill="#ffffff" d="M0 0h150v57H0z"/>
+  <image x="7" y="10" width="36" height="36" xlink:href="../branding/cerms-logo.png"/>
+  <text x="52" y="32" fill="#193c2d" font-size="18" font-weight="700" letter-spacing=".8" font-family="Arial, sans-serif">CERMS</text>
+</svg>

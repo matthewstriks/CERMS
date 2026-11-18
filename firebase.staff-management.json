@@ -1,0 +1,13 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "cerms-staff",
+      "ignore": ["node_modules", "*.test.mjs"],
+      "predeploy": ["npm run build:staff-management-domain"]
+    }
+  ],
+  "firestore": [
+    { "database": "cerms", "rules": "firebase/releases/discounts-2026-11-17.rules" }
+  ]
+}

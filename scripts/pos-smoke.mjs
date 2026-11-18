@@ -1,16 +1,30 @@
 import { seedReports, reportQuery } from './fixtures/reports.mjs'
 import { memberNotes } from '../functions/member-notes.mjs'
 import { saveThemePreference } from '../functions/theme.mjs'
+import { sendSaleReceipt } from '../functions/receipt-email.mjs'
 import { _electron as electron, expect } from 'playwright/test'
 import assert from 'node:assert/strict'
 import { readFile, mkdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { getImage } from '../functions/product-images.mjs'
-import { completeSale, savePosSettings, updateRental, checkOutRental } from '../functions/pos.mjs'
+import {
+  completeSale,
+  cashDrop,
+  savePosSettings,
+  updateRental,
+  checkOutRental,
+} from '../functions/pos.mjs'
 import { posFixture, owner as uid, registerId } from './fixtures/pos-server.mjs'
 import { membershipProduct } from './fixtures/catalog.mjs'
 import { emptyCounts } from './fixtures/registers.mjs'
 const reportsSmoke = process.argv.includes('--reports')
+const installationSmoke = process.argv.includes('--installation-report')
+let rejectFirstInstallationLogin = installationSmoke
+const receiptEmailSmoke = process.argv.includes('--receipt-email')
+const receiptEmails = []
+let loseEmailResponse = false
+const updatesSmoke = process.argv.includes('--setup-updates')
+let dropCashResponse = true
 let denyReportSales = false
 const expiredCheckinSmoke = process.argv.includes('--expired-checkin')
 const registerPromptSmoke = process.argv.includes('--register-prompt')
@@ -26,6 +40,7 @@ const membershipSmoke =
   renewalSmoke ||
   notesSmoke ||
   registerPromptSmoke ||
+  receiptEmailSmoke ||
   expiredCheckinSmoke
 const club = membershipSmoke ? 'dev' : 'club-a'
 const fixture = posFixture(),
@@ -60,7 +75,14 @@ if (membershipSmoke) {
     inventory: null,
   })
 }
-if (groupSmoke || renewalSmoke || notesSmoke || registerPromptSmoke || expiredCheckinSmoke) {
+if (
+  groupSmoke ||
+  renewalSmoke ||
+  notesSmoke ||
+  registerPromptSmoke ||
+  expiredCheckinSmoke ||
+  receiptEmailSmoke
+) {
   for (const [id, name, number] of [
     ['buyer', 'Alex Buyer', 101],
     ['friend', 'Casey Friend', 102],
@@ -83,6 +105,7 @@ if (groupSmoke || renewalSmoke || notesSmoke || registerPromptSmoke || expiredCh
       idstate: 'TX',
     })
 }
+if (receiptEmailSmoke) docs.get('members/buyer').email = 'onfile@example.test'
 if (notesSmoke) {
   docs.get('members/buyer').tag = true
   docs.get('members/buyer').notes = ['Original legacy note']
@@ -211,6 +234,14 @@ try {
       respond = (d) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(d) })
     if (url.hostname === 'identitytoolkit.googleapis.com') {
       if (url.pathname.endsWith(':signInWithPassword')) {
+        if (rejectFirstInstallationLogin) {
+          rejectFirstInstallationLogin = false
+          return route.fulfill({
+            status: 400,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 400, message: 'INVALID_LOGIN_CREDENTIALS' } }),
+          })
+        }
         const now = Math.floor(Date.now() / 1000),
           payload = Buffer.from(
             JSON.stringify({
@@ -261,6 +292,48 @@ try {
           result = await completeSale({ auth: { uid }, data }, fixture.deps)
           if (dropFirstResponse) {
             dropFirstResponse = false
+            return route.abort('failed')
+          }
+        } else if (url.pathname === '/sendSaleReceipt') {
+          result = await sendSaleReceipt(
+            { auth: { uid }, data },
+            {
+              ...fixture.deps,
+              db: {
+                ...fixture.deps.db,
+                runTransaction: (fn) =>
+                  fixture.deps.db.runTransaction((tx) =>
+                    fn({
+                      ...tx,
+                      get: async (path) => {
+                        const snapshot = await tx.get(path)
+                        return {
+                          ...snapshot,
+                          data: () => {
+                            const value = snapshot.data()
+                            if (value?.createdAt?.timestampValue)
+                              value.createdAt = new Date(value.createdAt.timestampValue)
+                            return value
+                          },
+                        }
+                      },
+                    }),
+                  ),
+              },
+              send: async (message) => {
+                receiptEmails.push(message)
+                return { accepted: message.to }
+              },
+            },
+          )
+          if (data.action === 'send' && loseEmailResponse) {
+            loseEmailResponse = false
+            return route.abort('failed')
+          }
+        } else if (url.pathname === '/cashDrop') {
+          result = await cashDrop({ auth: { uid }, data }, fixture.deps)
+          if (dropCashResponse) {
+            dropCashResponse = false
             return route.abort('failed')
           }
         } else if (url.pathname === '/saveThemePreference') {
@@ -360,7 +433,8 @@ try {
             .filter((p) =>
               collection === 'members'
                 ? p.startsWith('members/')
-                : p.startsWith(`system/${club}/${collection}/`),
+                : p.startsWith(`system/${club}/${collection}/`) &&
+                  !p.slice(`system/${club}/${collection}/`.length).includes('/'),
             )
             .map((p) => ({ document: document(p) })),
         )
@@ -415,6 +489,11 @@ try {
       ]
       wc.print = (options, callback) => {
         globalThis.receiptPrints.push(options)
+        if (globalThis.failReceiptPrint) {
+          globalThis.failReceiptPrint = false
+          callback(false, 'Synthetic printer offline')
+          return
+        }
         callback(true, '')
       }
     }
@@ -432,6 +511,20 @@ try {
   )
   await page.getByLabel('Email', { exact: true }).fill('matthew@striks.com')
   await page.getByLabel('Password', { exact: true }).fill('synthetic-password')
+  if (installationSmoke) {
+    await app.evaluate(({ ipcMain }) => {
+      globalThis.installationReports = []
+      ipcMain.removeHandler('app:report-installation')
+      ipcMain.handle('app:report-installation', (_event, token) => {
+        globalThis.installationReports.push(token)
+        throw Error('Synthetic mail service unavailable')
+      })
+    })
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await expect(page.getByRole('alert').first()).toBeVisible()
+    assert.equal(await app.evaluate(() => globalThis.installationReports.length), 0)
+    await page.getByLabel('Password', { exact: true }).fill('synthetic-password')
+  }
   await page.evaluate(() => (location.hash = 'registers'))
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Close my register' })).toBeVisible()
@@ -453,7 +546,213 @@ try {
     item.click()
   })
   await expect(page.getByText('Your register is open')).toBeVisible()
-  if (reportsSmoke) {
+  if (installationSmoke) {
+    await expect.poll(() => app.evaluate(() => globalThis.installationReports.length)).toBe(1)
+    assert.equal(await app.evaluate(() => globalThis.installationReports[0].split('.').length), 3)
+    await page.getByRole('link', { name: 'Registers', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Close my register', exact: true })).toBeVisible()
+    assert.equal(await app.evaluate(() => globalThis.installationReports.length), 1)
+    assert.deepEqual(errors, [])
+    console.log(
+      'Installation notification fires only after successful CERMS sign-in; failed sign-in sends nothing and a mail-service failure never blocks the workspace. All network/mail mocked.',
+    )
+  } else if (receiptEmailSmoke) {
+    dropFirstResponse = false
+    async function order(link = true) {
+      await expandCategories(page)
+      await page.locator('.pos-product').filter({ hasText: 'Test retail' }).click()
+      if (link) {
+        await page.getByRole('button', { name: 'Find existing member', exact: true }).click()
+        const picker = page.getByRole('dialog', { name: 'Choose existing member', exact: true })
+        await picker.getByRole('button').filter({ hasText: 'Alex Buyer' }).click()
+      }
+      await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+      const payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+      await payment.getByLabel('Payment amount 1').fill('10.80')
+      await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+      const receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+      await expect(receipt).toBeVisible()
+      if (link)
+        await expect(receipt.getByRole('radio', { name: 'Email', exact: true })).toBeEnabled()
+      return receipt
+    }
+    const prints = () => app.evaluate(() => globalThis.receiptPrints.length)
+    const memberBefore = structuredClone(docs.get('members/buyer'))
+    let receipt = await order()
+    await mkdir('artifacts', { recursive: true })
+    await receipt.screenshot({ path: 'artifacts/receipt-delivery-options.png' })
+    for (const name of ['Print', 'Email', 'Email + print', 'None'])
+      await expect(receipt.getByRole('radio', { name, exact: true })).toBeVisible()
+    await receipt.getByRole('radio', { name: 'None', exact: true }).check()
+    await receipt.getByRole('button', { name: 'Finish without receipt', exact: true }).click()
+    assert.equal(await prints(), 0)
+    assert.equal(receiptEmails.length, 0)
+    receipt = await order()
+    await receipt.getByRole('radio', { name: 'Email', exact: true }).check()
+    await receipt.getByRole('button', { name: 'Review email', exact: true }).click()
+    let confirm = page.getByRole('dialog', { name: 'Confirm receipt email', exact: true })
+    await expect(confirm.getByLabel('Customer email', { exact: true })).toHaveValue(
+      'onfile@example.test',
+    )
+    await confirm.screenshot({ path: 'artifacts/receipt-email-confirmation.png' })
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'dark'
+    })
+    await confirm.screenshot({ path: 'artifacts/receipt-email-confirmation-dark.png' })
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'light'
+    })
+    await confirm.getByRole('button', { name: 'Back', exact: true }).click()
+    assert.equal(receiptEmails.length, 0)
+    await receipt.getByRole('button', { name: 'Review email', exact: true }).click()
+    confirm = page.getByRole('dialog', { name: 'Confirm receipt email', exact: true })
+    await confirm.getByLabel('Customer email', { exact: true }).fill('invalid-address')
+    await confirm.getByRole('button', { name: 'Confirm and send', exact: true }).click()
+    await expect(confirm.getByRole('alert')).toContainText('Enter one valid customer email')
+    assert.equal(receiptEmails.length, 0)
+    await confirm.getByLabel('Customer email', { exact: true }).fill('edited@example.test')
+    loseEmailResponse = true
+    await confirm.getByRole('button', { name: 'Confirm and send', exact: true }).click()
+    await expect(confirm.getByRole('alert')).toBeVisible()
+    await confirm.getByRole('button', { name: 'Confirm and send', exact: true }).click()
+    await expect(confirm.getByRole('status')).toContainText('Receipt email sent.')
+    assert.equal(receiptEmails.length, 1)
+    assert.deepEqual(receiptEmails[0].to, ['edited@example.test'])
+    assert.equal(await prints(), 0)
+    await confirm.getByRole('button', { name: 'Done', exact: true }).click()
+    receipt = await order()
+    await receipt.getByRole('radio', { name: 'Email + print', exact: true }).check()
+    await receipt.getByLabel('Receipt printer', { exact: true }).selectOption('Synthetic RP326')
+    await receipt.getByRole('button', { name: 'Review email', exact: true }).click()
+    confirm = page.getByRole('dialog', { name: 'Confirm receipt email', exact: true })
+    await app.evaluate(() => {
+      globalThis.failReceiptPrint = true
+    })
+    await confirm.getByRole('button', { name: 'Confirm and send', exact: true }).click()
+    await expect(confirm.getByRole('alert')).toContainText('Receipt email sent.')
+    assert.equal(receiptEmails.length, 2)
+    await expect(confirm.getByLabel('Customer email', { exact: true })).toHaveAttribute(
+      'readonly',
+      '',
+    )
+    await confirm.getByRole('button', { name: 'Retry printing', exact: true }).click()
+    await expect(confirm.getByRole('status')).toContainText(
+      'Receipt emailed and sent to the printer.',
+    )
+    assert.equal(receiptEmails.length, 2)
+    assert.equal(await prints(), 2)
+    await confirm.getByRole('button', { name: 'Done', exact: true }).click()
+    receipt = await order()
+    await receipt.getByRole('radio', { name: 'Print', exact: true }).check()
+    await receipt.getByRole('button', { name: 'Print receipt', exact: true }).click()
+    await expect(receipt.getByRole('status')).toContainText('Receipt sent to the printer.')
+    assert.equal(receiptEmails.length, 2)
+    assert.equal(await prints(), 3)
+    await receipt.getByRole('button', { name: 'Done', exact: true }).click()
+    receipt = await order(false)
+    await expect(receipt.getByRole('radio', { name: 'Email', exact: true })).toBeDisabled()
+    await expect(receipt.getByRole('radio', { name: 'Email + print', exact: true })).toBeDisabled()
+    await receipt.getByRole('radio', { name: 'None', exact: true }).check()
+    await receipt.getByRole('button', { name: 'Finish without receipt', exact: true }).click()
+    assert.deepEqual(docs.get('members/buyer'), memberBefore)
+    assert.equal([...docs.keys()].filter((p) => /^system\/dev\/sales\/[^/]+$/.test(p)).length, 5)
+    assert.deepEqual(errors, [])
+    console.log(
+      'Receipt delivery passed all four choices, saved-address confirmation/editing, cancellation, invalid-address denial, lost-response email deduplication, email+print partial-failure recovery and missing-email protection. No real emails or print jobs.',
+    )
+  } else if (updatesSmoke) {
+    dropFirstResponse = false
+    await page.getByRole('link', { name: 'Registers', exact: true }).click()
+    const beforeDrops = fixture.commits()
+    await page.getByRole('button', { name: 'Cash drop', exact: true }).click()
+    let drop = page.getByRole('dialog', { name: 'Cash drop', exact: true })
+    await drop.getByLabel('Cash drop amount').fill('25.00')
+    await drop.getByRole('button', { name: 'Record cash drop', exact: true }).click()
+    await expect(drop.getByRole('button', { name: 'Retry same cash drop' })).toBeVisible()
+    await expect(drop.getByLabel('Cash drop amount')).toHaveAttribute('readonly', '')
+    await drop.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('button', { name: 'Cash drop', exact: true }).click()
+    drop = page.getByRole('dialog', { name: 'Cash drop', exact: true })
+    await expect(drop.getByLabel('Cash drop amount')).toHaveValue('25.00')
+    await drop.getByRole('button', { name: 'Retry same cash drop' }).click()
+    await expect(drop).not.toBeVisible()
+    assert.equal(fixture.commits(), beforeDrops + 1)
+    assert.equal(docs.get(`system/${club}/registerTotals/${registerId}`).expectedCashCents, 7500)
+    await page.getByRole('link', { name: 'Point of sale', exact: true }).click()
+    await expandCategories(page)
+    await page.locator('.pos-product').filter({ hasText: 'Test retail' }).click()
+    await page.getByRole('button', { name: 'Waive Test retail', exact: true }).click()
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    let payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await expect(payment.getByLabel('Payment amount 1')).toHaveCount(0)
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    let receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+    await expect(receipt).toBeVisible()
+    await expect(receipt.locator('pre')).toContainText('WAIVED')
+    assert.equal([...docs].filter(([p]) => p.includes('/sales/')).at(-1)[1].totalCents, 0)
+    await receipt.getByRole('button', { name: 'Done', exact: true }).click()
+    await page.locator('.pos-product').filter({ hasText: 'Test retail' }).click()
+    await page.getByRole('button', { name: 'Take payment', exact: true }).click()
+    payment = page.getByRole('dialog', { name: 'Take payment', exact: true })
+    await payment.getByLabel('Payment amount 1').fill('10.80')
+    await payment.getByRole('button', { name: 'Complete sale', exact: true }).click()
+    receipt = page.getByRole('dialog', { name: 'Sale receipt', exact: true })
+    await expect(receipt).toBeVisible()
+    await receipt.getByRole('button', { name: 'Done', exact: true }).click()
+    const totals = docs.get(`system/${club}/registerTotals/${registerId}`)
+    assert.equal(totals.cashDropCents, 2500)
+    assert.equal(totals.expectedCashCents, 8580)
+    assert.equal(totals.saleCount, 2)
+    await page.getByRole('link', { name: 'Registers', exact: true }).click()
+    await page.getByRole('button', { name: 'Close my register', exact: true }).click()
+    const closing = page.getByRole('dialog', { name: 'Close register', exact: true })
+    await closing.getByLabel('$50 bills', { exact: true }).fill('1')
+    await closing.getByLabel('$20 bills', { exact: true }).fill('1')
+    await closing.getByLabel('$10 bills', { exact: true }).fill('1')
+    await closing.getByLabel('$5 bills', { exact: true }).fill('1')
+    await closing.getByLabel('25¢ coins', { exact: true }).fill('3')
+    await closing.getByLabel('5¢ coins', { exact: true }).fill('1')
+    await closing.getByRole('button', { name: 'Save ending count and close' }).click()
+    const closeout = page.getByRole('dialog', { name: 'Register closeout report' })
+    await expect(closeout.locator('pre')).toContainText('Cash dropped: $25.00')
+    await expect(closeout.locator('pre')).toContainText('OVER / SHORT: $0.00')
+    await closeout.getByRole('button', { name: 'Done', exact: true }).click()
+    // Main-process fetch is mocked separately; no support API, bucket or SMTP is contacted.
+    await app.evaluate(({ net }) => {
+      globalThis.supportRequests = []
+      const localFetch = net.fetch.bind(net)
+      net.fetch = async (url, options) => {
+        if (String(url).startsWith('file:')) return localFetch(url, options)
+        if (url !== 'https://us-central1-cerms-7af24.cloudfunctions.net/submitBugReport')
+          throw Error('Unexpected main fetch')
+        const payload = JSON.parse(options.body).data
+        globalThis.supportRequests.push(payload)
+        return new Response(JSON.stringify({ result: { reportId: payload.requestId } }), {
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+    })
+    const newWindow = app.waitForEvent('window')
+    await page.getByRole('button', { name: 'Report a bug', exact: true }).click()
+    const support = await newWindow
+    await expect(support.getByRole('heading', { name: 'Report a bug', exact: true })).toBeVisible()
+    await support.getByLabel('Subject', { exact: true }).fill('Synthetic support flow')
+    await support.getByLabel('What happened?', { exact: true }).fill('Synthetic reproduction only')
+    await support.getByRole('button', { name: 'Capture screenshot', exact: true }).click()
+    await expect(support.getByRole('img', { name: 'Captured main window 1' })).toBeVisible()
+    await support.getByRole('button', { name: 'Remove screenshot 1' }).click()
+    await support.getByRole('button', { name: 'Capture screenshot', exact: true }).click()
+    await expect(support.getByRole('img', { name: 'Captured main window 1' })).toBeVisible()
+    await support.getByRole('button', { name: 'Send bug report', exact: true }).click()
+    await expect(support.getByRole('heading', { name: 'Report sent', exact: true })).toBeVisible()
+    assert.equal(await app.evaluate(() => globalThis.supportRequests.length), 1)
+    assert.equal(await app.evaluate(() => globalThis.supportRequests[0].screenshots.length), 1)
+    await support.getByRole('button', { name: 'Done', exact: true }).click()
+    assert.deepEqual(errors, [])
+    console.log(
+      'Updates desktop flow passed zero-payment waiver receipts, cash-drop lost-response recovery, later cash sale/closeout reconciliation, and isolated bug-report screenshot/submission. All network, mail and print effects intercepted.',
+    )
+  } else if (reportsSmoke) {
     await page.getByRole('link', { name: 'Reports & analytics', exact: true }).click()
     const reportView = page.getByRole('group', { name: 'Report views', exact: true })
     await expect(reportView).toBeVisible()

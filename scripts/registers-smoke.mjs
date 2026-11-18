@@ -39,6 +39,15 @@ try {
     .route('cerms://app/assets/firebase-admissions-*.js', (route) =>
       route.fulfill({ contentType: 'text/javascript', body: admissions }),
     )
+  const messaging = await readFile(
+    new URL('./fixtures/messaging-module.mjs', import.meta.url),
+    'utf8',
+  )
+  await app
+    .context()
+    .route('cerms://app/assets/firebase-messaging-*.js', (route) =>
+      route.fulfill({ contentType: 'text/javascript', body: messaging }),
+    )
   await app.context().route('https://**/*', async (route) => {
     const request = route.request(),
       url = new URL(request.url())

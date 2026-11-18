@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto'
 export const OWNER = 'c7D7AH07kgXmjn8tSiOgzHscLZ12'
 export const keys = [
+  'manageDiscountCodes',
+  'processRefunds',
+  'editStaffProfiles',
+  'removeStaffAccounts',
   'removeMemberNotes',
   'closeOtherRegisters',
   'deleteProducts',
@@ -44,11 +48,15 @@ export function validateAccount(data, fail) {
     !keys.every(
       (k) =>
         ([
+          'manageDiscountCodes',
+          'processRefunds',
           'processSales',
           'waiveProducts',
           'deleteProducts',
           'closeOtherRegisters',
           'removeMemberNotes',
+          'editStaffProfiles',
+          'removeStaffAccounts',
         ].includes(k) &&
           permissions[k] === undefined) ||
         typeof permissions[k] === 'boolean',
@@ -83,10 +91,14 @@ export async function createAccount(request, { db, auth, timestamp, fail }) {
           Object.entries(d.permissions).filter(
             ([key, value]) =>
               ![
+                'manageDiscountCodes',
+                'processRefunds',
                 'processSales',
                 'deleteProducts',
                 'closeOtherRegisters',
                 'removeMemberNotes',
+                'editStaffProfiles',
+                'removeStaffAccounts',
               ].includes(key) || value,
           ),
         ),
